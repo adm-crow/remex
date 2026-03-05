@@ -205,3 +205,8 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Synapse — ignore user documents and generated DB, keep the folder
+docs/*
+!docs/.gitkeep
+synapse_db/
