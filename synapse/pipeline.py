@@ -19,8 +19,8 @@ def ingest(
     source_dir: str = "./docs",
     db_path: str = "./synapse_db",
     collection_name: str = "synapse",
-    chunk_size: int = 500,
-    overlap: int = 50,
+    chunk_size: int = 1000,
+    overlap: int = 200,
     embedding_model: str = "all-MiniLM-L6-v2",
     verbose: bool = True,
 ) -> None:
