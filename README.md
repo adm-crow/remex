@@ -1,6 +1,8 @@
 <div align="center">
   <img src="logo.svg" alt="Synapse" width="120" /><br/><br/>
 
+# ⚡Synapse
+
 [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
 [![tests](https://img.shields.io/badge/tests-31%20passing-brightgreen?style=flat-square)](tests/)
 [![build](https://img.shields.io/github/actions/workflow/status/adm-crow/synapse/ci.yml?branch=main&style=flat-square&label=build)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
@@ -33,6 +35,10 @@ Your files  ──►  Extractor  ──►  Chunker  ──►  Embedder  ─�
 ```bash
 pip install synapse
 ```
+or
+```bash
+uv add synapse
+```
 
 Includes everything out of the box: `txt`, `md`, `csv`, `pdf`, `docx`, `json`, `jsonl`, embeddings, ChromaDB.
 
@@ -58,7 +64,7 @@ Done. Collection 'synapse' in './synapse_db'
 > All parameters have sensible defaults. `ingest()` with no arguments scans `./docs` and stores everything in `./synapse_db`.
 
 <details>
-<summary>► See all <code>ingest()</code> options</summary>
+<summary>See all <code>ingest()</code> options</summary>
 
 ```python
 ingest(
@@ -113,7 +119,7 @@ print(ask("What is the refund policy?"))
 > Each chunk includes `source` (absolute file path) and `chunk` (index) in its metadata, so your agent always knows where an answer came from.
 
 <details>
-<summary>► Need to run ingest from an async context?</summary>
+<summary>Need to run ingest from an async context?</summary>
 
 ```python
 import asyncio
