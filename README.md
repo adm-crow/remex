@@ -1,110 +1,77 @@
 <div align="center">
-
-<img src="logo.svg" alt="Synapse logo" width="160" /><br/><br/>
-
-# synapse
-
-**Turn your files into answers.**
-
-*Drop documents. Run one function. Let any AI agent query your knowledge.*
-
-<br/>
-
-[![Python](https://img.shields.io/badge/python-3.9%2B-3776ab?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![ChromaDB](https://img.shields.io/badge/vector--db-ChromaDB-FF6719?style=for-the-badge)](https://www.trychroma.com/)
-[![sentence-transformers](https://img.shields.io/badge/embeddings-sentence--transformers-4B8BBE?style=for-the-badge)](https://www.sbert.net/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-22c55e?style=for-the-badge)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-21%20passed-22c55e?style=for-the-badge&logo=pytest&logoColor=white)](tests/)
-
-<br/>
-
+  <img src="logo.svg" alt="Synapse" width="120" /><br/><br/>
 </div>
 
----
-
-## What is Synapse?
-
-Synapse is a **local-first RAG ingestion pipeline** packaged as a minimal Python library.
-
-You drop files into a folder. Synapse extracts the text, splits it into chunks, converts them to vectors using a local embedding model, and stores everything in ChromaDB — on your machine, with zero cloud dependency.
-
-Your AI agent then queries that collection to retrieve relevant context for any question.
+**synapse** is a local-first Python library for building file-based RAG pipelines — drop files into a folder, run the pipeline, and let any AI agent search your knowledge base with vector queries.
 
 ```
-  ./docs/                          ./synapse_db/
-  ├── contract.pdf                 ╔══════════════════════╗
-  ├── faq.txt       ─ ingest() ─►  ║  ChromaDB collection ║
-  └── notes.docx                   ║  vectors + metadata  ║
-                                   ╚══════════════════════╝
-                                            │
-                                            ▼
-                                    🤖 Your AI agent
+Your files  ──►  Extractor  ──►  Chunker  ──►  Embedder  ──►  ChromaDB
 ```
 
----
-
-## ✨ Highlights
-
-| | |
-|---|---|
-| 🏠 **Local first** | No API keys. No cloud. Everything runs on your machine. |
-| ⚡ **One function** | `ingest()` is all you need to go from files to vectors. |
-| 🔁 **Idempotent** | Re-run safely — chunks are updated, never duplicated. |
-| 🤖 **Agent agnostic** | Works with LangChain, LlamaIndex, or any custom agent. |
-| 📁 **Recursive scan** | Automatically picks up files in subdirectories. |
-| 🔌 **Extensible** | Add new file types or swap the embedding model easily. |
+| | Feature | Details |
+|---|---|---|
+| 📄 | **5 formats** | `txt`, `md`, `csv`, `pdf`, `docx` — auto-detected by extension |
+| ✂️ | **Smart chunking** | Sliding window with configurable size and overlap |
+| 🧠 | **Local embeddings** | `sentence-transformers` — no API key, runs fully offline |
+| 💾 | **ChromaDB** | Persistent vector store, zero config |
+| 🔁 | **Idempotent** | Re-run safely — chunks are upserted, never duplicated |
+| 🤖 | **Agent agnostic** | Works with LangChain, LlamaIndex, or any custom agent |
 
 ---
 
-## 📄 Supported formats
-
-| Format | Extension |
-|---|---|
-| Plain text | `.txt` `.md` |
-| PDF | `.pdf` |
-| Word document | `.docx` `.doc` |
-| Spreadsheet | `.csv` |
-
----
-
-## 🚀 Installation
+## 📦 Installation
 
 ```bash
 pip install -e .
+# or
+uv add synapse
 ```
 
-Dependencies (`chromadb`, `sentence-transformers`, `pypdf`, `python-docx`) are installed automatically.
+Includes everything out of the box: `txt`, `md`, `csv`, `pdf`, `docx`, embeddings, ChromaDB.
 
 ---
 
-## 🎯 Quick start
-
-### Step 1 — Drop your files
-
-```
-./docs/
-├── company_policy.pdf
-├── product_faq.txt
-└── meeting_notes.docx
-```
-
-### Step 2 — Ingest
+## 🚀 Quick start
 
 ```python
 from synapse import ingest
 
-ingest()
+ingest("./docs")
 ```
 
 ```
-Ingesting: company_policy.pdf  ->  12 chunks stored
-Ingesting: product_faq.txt     ->   8 chunks stored
-Ingesting: meeting_notes.docx  ->   5 chunks stored
+Ingesting: company_policy.pdf   ->  12 chunks stored
+Ingesting: product_faq.txt      ->   8 chunks stored
+Ingesting: meeting_notes.docx   ->   5 chunks stored
 
 Done. Collection 'synapse' in './synapse_db'
 ```
 
-### Step 3 — Query from your agent
+> [!TIP]
+> All parameters have sensible defaults. `ingest()` with no arguments scans `./docs` and stores everything in `./synapse_db`.
+
+<details>
+<summary>► See all <code>ingest()</code> options</summary>
+
+```python
+ingest(
+    source_dir      = "./docs",             # folder to scan (recursive)
+    db_path         = "./synapse_db",       # ChromaDB persistence path
+    collection_name = "synapse",            # collection name
+    chunk_size      = 1000,                 # characters per chunk
+    overlap         = 200,                  # overlap between consecutive chunks
+    embedding_model = "all-MiniLM-L6-v2",  # any SentenceTransformer model name
+    verbose         = True,                 # print progress to stdout
+)
+```
+
+</details>
+
+---
+
+## 🔌 Connecting to an AI agent
+
+synapse handles the **ingestion** half of RAG. Wire the ChromaDB collection to any LLM to build a complete agent:
 
 ```python
 import chromadb
@@ -114,117 +81,78 @@ client = chromadb.PersistentClient(path="./synapse_db")
 ef = embedding_functions.SentenceTransformerEmbeddingFunction("all-MiniLM-L6-v2")
 collection = client.get_collection("synapse", embedding_function=ef)
 
-results = collection.query(
-    query_texts=["What is the refund policy?"],
-    n_results=5,
-)
+def ask(question: str) -> str:
+    results = collection.query(query_texts=[question], n_results=4)
+    context = "\n\n".join(results["documents"][0])
+    # pass context to your LLM of choice
+    return context
 
-for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-    print(f"[{meta['source']}]\n{doc[:300]}\n")
+print(ask("What is the refund policy?"))
 ```
 
-> See [`examples/quickstart.py`](examples/quickstart.py) for the full working example.
+> [!IMPORTANT]
+> synapse is model-agnostic — it only provides retrieved chunks as context. The same pattern works with Anthropic, OpenAI, Ollama, Mistral, or any other LLM.
 
----
+> [!NOTE]
+> Each chunk includes `source` (absolute file path) and `chunk` (index) in its metadata, so your agent always knows where an answer came from.
 
-## ⚙️ API reference
-
-### `ingest()`
+<details>
+<summary>► Need to run ingest from an async context?</summary>
 
 ```python
+import asyncio
 from synapse import ingest
 
-ingest(
-    source_dir      = "./docs",             # 📁 folder to scan
-    db_path         = "./synapse_db",       # 💾 ChromaDB persistence path
-    collection_name = "synapse",            # 🏷️  collection name
-    chunk_size      = 1000,                 # ✂️  characters per chunk
-    overlap         = 200,                  # 🔗 overlap between chunks
-    embedding_model = "all-MiniLM-L6-v2",  # 🧠 SentenceTransformer model
-    verbose         = True,                 # 🖨️  print progress
-)
+async def main():
+    await asyncio.to_thread(ingest, "./docs")
+
+asyncio.run(main())
 ```
 
-All parameters are optional — `ingest()` works out of the box with zero configuration.
+`ingest()` is synchronous by design — the bottleneck is CPU-bound embedding, not I/O. Use `asyncio.to_thread` to avoid blocking an event loop.
+
+</details>
 
 ---
 
-## 🏗️ How it works
+## 📄 Supported formats
 
-```
-┌──────────────┐
-│  File on disk │
-└──────┬───────┘
-       │  extract()
-       ▼
-┌──────────────┐
-│   Raw text   │
-└──────┬───────┘
-       │  chunk_text()
-       ▼
-┌──────────────────────────────────────┐
-│  chunk 1  │  chunk 2  │  chunk 3 ... │   (1000 chars, 200 overlap)
-└──────┬───────────────────────────────┘
-       │  SentenceTransformer embed
-       ▼
-┌────────────────────────┐
-│  ChromaDB (local disk) │  ← upsert(documents, embeddings, metadata)
-└────────────────────────┘
-```
-
-Each chunk is stored with its **source file path** and **chunk index** as metadata, so your agent always knows where an answer came from.
+| Format | Extensions |
+|---|---|
+| Plain text | `.txt` `.md` |
+| PDF | `.pdf` |
+| Word document | `.docx` `.doc` |
+| Spreadsheet | `.csv` |
 
 ---
 
-## 🗂️ Project structure
+## 🏗️ Architecture
 
 ```
 synapse/
-│
-├── 📁 docs/                    ← drop your files here
-│
-├── 📁 synapse/
-│   ├── __init__.py             ← public API: ingest()
-│   ├── pipeline.py             ← orchestrates the full pipeline
-│   ├── extractors.py           ← file type → raw text
-│   └── chunker.py              ← raw text → overlapping chunks
-│
-├── 📁 examples/
-│   └── quickstart.py           ← minimal agent query example
-│
-└── 📁 tests/
-    ├── test_pipeline.py
-    ├── test_extractors.py
-    └── test_chunker.py
+├── pipeline.py         ← ingest() orchestrator
+├── extractors.py       ← file extension → raw text
+└── chunker.py          ← raw text → overlapping chunks
+```
+
+The central flow through every stage:
+
+```
+File on disk
+    │  extractors.py  →  raw text string
+    │  chunker.py     →  list of chunk strings
+    │  ChromaDB ef    →  vectors (sentence-transformers)
+    ▼
+chromadb.PersistentClient  →  upsert(documents, ids, metadatas)
 ```
 
 ---
 
-## 🧪 Running tests
+## 🧪 Tests
 
 ```bash
 pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-```
-tests/test_chunker.py::test_empty_text_returns_empty_list     PASSED
-tests/test_chunker.py::test_whitespace_is_normalized          PASSED
-tests/test_extractors.py::test_extract_txt                    PASSED
-tests/test_extractors.py::test_extract_pdf                    PASSED
-tests/test_pipeline.py::test_ingest_is_idempotent             PASSED
-...
-21 passed in 22s
-```
-
----
-
-## 📝 License
-
-MIT — free to use, modify, and distribute.
-
----
-
-<div align="center">
-  <sub>Built with ❤️ — local AI should be simple.</sub>
-</div>
+21 tests — chunker, extractors, and pipeline (ChromaDB mocked, fast).
