@@ -4,7 +4,7 @@
 # ⚡Synapse
 
 [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-[![tests](https://img.shields.io/badge/tests-31%20passing-brightgreen?style=flat-square)](tests/)
+[![tests](https://img.shields.io/badge/tests-41%20passing-brightgreen?style=flat-square)](tests/)
 [![build](https://img.shields.io/github/actions/workflow/status/adm-crow/synapse/ci.yml?branch=main&style=flat-square&label=build)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
 [![python](https://img.shields.io/badge/python-3.9%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![license](https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square)](LICENSE)
@@ -12,15 +12,17 @@
 
 </div>
 
-**synapse** is a local-first Python library for building file-based RAG pipelines — drop files into a folder, run the pipeline, and let any AI agent search your knowledge base with vector queries.
+**synapse** is a local-first Python library for building multi-source RAG pipelines — ingest files and databases into a single vector store and let any AI agent search across all your knowledge with one query.
 
 ```
-Your files  ──►  Extractor  ──►  Chunker  ──►  Embedder  ──►  ChromaDB
+Files      ──►  Extractor       ──►  Chunker  ──►  Embedder  ──►  ChromaDB
+SQLite DB  ──►  Row serializer  ──►  Chunker  ──►  Embedder  ──►  (same collection)
 ```
 
 | | Feature | Details |
 |---|---|---|
-| 📄 | **7 formats** | `txt`, `md`, `csv`, `pdf`, `docx`, `json`, `jsonl` — auto-detected by extension |
+| 📄 | **7 file formats** | `txt`, `md`, `csv`, `pdf`, `docx`, `json`, `jsonl` — auto-detected by extension |
+| 🗄️ | **SQLite ingestion** | Ingest table records alongside files into the same collection |
 | ✂️ | **Smart chunking** | Word-boundary aware, configurable size, overlap, and minimum chunk size |
 | 🧠 | **Local embeddings** | `sentence-transformers` — no API key, runs fully offline |
 | 💾 | **ChromaDB** | Persistent vector store, zero config |
@@ -178,7 +180,9 @@ All three functions accept the same `db_path` and `collection_name` arguments as
 
 ---
 
-## 📄 Supported formats
+## 📄 Data sources
+
+### Files
 
 | Format | Extensions |
 |---|---|
@@ -187,6 +191,46 @@ All three functions accept the same `db_path` and `collection_name` arguments as
 | Word document | `.docx` |
 | Spreadsheet | `.csv` |
 | JSON | `.json` `.jsonl` |
+
+### SQLite database
+
+Ingest records from any table with `ingest_sqlite()`:
+
+```python
+from synapse import ingest_sqlite
+
+ingest_sqlite(
+    db_path   = "./data.db",      # path to the SQLite file
+    table     = "articles",       # table to ingest
+)
+```
+
+Each row is serialized to `"col: value | col: value | ..."` and goes through the same chunker and embedder as files. Files and database records end up in the **same ChromaDB collection** — your agent queries both in a single call.
+
+<details>
+<summary>► See all <code>ingest_sqlite()</code> options</summary>
+
+```python
+ingest_sqlite(
+    db_path         = "./data.db",          # path to the SQLite file
+    table           = "articles",           # table to ingest
+    columns         = None,                 # list of columns to include (None = all)
+    id_column       = "id",                 # primary key for stable chunk IDs
+    row_template    = None,                 # optional "{title}: {body}" format string
+    chroma_path     = "./synapse_db",       # same ChromaDB directory as ingest()
+    collection_name = "synapse",            # same collection name
+    chunk_size      = 1000,
+    overlap         = 200,
+    min_chunk_size  = 50,
+    embedding_model = "all-MiniLM-L6-v2",
+    verbose         = True,
+)
+```
+
+</details>
+
+> [!NOTE]
+> The `source_type` metadata field distinguishes origins: `"file"` for ingested files, `"sqlite"` for database records — so your agent always knows where a result came from.
 
 ---
 
@@ -198,12 +242,15 @@ synapse/
 ├── synapse_db/                  ← ChromaDB writes here (auto-created)
 │
 └── synapse/
-    ├── __init__.py              ← public API: ingest, purge, reset, sources
-    ├── pipeline.py              ← orchestrates the full pipeline
+    ├── __init__.py              ← public API: ingest, ingest_sqlite, purge, reset, sources
+    ├── pipeline.py              ← file ingestion pipeline
     │     ingest()               ·  scan → extract → chunk → embed → upsert
     │     purge()                ·  delete chunks with missing source files
     │     reset()                ·  wipe the entire collection
-    │     sources()              ·  list unique ingested file paths
+    │     sources()              ·  list unique ingested source paths
+    │
+    ├── sqlite_ingester.py       ← SQLite ingestion pipeline
+    │     ingest_sqlite()        ·  connect → fetch rows → serialize → chunk → embed → upsert
     │
     ├── extractors.py            ← file extension → raw text string
     │     .txt .md               ·  built-in open()
@@ -228,6 +275,7 @@ synapse/
 - [x] **Idempotent ingestion** — upsert on re-run, never duplicates
 - [x] **Collection management** — `purge()`, `reset()`, `sources()`
 - [x] **CI/CD** — GitHub Actions pipeline across Python 3.9–3.13
+- [x] **SQLite ingestion** — `ingest_sqlite()` to embed table records alongside files
 - [ ] **PyPI release** — publish so `pip install synapse` works out of the box
 - [ ] **More formats** — `.pptx`, `.xlsx`, `.html`, `.epub`, `.odt`
 - [ ] **Incremental ingestion** — skip unchanged files (hash or mtime check) for faster re-runs
