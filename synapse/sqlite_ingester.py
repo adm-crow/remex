@@ -111,7 +111,7 @@ def ingest_sqlite(
         model_name=embedding_model
     )
     collection = client.get_or_create_collection(
-        name=collection_name, embedding_function=ef
+        name=collection_name, embedding_function=ef  # type: ignore[arg-type]
     )
 
     if verbose:
@@ -151,7 +151,7 @@ def ingest_sqlite(
             for i in range(len(chunks))
         ]
 
-        collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)
+        collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
         total_chunks += len(chunks)
 
     if verbose:

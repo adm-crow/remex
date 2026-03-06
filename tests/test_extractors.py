@@ -40,7 +40,7 @@ def test_extract_csv():
 # --- pdf ---
 
 def test_extract_pdf():
-    pypdf = pytest.importorskip("pypdf")
+    pytest.importorskip("pypdf")
     import io
     from pypdf import PdfWriter
 

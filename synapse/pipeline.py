@@ -25,7 +25,7 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str):
         model_name=embedding_model
     )
     return client, client.get_or_create_collection(
-        name=collection_name, embedding_function=ef
+        name=collection_name, embedding_function=ef  # type: ignore[arg-type]
     )
 
 
@@ -90,7 +90,7 @@ def ingest(
         ]
 
         # Upsert so re-running is idempotent
-        collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)
+        collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
 
         if verbose:
             print(f"  -> {len(chunks)} chunks stored")
@@ -121,7 +121,7 @@ def purge(
     results = collection.get(include=["metadatas"])
     stale_ids = [
         id_
-        for id_, meta in zip(results["ids"], results["metadatas"])
+        for id_, meta in zip(results["ids"], results["metadatas"])  # type: ignore[arg-type]
         if not Path(meta.get("source", "")).exists()
     ]
 
@@ -165,7 +165,7 @@ def sources(
     results = collection.get(include=["metadatas"])
     seen = set()
     unique = []
-    for meta in results["metadatas"]:
+    for meta in results["metadatas"]:  # type: ignore[union-attr]
         src = meta.get("source", "")
         if src and src not in seen:
             seen.add(src)
