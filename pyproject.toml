@@ -1,7 +1,7 @@
 [project]
 name = "synapse-core"
 version = "0.2.0"
-description = "Turn your files into answers — local RAG ingestion pipeline"
+description = "Local RAG library — ingest files and SQLite, query semantically, pipe results into any AI agent"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{name = "adm-crow"}]

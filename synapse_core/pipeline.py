@@ -16,7 +16,7 @@ def _make_id(file_path: Path, source_dir: Path, chunk_index: int) -> str:
     except ValueError:
         rel = file_path.resolve()
     key = f"{rel}::{chunk_index}"
-    return hashlib.md5(key.encode()).hexdigest()
+    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
 
 def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True):
@@ -61,13 +61,13 @@ def ingest(
     if not source.exists():
         raise FileNotFoundError(f"Source directory not found: {source}")
 
-    collection = _get_collection(db_path, collection_name, embedding_model)
-
     files = [f for f in source.rglob("*") if f.is_file() and is_supported(f)]
     if not files:
         if verbose:
             print(f"No supported files found in {source}")
         return
+
+    collection = _get_collection(db_path, collection_name, embedding_model)
 
     for file_path in files:
         if verbose:

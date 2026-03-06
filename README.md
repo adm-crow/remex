@@ -11,7 +11,7 @@
 
 </div>
 
-**synapse** is a local-first Python library that turns your files and databases into a searchable vector store — ready for any AI agent to query.
+**synapse** is a local-first Python library that turns your files and databases into a searchable vector store — ingest once, query semantically, pipe results straight into any AI agent.
 
 ```
 Files / SQLite  ──►  Extract  ──►  Chunk  ──►  Embed  ──►  ChromaDB
@@ -25,6 +25,7 @@ Files / SQLite  ──►  Extract  ──►  Chunk  ──►  Embed  ──�
 | 🧠 | **Local embeddings** | `sentence-transformers` — no API key, fully offline |
 | 💾 | **ChromaDB** | Persistent vector store, zero config |
 | 🔁 | **Idempotent** | Re-run safely — chunks are upserted, never duplicated |
+| 🔍 | **Semantic search** | `query()` returns ranked results with scores and source attribution |
 | 🤖 | **Agent agnostic** | Works with LangChain, LlamaIndex, or any custom agent |
 
 ---

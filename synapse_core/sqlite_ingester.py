@@ -25,7 +25,7 @@ def _row_to_text(row: dict, template: Optional[str]) -> str:
 def _make_sqlite_id(db_path: str, table: str, row_id, chunk_index: int) -> str:
     """Stable unique ID: hash of db path + table + row pk + chunk index."""
     key = f"sqlite::{Path(db_path).resolve()}::{table}::{row_id}::{chunk_index}"
-    return hashlib.md5(key.encode()).hexdigest()
+    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
 
 def ingest_sqlite(
