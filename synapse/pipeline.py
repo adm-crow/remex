@@ -24,7 +24,7 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str):
     ef = embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name=embedding_model
     )
-    return client, client.get_or_create_collection(
+    return client.get_or_create_collection(
         name=collection_name, embedding_function=ef  # type: ignore[arg-type]
     )
 
@@ -57,11 +57,12 @@ def ingest(
     if not source.exists():
         raise FileNotFoundError(f"Source directory not found: {source}")
 
-    _, collection = _get_collection(db_path, collection_name, embedding_model)
+    collection = _get_collection(db_path, collection_name, embedding_model)
 
     files = [f for f in source.rglob("*") if f.is_file() and is_supported(f)]
     if not files:
-        print(f"No supported files found in {source}")
+        if verbose:
+            print(f"No supported files found in {source}")
         return
 
     for file_path in files:
@@ -100,7 +101,6 @@ def ingest(
 
 
 def purge(
-    source_dir: str = "./docs",
     db_path: str = "./synapse_db",
     collection_name: str = "synapse",
     verbose: bool = True,

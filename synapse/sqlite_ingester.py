@@ -65,40 +65,40 @@ def ingest_sqlite(
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
 
-    # Validate table exists
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
-    )
-    if not cursor.fetchone():
+        # Validate table exists
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        )
+        if not cursor.fetchone():
+            raise ValueError(f"Table '{table}' not found in {db_path}")
+
+        # Validate and resolve columns against actual schema
+        cursor.execute(f"PRAGMA table_info(\"{table}\")")
+        available = [row["name"] for row in cursor.fetchall()]
+
+        if columns:
+            invalid = [c for c in columns if c not in available]
+            if invalid:
+                raise ValueError(f"Columns not found in '{table}': {invalid}")
+            selected = columns
+        else:
+            selected = available
+
+        # Fall back to SQLite rowid if id_column is absent
+        use_rowid = id_column not in available
+        col_list = ", ".join(f'"{c}"' for c in selected)
+
+        if use_rowid:
+            cursor.execute(f'SELECT rowid, {col_list} FROM "{table}"')
+        else:
+            cursor.execute(f'SELECT {col_list} FROM "{table}"')
+
+        rows = cursor.fetchall()
+    finally:
         conn.close()
-        raise ValueError(f"Table '{table}' not found in {db_path}")
-
-    # Validate and resolve columns against actual schema
-    cursor.execute(f"PRAGMA table_info(\"{table}\")")
-    available = [row["name"] for row in cursor.fetchall()]
-
-    if columns:
-        invalid = [c for c in columns if c not in available]
-        if invalid:
-            conn.close()
-            raise ValueError(f"Columns not found in '{table}': {invalid}")
-        selected = columns
-    else:
-        selected = available
-
-    # Fall back to SQLite rowid if id_column is absent
-    use_rowid = id_column not in available
-    col_list = ", ".join(f'"{c}"' for c in selected)
-
-    if use_rowid:
-        cursor.execute(f'SELECT rowid, {col_list} FROM "{table}"')
-    else:
-        cursor.execute(f'SELECT {col_list} FROM "{table}"')
-
-    rows = cursor.fetchall()
-    conn.close()
 
     if not rows:
         if verbose:

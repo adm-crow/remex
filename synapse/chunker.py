@@ -15,6 +15,9 @@ def chunk_text(
         overlap:        Character overlap between consecutive chunks.
         min_chunk_size: Chunks shorter than this are discarded.
     """
+    if overlap >= chunk_size:
+        raise ValueError(f"overlap ({overlap}) must be less than chunk_size ({chunk_size})")
+
     text = " ".join(text.split())  # normalize whitespace
     if not text:
         return []

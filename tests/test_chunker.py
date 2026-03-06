@@ -1,3 +1,5 @@
+import pytest
+
 from synapse.chunker import chunk_text
 
 
@@ -49,6 +51,11 @@ def test_word_boundary_respected():
         assert last_word in ("hello", "world"), (
             f"Chunk ends with partial word: '{last_word}'"
         )
+
+
+def test_overlap_gte_chunk_size_raises():
+    with pytest.raises(ValueError, match="overlap"):
+        chunk_text("some text", chunk_size=100, overlap=100)
 
 
 def test_min_chunk_size_filters_tiny_chunks():

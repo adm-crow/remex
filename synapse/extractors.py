@@ -22,7 +22,7 @@ def extract_docx(path: Path) -> str:
     except ImportError:
         raise ImportError("Install python-docx: pip install python-docx")
     doc = Document(str(path))
-    return "\n".join(p.text for p in doc.paragraphs)
+    return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
 
 
 def extract_csv(path: Path) -> str:

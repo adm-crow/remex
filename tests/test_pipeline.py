@@ -67,6 +67,12 @@ def test_ingest_missing_directory_raises(tmp_path):
         ingest(source_dir=str(tmp_path / "nonexistent"), db_path=str(tmp_path / "db"))
 
 
+def test_ingest_no_supported_files_verbose_false_no_output(mock_chroma, tmp_path, capsys):
+    docs = make_docs_dir(tmp_path, ("image.png", "fake"))
+    ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
+    assert capsys.readouterr().out == ""
+
+
 def test_upsert_payload_structure(mock_chroma, tmp_path):
     """Verify that ids, documents and metadatas are passed to upsert."""
     docs = make_docs_dir(tmp_path, ("test.txt", "word " * 100))
