@@ -18,8 +18,7 @@ if __name__ == "__main__":
         n_results=4,
     )
 
-    print(f"Query: {QUESTION!r}
-")
+    print(f"Query: {QUESTION!r}\n")
     for i, r in enumerate(results):
         print(f"[{i + 1}] score={r['score']:.3f}  source={r['source']}  chunk={r['chunk']}")
         print(f"    {r['text'][:300]}")
