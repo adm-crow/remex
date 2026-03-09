@@ -66,6 +66,8 @@ def setup_logging(
         synapse_core.setup_logging(level=logging.CRITICAL)
     """
     logger.setLevel(level)
+    for handler in logger.handlers[:]:
+        handler.close()
     logger.handlers.clear()
 
     # Console handler with colours

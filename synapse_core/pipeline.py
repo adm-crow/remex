@@ -56,7 +56,7 @@ def ingest(
         overlap:          Character overlap between consecutive chunks.
         min_chunk_size:   Discard chunks shorter than this (chars).
         embedding_model:  SentenceTransformer model name.
-        verbose:          Print progress to stdout.
+        verbose:          Emit progress via the synapse_core logger.
     """
     source = Path(source_dir)
     if not source.exists():

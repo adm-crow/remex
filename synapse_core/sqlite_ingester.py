@@ -63,7 +63,7 @@ def ingest_sqlite(
         overlap:          Character overlap between consecutive chunks.
         min_chunk_size:   Discard chunks shorter than this.
         embedding_model:  SentenceTransformer model name.
-        verbose:          Print progress to stdout.
+        verbose:          Emit progress via the synapse_core logger.
     """
     if not Path(db_path).exists():
         raise FileNotFoundError(f"SQLite database not found: {db_path}")

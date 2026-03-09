@@ -7,6 +7,21 @@ import synapse_core
 from synapse_core.logger import CustomFormatter, logger, setup_logging
 
 
+@pytest.fixture(autouse=True)
+def restore_logger_state():
+    """Save and restore logger level and handlers around every test."""
+    original_level = logger.level
+    original_handlers = logger.handlers[:]
+    yield
+    # Close any handlers added during the test
+    for handler in logger.handlers[:]:
+        if handler not in original_handlers:
+            handler.close()
+    logger.handlers.clear()
+    logger.handlers.extend(original_handlers)
+    logger.setLevel(original_level)
+
+
 # --- logger baseline ---
 
 def test_logger_name():
@@ -31,7 +46,6 @@ def test_logger_has_default_handler():
 def test_setup_logging_sets_level():
     setup_logging(level=logging.DEBUG)
     assert logger.level == logging.DEBUG
-    setup_logging()  # restore default
 
 
 def test_setup_logging_replaces_handlers():
@@ -45,17 +59,21 @@ def test_setup_logging_adds_file_handler(tmp_path):
     log_file = str(tmp_path / "test.log")
     setup_logging(log_file=log_file)
     assert len(logger.handlers) == 2
-    setup_logging()  # restore to console-only
 
 
 def test_setup_logging_file_is_written(tmp_path):
     log_file = str(tmp_path / "out.log")
     setup_logging(log_file=log_file)
     logger.info("hello from test")
-    setup_logging()  # close file handler before reading
+    # Flush and close the file handler explicitly before reading
+    for handler in logger.handlers:
+        handler.flush()
+        if isinstance(handler, logging.FileHandler):
+            handler.close()
 
     assert os.path.exists(log_file)
-    content = open(log_file, encoding="utf-8").read()
+    with open(log_file, encoding="utf-8") as f:
+        content = f.read()
     assert "hello from test" in content
 
 
