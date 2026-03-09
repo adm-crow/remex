@@ -34,8 +34,7 @@ if __name__ == "__main__":
     # whose source path no longer exists.
 
     print("\n=== Purging stale chunks ===")
-    deleted = purge(db_path=DB_PATH, collection_name=COLLECTION, verbose=True)
-    print(f"Removed {deleted} stale chunk(s).")
+    purge(db_path=DB_PATH, collection_name=COLLECTION, verbose=True)
 
 
     # --- reset() -------------------------------------------------------------

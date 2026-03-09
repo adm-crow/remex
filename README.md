@@ -4,7 +4,7 @@
 # ⚡Synapse
 
 [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-[![tests](https://img.shields.io/badge/tests-51%20passing-brightgreen?style=flat-square)](tests/)
+[![tests](https://img.shields.io/badge/tests-55%20passing-brightgreen?style=flat-square)](tests/)
 [![python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![license](https://img.shields.io/badge/license-Apache%202.0-brightgreen?style=flat-square)](LICENSE)
 [![pypi](https://img.shields.io/pypi/v/synapse-core?style=flat-square&label=pypi)](https://pypi.org/project/synapse-core/)
@@ -53,11 +53,13 @@ ingest("./my_documents")
 ```
 
 ```
-Ingesting: company_policy.pdf   ->  12 chunks stored
-Ingesting: product_faq.txt      ->   8 chunks stored
-Ingesting: meeting_notes.docx   ->   5 chunks stored
-
-Done. Collection 'synapse' in './synapse_db'
+2026-03-09 14:32:01 - INFO : Ingesting: company_policy.pdf
+2026-03-09 14:32:02 - INFO :   -> 12 chunks stored
+2026-03-09 14:32:03 - INFO : Ingesting: product_faq.txt
+2026-03-09 14:32:04 - INFO :   -> 8 chunks stored
+2026-03-09 14:32:05 - INFO : Ingesting: meeting_notes.docx
+2026-03-09 14:32:06 - INFO :   -> 5 chunks stored
+2026-03-09 14:32:06 - INFO : Done. Collection 'synapse' in './synapse_db'
 ```
 
 **Ingest a SQLite table:**
@@ -69,8 +71,8 @@ ingest_sqlite("./data.db", table="articles")
 ```
 
 ```
-Ingesting: articles (120 records)
-  -> 87 chunks stored
+2026-03-09 14:32:07 - INFO : Ingesting: articles (120 records)
+2026-03-09 14:32:09 - INFO :   -> 87 chunks stored
 ```
 
 > [!TIP]
@@ -204,6 +206,28 @@ Returns a list of dicts: `text`, `source`, `source_type`, `score`, `distance`, `
 
 ---
 
+## Logging
+
+By default synapse writes colored `INFO` messages to stdout. Use `setup_logging()` to customise the level or add a log file:
+
+```python
+import logging
+import synapse_core
+
+# Add a persistent log file (plain text, no ANSI codes)
+synapse_core.setup_logging(log_file="ingest.log")
+
+# More verbose output
+synapse_core.setup_logging(level=logging.DEBUG)
+
+# Silence all synapse_core output
+synapse_core.setup_logging(level=logging.CRITICAL)
+```
+
+You can also control verbosity per-call with the `verbose` parameter (`True` by default on all functions that produce output).
+
+---
+
 ## Architecture
 
 ```
@@ -214,7 +238,8 @@ synapse/
     ├── pipeline.py          ← ingest · query · purge · reset · sources
     ├── sqlite_ingester.py   ← ingest_sqlite
     ├── extractors.py        ← txt · md · pdf · docx · csv · json · jsonl
-    └── chunker.py           ← word-boundary sliding window
+    ├── chunker.py           ← word-boundary sliding window
+    └── logger.py            ← colored logger · setup_logging()
 ```
 
 ---
@@ -230,6 +255,7 @@ synapse/
 - [x] **CI/CD** — GitHub Actions pipeline across Python 3.11–3.13
 - [x] **SQLite ingestion** — `ingest_sqlite()` to embed table records alongside files
 - [x] **Semantic search** — `query()` returns ranked results with relevance scores and source attribution
+- [x] **Structured logging** — colored output, configurable level, optional file output via `setup_logging()`
 - [x] **PyPI release** — `pip install synapse-core`
 - [ ] **More formats** — `.pptx`, `.xlsx`, `.html`, `.epub`, `.odt`
 - [ ] **Incremental ingestion** — skip unchanged files (hash or mtime check) for faster re-runs

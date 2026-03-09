@@ -30,6 +30,7 @@ class CustomFormatter(logging.Formatter):
 
 logger = logging.getLogger("synapse_core")
 logger.setLevel(logging.INFO)
+logger.propagate = False  # prevent double output when the root logger has handlers
 
 # Default: colored output to stdout (preserves existing verbose=True behaviour)
 _default_handler = logging.StreamHandler(sys.stdout)
