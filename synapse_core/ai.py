@@ -34,7 +34,7 @@ def detect_provider() -> Optional[str]:
         req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=2):
             return "ollama"
-    except Exception:
+    except (urllib.error.URLError, OSError):
         pass
     return None
 
@@ -78,7 +78,9 @@ def _answer_anthropic(question: str, system: str, model: str) -> str:
         system=system,
         messages=[{"role": "user", "content": question}],
     )
-    text_block = next(b for b in response.content if isinstance(b, TextBlock))
+    text_block = next((b for b in response.content if isinstance(b, TextBlock)), None)
+    if text_block is None:
+        raise RuntimeError("Anthropic response contained no text block.")
     return text_block.text
 
 

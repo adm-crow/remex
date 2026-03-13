@@ -52,7 +52,9 @@ def ask(question: str, n_results: int = 4) -> str:
         ),
         messages=[{"role": "user", "content": question}],
     )
-    text_block = next(b for b in response.content if isinstance(b, TextBlock))
+    text_block = next((b for b in response.content if isinstance(b, TextBlock)), None)
+    if text_block is None:
+        raise RuntimeError("Anthropic response contained no text block.")
     return text_block.text
 
 
