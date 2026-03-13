@@ -188,6 +188,7 @@ synapse handles ingestion and retrieval — you wire it to any LLM. Here's a com
 
 ```python
 import anthropic
+from anthropic.types import TextBlock
 from synapse_core import ingest, query
 
 # 1 — ingest your documents (once)
@@ -201,7 +202,7 @@ def ask(question: str) -> str:
     context = "\n\n".join(r["text"] for r in chunks)
 
     response = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-5",
         max_tokens=1024,
         system=(
             "You are a helpful assistant. "
@@ -211,7 +212,8 @@ def ask(question: str) -> str:
         ),
         messages=[{"role": "user", "content": question}],
     )
-    return response.content[0].text
+    text_block = next(b for b in response.content if isinstance(b, TextBlock))
+    return text_block.text
 
 print(ask("What is the refund policy?"))
 ```

@@ -66,6 +66,7 @@ def generate_answer(
 def _answer_anthropic(question: str, system: str, model: str) -> str:
     try:
         import anthropic
+        from anthropic.types import TextBlock
     except ImportError:
         raise ImportError(
             "Anthropic SDK not installed. Run: pip install anthropic"
@@ -77,7 +78,8 @@ def _answer_anthropic(question: str, system: str, model: str) -> str:
         system=system,
         messages=[{"role": "user", "content": question}],
     )
-    return response.content[0].text
+    text_block = next(b for b in response.content if isinstance(b, TextBlock))
+    return text_block.text
 
 
 def _answer_openai(question: str, system: str, model: str) -> str:

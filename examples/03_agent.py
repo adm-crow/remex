@@ -17,6 +17,7 @@ For other LLM providers, replace the `ask()` body:
 """
 
 import anthropic
+from anthropic.types import TextBlock
 
 from synapse_core import ingest, query
 
@@ -51,7 +52,8 @@ def ask(question: str, n_results: int = 4) -> str:
         ),
         messages=[{"role": "user", "content": question}],
     )
-    return response.content[0].text
+    text_block = next(b for b in response.content if isinstance(b, TextBlock))
+    return text_block.text
 
 
 # --- Run --------------------------------------------------------------------
