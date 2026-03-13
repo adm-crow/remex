@@ -133,11 +133,18 @@ synapse ingest-sqlite ./data.db --table articles
 # Semantic search (raw chunks)
 synapse query "what is the refund policy?"
 
-# AI-powered answer (auto-detects provider from env vars)
+# AI-powered answer — set your API key first, then query
+# Anthropic
+export ANTHROPIC_API_KEY="sk-ant-..."
 synapse query "what is the refund policy?" --ai
+synapse query "what is the refund policy?" --ai --provider anthropic --model claude-sonnet-4-5
 
-# Explicit provider and model
+# OpenAI
+export OPENAI_API_KEY="sk-..."
 synapse query "what is the refund policy?" --ai --provider openai --model gpt-4o
+
+# Ollama (local, no key needed — just start the server)
+ollama serve
 synapse query "what is the refund policy?" --ai --provider ollama --model mistral
 
 # List all indexed sources
@@ -180,7 +187,7 @@ from synapse_core import ingest, query
 ingest("./docs")
 
 # 2 — build a RAG-powered assistant
-client = anthropic.Anthropic(api_key="sk-ant-...)
+client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
 
 def ask(question: str) -> str:
     chunks = query(question, n_results=4)
