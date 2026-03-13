@@ -5,7 +5,7 @@
   <p><strong>Local-first RAG for Python — ingest files, query semantically, feed any AI agent.</strong></p>
 
   [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-  [![tests](https://img.shields.io/badge/tests-107%20passing-brightgreen?style=flat-square)](tests/)
+  [![tests](https://img.shields.io/badge/tests-124%20passing-brightgreen?style=flat-square)](tests/)
   [![PyPI](https://img.shields.io/pypi/v/synapse-core?style=flat-square&color=blue)](https://pypi.org/project/synapse-core/)
   [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green?style=flat-square)](LICENSE)
@@ -56,7 +56,8 @@ pip install synapse-core[formats,sentence]
 from synapse_core import ingest, query
 
 # Ingest a folder — persists to ./synapse_db by default
-ingest("./docs")
+result = ingest("./docs")
+print(f"{result.sources_ingested}/{result.sources_found} files ingested, {result.chunks_stored} chunks stored")
 
 # Query semantically
 results = query("what is the refund policy?", n_results=4)
@@ -65,7 +66,7 @@ for r in results:
     print(r['text'])
 ```
 
-Each result is a plain dict:
+`ingest()` returns an [`IngestResult`](#ingestresult) with ingestion stats. Each query result is a typed dict ([`QueryResult`](#queryresult)):
 
 ```python
 {
@@ -170,7 +171,7 @@ print(ask("What is the refund policy?"))
 <summary><strong>ingest()</strong></summary>
 
 ```python
-ingest(
+result = ingest(
     source_dir      = "./docs",             # folder to scan (recursive)
     db_path         = "./synapse_db",       # ChromaDB persistence path
     collection_name = "synapse",
@@ -182,7 +183,10 @@ ingest(
     chunking        = "word",               # "word" or "sentence" (requires [sentence])
     verbose         = True,
 )
+# result.sources_found / sources_ingested / sources_skipped / chunks_stored
 ```
+
+Raises `SourceNotFoundError` if `source_dir` does not exist.
 
 </details>
 
@@ -190,7 +194,7 @@ ingest(
 <summary><strong>ingest_sqlite()</strong></summary>
 
 ```python
-ingest_sqlite(
+result = ingest_sqlite(
     db_path         = "./data.db",
     table           = "articles",
     columns         = None,                 # columns to embed (None = all)
@@ -205,7 +209,10 @@ ingest_sqlite(
     chunking        = "word",
     verbose         = True,
 )
+# result.sources_found / sources_ingested / sources_skipped / chunks_stored
 ```
+
+Raises `SourceNotFoundError` if the database file is missing, `TableNotFoundError` if the table does not exist.
 
 </details>
 
@@ -213,7 +220,7 @@ ingest_sqlite(
 <summary><strong>query()</strong></summary>
 
 ```python
-query(
+results = query(
     text            = "what is the refund policy?",
     db_path         = "./synapse_db",
     collection_name = "synapse",
@@ -222,7 +229,7 @@ query(
 )
 ```
 
-Returns a list of dicts: `text`, `source`, `source_type`, `score`, `distance`, `chunk`, `doc_title`, `doc_author`, `doc_created`.
+Returns `List[QueryResult]` — each item is a typed dict with keys: `text`, `source`, `source_type`, `score`, `distance`, `chunk`, `doc_title`, `doc_author`, `doc_created`. Raises `CollectionNotFoundError` if no collection exists yet.
 
 </details>
 
@@ -249,6 +256,58 @@ synapse_core.setup_logging(level=logging.CRITICAL)       # silence
 
 </details>
 
+<details>
+<summary><strong>Exceptions · Models</strong></summary>
+
+#### IngestResult
+
+Returned by `ingest()` and `ingest_sqlite()`.
+
+```python
+from synapse_core import IngestResult
+
+result: IngestResult = ingest("./docs")
+print(result.sources_found)      # files/rows discovered
+print(result.sources_ingested)   # successfully stored
+print(result.sources_skipped)    # unchanged (incremental), empty, or errored
+print(result.chunks_stored)      # total chunks written to ChromaDB
+```
+
+#### QueryResult
+
+A `TypedDict` — plain `dict` at runtime, typed for static analysis.
+
+```python
+from synapse_core import QueryResult
+from typing import List
+
+results: List[QueryResult] = query("refund policy")
+```
+
+#### Exception hierarchy
+
+```
+SynapseError                   ← catch-all for all synapse errors
+├── CollectionNotFoundError    ← also a ValueError  (query on missing collection)
+├── SourceNotFoundError        ← also a FileNotFoundError  (missing dir or .db file)
+└── TableNotFoundError         ← also a ValueError  (missing SQLite table)
+```
+
+```python
+from synapse_core import SynapseError, CollectionNotFoundError
+
+try:
+    results = query("test", db_path="./empty_db")
+except CollectionNotFoundError:
+    print("Run ingest() first.")
+except SynapseError as e:
+    print(f"Synapse error: {e}")
+```
+
+All subclasses also inherit from the matching Python built-in (`ValueError`, `FileNotFoundError`) so existing `except ValueError` / `except FileNotFoundError` code continues to work unchanged.
+
+</details>
+
 ---
 
 ## Architecture
@@ -263,6 +322,8 @@ synapse/
     ├── sqlite_ingester.py   ← ingest_sqlite()
     ├── extractors.py        ← 12 formats + document metadata extraction
     ├── chunker.py           ← word-boundary & sentence-aware chunking
+    ├── models.py            ← IngestResult · QueryResult
+    ├── exceptions.py        ← SynapseError hierarchy
     └── logger.py            ← colored logger · setup_logging()
 ```
 
@@ -282,6 +343,7 @@ synapse/
 - [x] CI/CD — GitHub Actions, Python 3.11–3.13
 - [x] PyPI release — `pip install synapse-core`
 - [x] CLI — `synapse ingest`, `query --ai`, `purge`, `reset`, `sources`
+- [x] Typed API — `IngestResult`, `QueryResult`, `SynapseError` hierarchy
 - [ ] File watcher — `watch()` auto-ingest on change
 - [ ] Pluggable embedders — OpenAI, Cohere, HuggingFace Inference API
 - [ ] Pluggable vector stores — Qdrant, FAISS, Weaviate

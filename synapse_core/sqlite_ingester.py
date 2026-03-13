@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import List, Optional
 
 from .chunker import chunk_text
+from .exceptions import SourceNotFoundError, TableNotFoundError
 from .logger import logger
+from .models import IngestResult
 from .pipeline import _get_collection
 
 
@@ -43,7 +45,7 @@ def ingest_sqlite(
     embedding_model: str = "all-MiniLM-L6-v2",
     chunking: str = "word",
     verbose: bool = True,
-) -> None:
+) -> IngestResult:
     """
     Ingest records from a SQLite table into a ChromaDB collection.
 
@@ -68,7 +70,7 @@ def ingest_sqlite(
         verbose:          Emit progress via the synapse_core logger.
     """
     if not Path(db_path).exists():
-        raise FileNotFoundError(f"SQLite database not found: {db_path}")
+        raise SourceNotFoundError(f"SQLite database not found: {db_path}")
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -80,7 +82,7 @@ def ingest_sqlite(
             "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
         )
         if not cursor.fetchone():
-            raise ValueError(f"Table '{table}' not found in {db_path}")
+            raise TableNotFoundError(f"Table '{table}' not found in {db_path}")
 
         # Validate and resolve columns against actual schema
         cursor.execute(f"PRAGMA table_info(\"{table}\")")
@@ -107,17 +109,18 @@ def ingest_sqlite(
     finally:
         conn.close()
 
+    result = IngestResult(sources_found=len(rows))
+
     if not rows:
         if verbose:
             logger.info("No records found in %s::%s", db_path, table)
-        return
+        return result
 
     collection = _get_collection(chroma_path, collection_name, embedding_model)
 
     if verbose:
         logger.info("Ingesting: %s (%d records)", table, len(rows))
 
-    total_chunks = 0
     for row in rows:
         row_dict = dict(row)
 
@@ -139,6 +142,7 @@ def ingest_sqlite(
             mode=chunking,
         )
         if not chunks:
+            result.sources_skipped += 1
             continue
 
         ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(len(chunks))]
@@ -153,7 +157,10 @@ def ingest_sqlite(
         ]
 
         collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
-        total_chunks += len(chunks)
+        result.sources_ingested += 1
+        result.chunks_stored += len(chunks)
 
     if verbose:
-        logger.info("  -> %d chunks stored", total_chunks)
+        logger.info("  -> %d chunks stored", result.chunks_stored)
+
+    return result

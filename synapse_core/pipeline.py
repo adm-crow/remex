@@ -6,8 +6,10 @@ import chromadb
 from chromadb.utils import embedding_functions
 
 from .chunker import chunk_text
+from .exceptions import CollectionNotFoundError, SourceNotFoundError
 from .extractors import extract, extract_metadata, is_supported
 from .logger import logger
+from .models import IngestResult, QueryResult
 
 
 def _make_id(file_path: Path, source_dir: Path, chunk_index: int) -> str:
@@ -58,7 +60,7 @@ def ingest(
     incremental: bool = False,
     chunking: str = "word",
     verbose: bool = True,
-) -> None:
+) -> IngestResult:
     """
     Scan source_dir for supported files, extract text, chunk it,
     embed it and store everything in a local ChromaDB collection.
@@ -78,17 +80,18 @@ def ingest(
     """
     source = Path(source_dir)
     if not source.exists():
-        raise FileNotFoundError(f"Source directory not found: {source}")
+        raise SourceNotFoundError(f"Source directory not found: {source}")
 
     files = [f for f in source.rglob("*") if f.is_file() and is_supported(f)]
+    result = IngestResult(sources_found=len(files))
+
     if not files:
         if verbose:
             logger.info("No supported files found in %s", source)
-        return
+        return result
 
     collection = _get_collection(db_path, collection_name, embedding_model)
 
-    current_hash: str = ""
     for file_path in files:
         source_str = str(file_path.resolve())
 
@@ -100,6 +103,7 @@ def ingest(
                 if stored_hash == current_hash:
                     if verbose:
                         logger.info("Skipping (unchanged): %s", file_path.name)
+                    result.sources_skipped += 1
                     continue
                 # File changed — delete stale chunks before re-ingesting
                 collection.delete(ids=existing["ids"])
@@ -111,6 +115,7 @@ def ingest(
         except Exception as e:
             if verbose:
                 logger.warning("[skip] %s: %s", file_path.name, e)
+            result.sources_skipped += 1
             continue
 
         chunks = chunk_text(
@@ -123,6 +128,7 @@ def ingest(
         if not chunks:
             if verbose:
                 logger.warning("[skip] %s: no text extracted", file_path.name)
+            result.sources_skipped += 1
             continue
 
         ids = [_make_id(file_path, source, i) for i in range(len(chunks))]
@@ -137,12 +143,16 @@ def ingest(
 
         # Upsert so re-running is idempotent
         collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
+        result.sources_ingested += 1
+        result.chunks_stored += len(chunks)
 
         if verbose:
             logger.info("  -> %d chunks stored", len(chunks))
 
     if verbose:
         logger.info("Done. Collection '%s' in '%s'", collection_name, db_path)
+
+    return result
 
 
 def query(
@@ -151,7 +161,7 @@ def query(
     collection_name: str = "synapse",
     n_results: int = 5,
     embedding_model: str = "all-MiniLM-L6-v2",
-) -> List[dict]:
+) -> List[QueryResult]:
     """
     Semantic search over the ChromaDB collection.
 
@@ -177,7 +187,7 @@ def query(
     try:
         collection = _get_collection(db_path, collection_name, embedding_model, create=False)
     except ValueError:
-        raise ValueError(
+        raise CollectionNotFoundError(
             f"Collection '{collection_name}' not found in '{db_path}' — run ingest() first."
         ) from None
     count = collection.count()

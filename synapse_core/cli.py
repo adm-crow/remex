@@ -1,6 +1,7 @@
 import click
 
 from . import __version__
+from .exceptions import SynapseError
 from .pipeline import ingest, purge, query, reset, sources
 from .sqlite_ingester import ingest_sqlite
 from .ai import PROVIDERS, DEFAULT_MODELS, detect_provider, generate_answer
@@ -18,9 +19,9 @@ def cli() -> None:
               help="ChromaDB persistence path.")
 @click.option("--collection", default="synapse", show_default=True,
               help="Collection name.")
-@click.option("--chunk-size", default=1000, show_default=True,
+@click.option("--chunk-size", default=1000, show_default=True, type=click.IntRange(min=1),
               help="Target characters per chunk.")
-@click.option("--overlap", default=200, show_default=True,
+@click.option("--overlap", default=200, show_default=True, type=click.IntRange(min=0),
               help="Character overlap between chunks.")
 @click.option("--incremental", is_flag=True,
               help="Skip files whose content hasn't changed (SHA-256 check).")
@@ -47,7 +48,7 @@ def ingest_cmd(
             incremental=incremental,
             chunking=chunking,
         )
-    except (FileNotFoundError, ValueError) as e:
+    except (SynapseError, FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
 
@@ -59,9 +60,9 @@ def ingest_cmd(
               help="ChromaDB persistence path.")
 @click.option("--collection", default="synapse", show_default=True,
               help="Collection name.")
-@click.option("--chunk-size", default=1000, show_default=True,
+@click.option("--chunk-size", default=1000, show_default=True, type=click.IntRange(min=1),
               help="Target characters per chunk.")
-@click.option("--overlap", default=200, show_default=True,
+@click.option("--overlap", default=200, show_default=True, type=click.IntRange(min=0),
               help="Character overlap between chunks.")
 @click.option("--chunking", default="word", show_default=True,
               type=click.Choice(["word", "sentence"]),
@@ -86,7 +87,7 @@ def ingest_sqlite_cmd(
             overlap=overlap,
             chunking=chunking,
         )
-    except (FileNotFoundError, ValueError) as e:
+    except (SynapseError, FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
 
@@ -127,7 +128,7 @@ def query_cmd(
             collection_name=collection,
             n_results=n_results,
         )
-    except ValueError as e:
+    except (SynapseError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
 
