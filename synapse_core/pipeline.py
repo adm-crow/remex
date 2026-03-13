@@ -179,7 +179,7 @@ def query(
     except ValueError:
         raise ValueError(
             f"Collection '{collection_name}' not found in '{db_path}' — run ingest() first."
-        )
+        ) from None
     count = collection.count()
     if count == 0:
         return []

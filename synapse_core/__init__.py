@@ -1,4 +1,4 @@
-__version__ = "0.5.3"
+__version__ = "0.5.4"
 
 from .logger import setup_logging
 from .pipeline import ingest, purge, query, reset, sources

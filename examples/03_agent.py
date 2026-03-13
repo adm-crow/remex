@@ -42,7 +42,7 @@ def ask(question: str, n_results: int = 4) -> str:
     )
 
     response = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-5",
         max_tokens=1024,
         system=(
             "You are a helpful assistant. "

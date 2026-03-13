@@ -9,7 +9,7 @@ from typing import Optional
 PROVIDERS = ("anthropic", "openai", "ollama")
 
 DEFAULT_MODELS: dict[str, str] = {
-    "anthropic": "claude-opus-4-6",
+    "anthropic": "claude-sonnet-4-5",
     "openai": "gpt-4o",
     "ollama": "llama3",
 }

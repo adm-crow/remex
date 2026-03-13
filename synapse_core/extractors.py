@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 from typing import Dict
 
+from .logger import logger
+
 
 def extract_txt(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="ignore")
@@ -59,7 +61,7 @@ def extract_jsonl(path: Path) -> str:
             try:
                 parts.append(_flatten_json(json.loads(line)))
             except json.JSONDecodeError:
-                pass
+                logger.warning("Skipping invalid JSON line in %s", path.name)
     return "\n".join(parts)
 
 
@@ -188,8 +190,8 @@ def extract_metadata(path: Path) -> Dict[str, str]:
                 meta["doc_author"] = info.author or ""
                 if info.creation_date:
                     meta["doc_created"] = info.creation_date.isoformat()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read PDF metadata from %s: %s", path.name, e)
 
     elif suffix == ".docx":
         try:
@@ -199,8 +201,8 @@ def extract_metadata(path: Path) -> Dict[str, str]:
             meta["doc_author"] = props.author or ""
             if props.created:
                 meta["doc_created"] = props.created.isoformat()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read DOCX metadata from %s: %s", path.name, e)
 
     elif suffix in (".html", ".htm"):
         try:
@@ -213,8 +215,8 @@ def extract_metadata(path: Path) -> Dict[str, str]:
             author_tag = soup.find("meta", attrs={"name": "author"})
             if author_tag:
                 meta["doc_author"] = author_tag.get("content", "")  # type: ignore[arg-type]
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read HTML metadata from %s: %s", path.name, e)
 
     elif suffix == ".pptx":
         try:
@@ -224,7 +226,7 @@ def extract_metadata(path: Path) -> Dict[str, str]:
             meta["doc_author"] = props.author or ""
             if props.created:
                 meta["doc_created"] = props.created.isoformat()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not read PPTX metadata from %s: %s", path.name, e)
 
     return meta

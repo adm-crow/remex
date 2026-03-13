@@ -1,6 +1,6 @@
 [project]
 name = "synapse-core"
-version = "0.5.3"
+version = "0.5.4"
 description = "Local RAG library — ingest files and SQLite, query semantically, pipe results into any AI agent"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -8,7 +8,7 @@ authors = [{name = "adm-crow"}]
 license = "Apache-2.0"
 keywords = ["rag", "ai", "llm", "vector", "chromadb", "embeddings", "local-ai", "nlp"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
@@ -34,7 +34,7 @@ formats = ["python-pptx", "openpyxl", "beautifulsoup4", "ebooklib", "odfpy"]
 synapse = "synapse_core.cli:cli"
 
 [project.urls]
-Homepage = "https://pypi.org/project/synapse-core/"
+Homepage = "https://github.com/adm-crow/synapse"
 Repository = "https://github.com/adm-crow/synapse"
 Issues = "https://github.com/adm-crow/synapse/issues"
 
