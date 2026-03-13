@@ -1,6 +1,5 @@
 import io
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -150,6 +149,44 @@ def test_extract_xlsx(tmp_path):
     result = extract(path)
     assert "Alice" in result
     assert "Name" in result
+
+
+# --- epub ---
+
+def test_extract_epub(tmp_path):
+    pytest.importorskip("ebooklib")
+    pytest.importorskip("bs4")
+    from ebooklib import epub
+
+    book = epub.EpubBook()
+    book.set_title("Test Book")
+    chapter = epub.EpubHtml(title="Chapter 1", file_name="chapter1.xhtml")
+    chapter.content = b"<html><body><p>Hello from EPUB</p></body></html>"
+    book.add_item(chapter)
+    book.add_item(epub.EpubNcx())
+    book.add_item(epub.EpubNav())
+    book.spine = ["nav", chapter]
+    path = tmp_path / "file.epub"
+    epub.write_epub(str(path), book)
+
+    assert "Hello from EPUB" in extract(path)
+
+
+# --- odt ---
+
+def test_extract_odt(tmp_path):
+    pytest.importorskip("odf")
+    from odf.opendocument import OpenDocumentText
+    from odf.text import P
+
+    doc = OpenDocumentText()
+    p = P()
+    p.addText("Hello from ODT")
+    doc.text.addElement(p)
+    path = tmp_path / "file.odt"
+    doc.save(str(path))
+
+    assert "Hello from ODT" in extract(path)
 
 
 # --- unsupported ---

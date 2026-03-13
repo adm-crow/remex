@@ -36,15 +36,58 @@ def ingest_cmd(
     chunking: str,
 ) -> None:
     """Ingest files from SOURCE_DIR into ChromaDB."""
-    ingest(
-        source_dir=source_dir,
-        db_path=db_path,
-        collection_name=collection,
-        chunk_size=chunk_size,
-        overlap=overlap,
-        incremental=incremental,
-        chunking=chunking,
-    )
+    try:
+        ingest(
+            source_dir=source_dir,
+            db_path=db_path,
+            collection_name=collection,
+            chunk_size=chunk_size,
+            overlap=overlap,
+            incremental=incremental,
+            chunking=chunking,
+        )
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+
+
+@cli.command(name="ingest-sqlite")
+@click.argument("db_path")
+@click.option("--table", required=True, help="Table name to ingest.")
+@click.option("--db", "chroma_path", default="./synapse_db", show_default=True,
+              help="ChromaDB persistence path.")
+@click.option("--collection", default="synapse", show_default=True,
+              help="Collection name.")
+@click.option("--chunk-size", default=1000, show_default=True,
+              help="Target characters per chunk.")
+@click.option("--overlap", default=200, show_default=True,
+              help="Character overlap between chunks.")
+@click.option("--chunking", default="word", show_default=True,
+              type=click.Choice(["word", "sentence"]),
+              help="Chunking strategy.")
+def ingest_sqlite_cmd(
+    db_path: str,
+    table: str,
+    chroma_path: str,
+    collection: str,
+    chunk_size: int,
+    overlap: int,
+    chunking: str,
+) -> None:
+    """Ingest records from a SQLite DB_PATH table into ChromaDB."""
+    try:
+        ingest_sqlite(
+            db_path=db_path,
+            table=table,
+            chroma_path=chroma_path,
+            collection_name=collection,
+            chunk_size=chunk_size,
+            overlap=overlap,
+            chunking=chunking,
+        )
+    except (FileNotFoundError, ValueError) as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
 
 
 @cli.command(name="query")
@@ -57,12 +100,17 @@ def ingest_cmd(
               help="Number of results to return.")
 def query_cmd(text: str, db_path: str, collection: str, n_results: int) -> None:
     """Semantic search over the ChromaDB collection."""
-    results = query(
-        text=text,
-        db_path=db_path,
-        collection_name=collection,
-        n_results=n_results,
-    )
+    try:
+        results = query(
+            text=text,
+            db_path=db_path,
+            collection_name=collection,
+            n_results=n_results,
+        )
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+
     if not results:
         click.echo("No results found.")
         return

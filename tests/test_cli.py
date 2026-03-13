@@ -101,3 +101,42 @@ def test_cli_version():
     result = CliRunner().invoke(cli, ["--version"])
     assert result.exit_code == 0
     assert "0.5.0" in result.output
+
+
+# --- ingest-sqlite ---
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_basic(mock_ingest_sqlite):
+    result = CliRunner().invoke(cli, ["ingest-sqlite", "./data.db", "--table", "articles"])
+    assert result.exit_code == 0
+    mock_ingest_sqlite.assert_called_once()
+    kw = mock_ingest_sqlite.call_args.kwargs
+    assert kw["db_path"] == "./data.db"
+    assert kw["table"] == "articles"
+    assert kw["chunking"] == "word"
+
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_missing_table_errors(mock_ingest_sqlite):
+    """--table is required; omitting it must exit non-zero."""
+    result = CliRunner().invoke(cli, ["ingest-sqlite", "./data.db"])
+    assert result.exit_code != 0
+    mock_ingest_sqlite.assert_not_called()
+
+
+# --- error handling ---
+
+@patch("synapse_core.cli.ingest")
+def test_cli_ingest_file_not_found_shows_error(mock_ingest):
+    mock_ingest.side_effect = FileNotFoundError("Source directory not found: ./missing")
+    result = CliRunner().invoke(cli, ["ingest", "./missing"])
+    assert result.exit_code != 0
+    assert "Error:" in result.output
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_collection_not_found_shows_error(mock_query):
+    mock_query.side_effect = ValueError("Collection 'synapse' not found — run ingest() first.")
+    result = CliRunner().invoke(cli, ["query", "test"])
+    assert result.exit_code != 0
+    assert "Error:" in result.output

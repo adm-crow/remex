@@ -46,7 +46,6 @@ build-backend = "hatchling.build"
 dev = [
     "pytest>=8.4.2",
     "nltk",
-    "click",
 ]
 
 [tool.pytest.ini_options]

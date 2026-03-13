@@ -13,8 +13,10 @@ from synapse_core import ingest, ingest_sqlite
 
 if __name__ == "__main__":
     # --- files ---------------------------------------------------------------
-    # Recursively scans ./docs for .txt .md .pdf .docx .csv .json .jsonl files,
-    # extracts text, chunks it, embeds it and upserts into ChromaDB.
+    # Recursively scans ./docs for supported files:
+    # .txt .md .csv .pdf .docx .json .jsonl
+    # .html .htm .pptx .xlsx .epub .odt  (requires: pip install synapse-core[formats])
+    # Extracts text, chunks it, embeds it and upserts into ChromaDB.
 
     ingest(
         source_dir="./docs",       # folder to scan (any path works)
