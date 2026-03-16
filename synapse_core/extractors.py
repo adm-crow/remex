@@ -163,9 +163,9 @@ def extract_streaming(path: Path, block_size: int = 65_536) -> Iterator[str]:
 
     Args:
         path:       File to read.
-        block_size: Target bytes per block for character-based formats.
-                    CSV/JSONL yield batches of rows whose total chars approach
-                    this threshold.
+        block_size: Target characters per block for text-based formats.
+                    CSV/JSONL yield batches of rows whose total character count
+                    approaches this threshold.
     """
     suffix = path.suffix.lower()
 

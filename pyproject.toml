@@ -29,6 +29,7 @@ dependencies = [
 [project.optional-dependencies]
 sentence = ["nltk"]
 formats = ["python-pptx", "openpyxl", "beautifulsoup4", "ebooklib", "odfpy"]
+ai = ["anthropic", "openai"]
 
 [project.scripts]
 synapse = "synapse_core.cli:cli"

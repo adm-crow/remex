@@ -42,10 +42,12 @@ pip install synapse-core
 uv add synapse-core
 ```
 
-Extra file formats (`.html` `.pptx` `.xlsx` `.epub` `.odt`) and sentence chunking:
+Optional extras:
 
 ```bash
-pip install synapse-core[formats,sentence]
+pip install synapse-core[formats,sentence]   # .html .pptx .xlsx .epub .odt + sentence chunking
+pip install synapse-core[ai]                 # Anthropic + OpenAI SDKs (for --ai flag)
+pip install synapse-core[formats,sentence,ai]  # everything
 ```
 
 ---
@@ -126,7 +128,7 @@ Every command accepts `--db PATH` and `--collection NAME` to target a specific s
 synapse handles retrieval — you wire it to any LLM. Full example with the **Anthropic SDK**:
 
 ```bash
-pip install synapse-core anthropic
+pip install synapse-core[ai]
 # macOS/Linux:        export ANTHROPIC_API_KEY="sk-ant-..."
 # Windows PowerShell: $env:ANTHROPIC_API_KEY = "sk-ant-..."
 ```
