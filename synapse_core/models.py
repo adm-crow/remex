@@ -1,6 +1,6 @@
 """Public data models returned by synapse-core API functions."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, TypedDict
 
 
@@ -55,6 +55,29 @@ class IngestResult:
     """Sources skipped: extract errors, empty content, or unchanged (incremental)."""
     chunks_stored: int = 0
     """Total number of chunks written to ChromaDB."""
+    skipped_reasons: list[str] = field(default_factory=list)
+    """Human-readable reason for each skipped source, e.g. ``"doc.txt: empty"``
+    or ``"report.pdf: extract_error: …"``. One entry per skipped file, in
+    the order they were encountered."""
+
+
+@dataclass
+class PurgeResult:
+    """Summary of a completed purge run.
+
+    Returned by :func:`~synapse_core.purge`.
+
+    Example::
+
+        result = purge()
+        print(f"Deleted {result.chunks_deleted} stale chunk(s) "
+              f"out of {result.chunks_checked} scanned.")
+    """
+
+    chunks_deleted: int = 0
+    """Number of chunks removed from ChromaDB."""
+    chunks_checked: int = 0
+    """Total number of chunks scanned (includes both kept and deleted)."""
 
 
 @dataclass

@@ -5,7 +5,7 @@
   <p><strong>Local-first RAG for Python — ingest files, query semantically, feed any AI agent.</strong></p>
 
   [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-  [![tests](https://img.shields.io/badge/tests-156%20passing-brightgreen?style=flat-square)](tests/)
+  [![tests](https://img.shields.io/badge/tests-174%20passing-brightgreen?style=flat-square)](tests/)
   [![PyPI](https://img.shields.io/pypi/v/synapse-core?style=flat-square&color=blue)](https://pypi.org/project/synapse-core/)
   [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green?style=flat-square)](LICENSE)
@@ -268,11 +268,18 @@ Returns `List[QueryResult]` — each item is a typed dict with keys: `text`, `so
 from synapse_core import purge, reset, sources
 
 sources()   # list all ingested source paths
-purge()     # remove chunks whose source file no longer exists on disk
-reset()     # delete the entire collection (irreversible)
+
+result = purge()           # remove chunks whose source file no longer exists
+print(result.chunks_deleted)   # stale chunks removed
+print(result.chunks_checked)   # total chunks scanned
+
+reset(confirm=True)   # delete the entire collection — confirm=True required
 ```
 
 All three accept `db_path` and `collection_name`.
+
+> [!WARNING]
+> `reset()` requires `confirm=True` to prevent accidental data loss. The CLI (`synapse reset --yes`) passes it automatically.
 
 ```python
 # Logging — colored INFO by default
@@ -299,6 +306,7 @@ print(result.sources_found)      # files/rows discovered
 print(result.sources_ingested)   # successfully stored
 print(result.sources_skipped)    # unchanged (incremental), empty, or errored
 print(result.chunks_stored)      # total chunks written to ChromaDB
+print(result.skipped_reasons)    # ["report.pdf: empty", "data.csv: extract_error: …"]
 ```
 
 #### QueryResult
@@ -350,7 +358,7 @@ synapse/
     ├── sqlite_ingester.py   ← ingest_sqlite()
     ├── extractors.py        ← 12 formats + document metadata extraction
     ├── chunker.py           ← word-boundary & sentence-aware chunking
-    ├── models.py            ← IngestResult · QueryResult · IngestProgress
+    ├── models.py            ← IngestResult · PurgeResult · QueryResult · IngestProgress
     ├── exceptions.py        ← SynapseError hierarchy
     └── logger.py            ← colored logger · setup_logging()
 ```
@@ -376,6 +384,10 @@ synapse/
 - [x] Progress callback — `on_progress: Callable[[IngestProgress], None]` for tqdm / UIs
 - [x] Multi-collection query — merge results from several collections ranked by score
 - [x] Metadata filtering — `query(where={"source_type": {"$eq": "file"}})` ChromaDB filter
+- [x] Skip reasons — `IngestResult.skipped_reasons` exposes why each file was skipped
+- [x] `PurgeResult` — typed return with `chunks_deleted` and `chunks_checked`
+- [x] `reset(confirm=True)` — explicit confirmation guard prevents accidental data loss
+- [x] Embedding model mismatch detection — warns when model differs from collection's stored model
 - [ ] File watcher — `watch()` auto-ingest on change
 - [ ] Pluggable embedders — OpenAI, Cohere, HuggingFace Inference API
 - [ ] Pluggable vector stores — Qdrant, FAISS, Weaviate

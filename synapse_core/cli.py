@@ -251,4 +251,4 @@ def reset_cmd(db_path: str, collection: str, yes: bool) -> None:
             f"Delete collection '{collection}' in '{db_path}'? This cannot be undone.",
             abort=True,
         )
-    reset(db_path=db_path, collection_name=collection)
+    reset(db_path=db_path, collection_name=collection, confirm=True)

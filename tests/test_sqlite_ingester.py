@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from synapse_core.exceptions import SourceNotFoundError, TableNotFoundError
 from synapse_core.sqlite_ingester import ingest_sqlite
 
 
@@ -122,7 +123,7 @@ def test_ingest_sqlite_uses_rowid_when_no_id_column(mock_chroma, tmp_path):
 # --- error cases ---
 
 def test_ingest_sqlite_missing_db(tmp_path):
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(SourceNotFoundError):
         ingest_sqlite(db_path=str(tmp_path / "missing.db"), table="foo",
                       chroma_path=str(tmp_path / "db"))
 
@@ -130,7 +131,7 @@ def test_ingest_sqlite_missing_db(tmp_path):
 def test_ingest_sqlite_missing_table(tmp_path):
     db = create_test_db(tmp_path, "articles",
                         ["id INTEGER PRIMARY KEY", "title TEXT"], [(1, "Hello")])
-    with pytest.raises(ValueError, match="Table"):
+    with pytest.raises(TableNotFoundError):
         ingest_sqlite(db_path=db, table="nonexistent", chroma_path=str(tmp_path / "db"))
 
 

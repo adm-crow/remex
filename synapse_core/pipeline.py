@@ -10,7 +10,7 @@ from .chunker import chunk_text
 from .exceptions import CollectionNotFoundError, SourceNotFoundError
 from .extractors import extract, extract_metadata, extract_streaming, is_supported, supports_streaming
 from .logger import logger
-from .models import IngestProgress, IngestResult, QueryResult
+from .models import IngestProgress, IngestResult, PurgeResult, QueryResult
 
 
 def _make_id(file_path: Path, source_dir: Path, chunk_index: int) -> str:
@@ -42,9 +42,27 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
         model_name=embedding_model
     )
     if create:
-        return client.get_or_create_collection(
-            name=collection_name, embedding_function=ef  # type: ignore[arg-type]
+        collection = client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=ef,  # type: ignore[arg-type]
+            metadata={"embedding_model": embedding_model},
         )
+        # Warn if this collection was created with a different model.
+        # collection.metadata is only a dict when set explicitly; MagicMocks
+        # and pre-v0.6.1 collections (no metadata) are skipped safely.
+        stored_model = (
+            collection.metadata.get("embedding_model")
+            if isinstance(collection.metadata, dict)
+            else None
+        )
+        if stored_model and stored_model != embedding_model:
+            logger.warning(
+                "Embedding model mismatch in collection '%s': "
+                "stored='%s', requested='%s'. "
+                "Vectors may be incompatible — consider running reset() and re-ingesting.",
+                collection_name, stored_model, embedding_model,
+            )
+        return collection
     return client.get_collection(
         name=collection_name, embedding_function=ef  # type: ignore[arg-type]
     )
@@ -174,6 +192,7 @@ def ingest(
         source_str = str(file_path.resolve())
         current_hash = ""
         _status: str = "skipped"
+        _skip_reason: str = ""
 
         try:
             if incremental:
@@ -184,6 +203,7 @@ def ingest(
                     if stored_hash == current_hash:
                         if verbose:
                             logger.info("Skipping (unchanged): %s", file_path.name)
+                        _skip_reason = "hash_match"
                         result.sources_skipped += 1
                         continue
                     # File changed — delete stale chunks before re-ingesting
@@ -210,12 +230,14 @@ def ingest(
                     if verbose:
                         logger.warning("[skip] %s: %s", file_path.name, e)
                     _status = "error"
+                    _skip_reason = f"extract_error: {e}"
                     result.sources_skipped += 1
                     continue
 
                 if n == 0:
                     if verbose:
                         logger.warning("[skip] %s: no text extracted", file_path.name)
+                    _skip_reason = "empty"
                     result.sources_skipped += 1
                     continue
 
@@ -232,6 +254,7 @@ def ingest(
                     if verbose:
                         logger.warning("[skip] %s: %s", file_path.name, e)
                     _status = "error"
+                    _skip_reason = f"extract_error: {e}"
                     result.sources_skipped += 1
                     continue
 
@@ -245,6 +268,7 @@ def ingest(
                 if not chunks:
                     if verbose:
                         logger.warning("[skip] %s: no text extracted", file_path.name)
+                    _skip_reason = "empty"
                     result.sources_skipped += 1
                     continue
 
@@ -268,6 +292,8 @@ def ingest(
 
         finally:
             files_done += 1
+            if _skip_reason:
+                result.skipped_reasons.append(f"{file_path.name}: {_skip_reason}")
             if on_progress:
                 on_progress(IngestProgress(
                     filename=file_path.name,
@@ -388,11 +414,12 @@ def purge(
     db_path: str = "./synapse_db",
     collection_name: str = "synapse",
     verbose: bool = True,
-) -> int:
+) -> PurgeResult:
     """
     Remove chunks from ChromaDB whose source file no longer exists on disk.
 
-    Returns the number of chunks deleted.
+    Returns a :class:`~synapse_core.PurgeResult` with ``chunks_deleted`` and
+    ``chunks_checked``.
     """
     client = chromadb.PersistentClient(path=db_path)
     try:
@@ -400,12 +427,13 @@ def purge(
     except (ValueError, ChromaNotFoundError):
         if verbose:
             logger.warning("Collection '%s' not found.", collection_name)
-        return 0
+        return PurgeResult()
 
     results = collection.get(include=["metadatas"])
+    all_ids = results["ids"]
     stale_ids = [
         id_
-        for id_, meta in zip(results["ids"], results["metadatas"])  # type: ignore[arg-type]
+        for id_, meta in zip(all_ids, results["metadatas"])  # type: ignore[arg-type]
         if not _source_exists(meta)
     ]
 
@@ -416,15 +444,30 @@ def purge(
     elif verbose:
         logger.info("Nothing to purge — all sources still exist.")
 
-    return len(stale_ids)
+    return PurgeResult(chunks_deleted=len(stale_ids), chunks_checked=len(all_ids))
 
 
 def reset(
     db_path: str = "./synapse_db",
     collection_name: str = "synapse",
     verbose: bool = True,
+    confirm: bool = False,
 ) -> None:
-    """Delete the entire ChromaDB collection."""
+    """Delete the entire ChromaDB collection.
+
+    Args:
+        confirm: Must be ``True`` to proceed. This guard prevents accidental
+                 programmatic resets. The CLI passes ``confirm=True`` after
+                 prompting the user with ``--yes`` or an interactive confirm.
+
+    Raises:
+        ValueError: If ``confirm`` is ``False``.
+    """
+    if not confirm:
+        raise ValueError(
+            "reset() permanently deletes the collection. "
+            "Pass confirm=True to proceed, or use the CLI (`synapse reset --yes`)."
+        )
     client = chromadb.PersistentClient(path=db_path)
     try:
         client.delete_collection(name=collection_name)
