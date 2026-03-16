@@ -116,8 +116,14 @@ def _answer_ollama(question: str, system: str, model: str) -> str:
     )
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read())["response"]
+            data = json.loads(resp.read())
     except urllib.error.URLError as e:
         raise RuntimeError(
             f"Ollama request failed: {e}. Is 'ollama serve' running?"
         )
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Ollama returned invalid JSON: {e}")
+    try:
+        return data["response"]
+    except KeyError:
+        raise RuntimeError(f"Unexpected Ollama response format: {data}")

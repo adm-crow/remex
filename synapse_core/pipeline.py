@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 import chromadb
+from chromadb.errors import NotFoundError as ChromaNotFoundError
 from chromadb.utils import embedding_functions
 
 from .chunker import chunk_text
@@ -186,7 +187,7 @@ def query(
     """
     try:
         collection = _get_collection(db_path, collection_name, embedding_model, create=False)
-    except ValueError:
+    except (ValueError, ChromaNotFoundError):
         raise CollectionNotFoundError(
             f"Collection '{collection_name}' not found in '{db_path}' — run ingest() first."
         ) from None
@@ -243,7 +244,7 @@ def purge(
     client = chromadb.PersistentClient(path=db_path)
     try:
         collection = client.get_collection(name=collection_name)
-    except ValueError:
+    except (ValueError, ChromaNotFoundError):
         if verbose:
             logger.warning("Collection '%s' not found.", collection_name)
         return 0
@@ -276,7 +277,7 @@ def reset(
         client.delete_collection(name=collection_name)
         if verbose:
             logger.info("Collection '%s' deleted.", collection_name)
-    except ValueError:
+    except (ValueError, ChromaNotFoundError):
         if verbose:
             logger.warning("Collection '%s' not found.", collection_name)
 
@@ -289,7 +290,7 @@ def sources(
     client = chromadb.PersistentClient(path=db_path)
     try:
         collection = client.get_collection(name=collection_name)
-    except ValueError:
+    except (ValueError, ChromaNotFoundError):
         return []
 
     results = collection.get(include=["metadatas"])

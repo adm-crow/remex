@@ -1,7 +1,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from chromadb.errors import NotFoundError as ChromaNotFoundError
 
+from synapse_core.exceptions import CollectionNotFoundError
 from synapse_core.pipeline import ingest, purge, query, reset, sources
 
 
@@ -305,7 +307,18 @@ def test_query_raises_if_collection_not_found(tmp_path):
 
     with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
          patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
-        with pytest.raises(ValueError, match="ingest()"):
+        with pytest.raises(CollectionNotFoundError):
+            query(text="test", db_path=str(tmp_path / "db"))
+
+
+def test_query_raises_collection_not_found_on_chroma_not_found_error(tmp_path):
+    """Real chromadb raises NotFoundError (not ValueError) — must still produce CollectionNotFoundError."""
+    client = MagicMock()
+    client.get_collection.side_effect = ChromaNotFoundError("Collection nonexistent does not exist")
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+        with pytest.raises(CollectionNotFoundError):
             query(text="test", db_path=str(tmp_path / "db"))
 
 
