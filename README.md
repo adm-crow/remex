@@ -5,7 +5,7 @@
   <p><strong>Local-first RAG for Python — ingest files, query semantically, feed any AI agent.</strong></p>
 
   [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-  [![tests](https://img.shields.io/badge/tests-155%20passing-brightgreen?style=flat-square)](tests/)
+  [![tests](https://img.shields.io/badge/tests-156%20passing-brightgreen?style=flat-square)](tests/)
   [![PyPI](https://img.shields.io/pypi/v/synapse-core?style=flat-square&color=blue)](https://pypi.org/project/synapse-core/)
   [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green?style=flat-square)](LICENSE)
@@ -350,7 +350,7 @@ synapse/
     ├── sqlite_ingester.py   ← ingest_sqlite()
     ├── extractors.py        ← 12 formats + document metadata extraction
     ├── chunker.py           ← word-boundary & sentence-aware chunking
-    ├── models.py            ← IngestResult · QueryResult
+    ├── models.py            ← IngestResult · QueryResult · IngestProgress
     ├── exceptions.py        ← SynapseError hierarchy
     └── logger.py            ← colored logger · setup_logging()
 ```
