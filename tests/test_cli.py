@@ -192,6 +192,65 @@ def test_cli_query_ai_missing_sdk_shows_error(mock_query, mock_detect, mock_gene
     assert "Error:" in result.output
 
 
+# --- new v0.6 CLI options ---
+
+@patch("synapse_core.cli.ingest")
+def test_cli_ingest_streaming_threshold_converted_to_bytes(mock_ingest):
+    """--streaming-threshold N (MB) must be passed as N*1024*1024 bytes."""
+    result = CliRunner().invoke(cli, ["ingest", "./docs", "--streaming-threshold", "10"])
+    assert result.exit_code == 0
+    assert mock_ingest.call_args.kwargs["streaming_threshold"] == 10 * 1024 * 1024
+
+
+@patch("synapse_core.cli.ingest")
+def test_cli_ingest_streaming_threshold_zero_disables(mock_ingest):
+    result = CliRunner().invoke(cli, ["ingest", "./docs", "--streaming-threshold", "0"])
+    assert result.exit_code == 0
+    assert mock_ingest.call_args.kwargs["streaming_threshold"] == 0
+
+
+@patch("synapse_core.cli.ingest")
+def test_cli_ingest_streaming_threshold_negative_rejected(mock_ingest):
+    result = CliRunner().invoke(cli, ["ingest", "./docs", "--streaming-threshold", "-1"])
+    assert result.exit_code != 0
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_where_valid_json(mock_query):
+    mock_query.return_value = []
+    result = CliRunner().invoke(
+        cli, ["query", "test", "--where", '{"source_type": {"$eq": "file"}}']
+    )
+    assert result.exit_code == 0
+    call_kwargs = mock_query.call_args.kwargs
+    assert call_kwargs["where"] == {"source_type": {"$eq": "file"}}
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_where_invalid_json_exits_nonzero(mock_query):
+    result = CliRunner().invoke(cli, ["query", "test", "--where", "not json"])
+    assert result.exit_code != 0
+    assert "not valid JSON" in result.output
+    mock_query.assert_not_called()
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_collections_passed_as_list(mock_query):
+    mock_query.return_value = []
+    result = CliRunner().invoke(
+        cli, ["query", "test", "--collections", "col_a,col_b,col_c"]
+    )
+    assert result.exit_code == 0
+    call_kwargs = mock_query.call_args.kwargs
+    assert call_kwargs["collection_names"] == ["col_a", "col_b", "col_c"]
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_n_results_zero_rejected(mock_query):
+    result = CliRunner().invoke(cli, ["query", "test", "-n", "0"])
+    assert result.exit_code != 0
+
+
 # --- error handling ---
 
 @patch("synapse_core.cli.ingest")

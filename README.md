@@ -5,7 +5,7 @@
   <p><strong>Local-first RAG for Python — ingest files, query semantically, feed any AI agent.</strong></p>
 
   [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-  [![tests](https://img.shields.io/badge/tests-124%20passing-brightgreen?style=flat-square)](tests/)
+  [![tests](https://img.shields.io/badge/tests-155%20passing-brightgreen?style=flat-square)](tests/)
   [![PyPI](https://img.shields.io/pypi/v/synapse-core?style=flat-square&color=blue)](https://pypi.org/project/synapse-core/)
   [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green?style=flat-square)](LICENSE)
@@ -94,10 +94,13 @@ for r in results:
 synapse ingest ./docs
 synapse ingest ./docs --incremental          # skip unchanged files
 synapse ingest ./docs --chunking sentence    # sentence-aware splitting
+synapse ingest ./docs --streaming-threshold 100  # stream files > 100 MB (default 50)
 synapse ingest-sqlite ./data.db --table articles
 
 # Query
 synapse query "what is the refund policy?"   # raw chunks
+synapse query "..." --collections "docs,archive"  # merge results from multiple collections
+synapse query "..." --where '{"source_type": {"$eq": "file"}}'  # metadata filter
 
 # AI-powered answer — set your key first:
 # macOS/Linux:        export ANTHROPIC_API_KEY="sk-ant-..."
@@ -172,21 +175,36 @@ print(ask("What is the refund policy?"))
 
 ```python
 result = ingest(
-    source_dir      = "./docs",             # folder to scan (recursive)
-    db_path         = "./synapse_db",       # ChromaDB persistence path
-    collection_name = "synapse",
-    chunk_size      = 1000,                 # target characters per chunk
-    overlap         = 200,                  # overlap between consecutive chunks
-    min_chunk_size  = 50,                   # discard chunks shorter than this
-    embedding_model = "all-MiniLM-L6-v2",
-    incremental     = False,                # skip unchanged files (SHA-256)
-    chunking        = "word",               # "word" or "sentence" (requires [sentence])
-    verbose         = True,
+    source_dir           = "./docs",            # folder to scan (recursive)
+    db_path              = "./synapse_db",      # ChromaDB persistence path
+    collection_name      = "synapse",
+    chunk_size           = 1000,                # target characters per chunk
+    overlap              = 200,                 # overlap between consecutive chunks
+    min_chunk_size       = 50,                  # discard chunks shorter than this
+    embedding_model      = "all-MiniLM-L6-v2",
+    incremental          = False,               # skip unchanged files (SHA-256)
+    chunking             = "word",              # "word" or "sentence" (requires [sentence])
+    verbose              = True,
+    streaming_threshold  = 50 * 1024 * 1024,   # stream .txt/.md/.csv/.jsonl files > 50 MB
+    on_progress          = None,                # optional Callable[[IngestProgress], None]
 )
 # result.sources_found / sources_ingested / sources_skipped / chunks_stored
 ```
 
 Raises `SourceNotFoundError` if `source_dir` does not exist.
+
+**Progress callback (tqdm example):**
+```python
+from tqdm import tqdm
+from synapse_core import ingest, IngestProgress
+
+with tqdm(unit="file") as bar:
+    def _cb(p: IngestProgress) -> None:
+        bar.total = p.files_total
+        bar.update(1)
+        bar.set_postfix(file=p.filename, status=p.status)
+    ingest("./docs", on_progress=_cb)
+```
 
 </details>
 
@@ -221,15 +239,23 @@ Raises `SourceNotFoundError` if the database file is missing, `TableNotFoundErro
 
 ```python
 results = query(
-    text            = "what is the refund policy?",
-    db_path         = "./synapse_db",
-    collection_name = "synapse",
-    n_results       = 5,
-    embedding_model = "all-MiniLM-L6-v2",  # must match the model used at ingest
+    text             = "what is the refund policy?",
+    db_path          = "./synapse_db",
+    collection_name  = "synapse",
+    n_results        = 5,
+    embedding_model  = "all-MiniLM-L6-v2",  # must match the model used at ingest
+    where            = None,                 # optional ChromaDB metadata filter
+    collection_names = None,                 # query multiple collections, merge by score
 )
+
+# Metadata filter example — only return file chunks:
+results = query("...", where={"source_type": {"$eq": "file"}})
+
+# Multi-collection example — merge results from two collections:
+results = query("...", collection_names=["docs", "archive"])
 ```
 
-Returns `List[QueryResult]` — each item is a typed dict with keys: `text`, `source`, `source_type`, `score`, `distance`, `chunk`, `doc_title`, `doc_author`, `doc_created`. Raises `CollectionNotFoundError` if no collection exists yet.
+Returns `List[QueryResult]` — each item is a typed dict with keys: `text`, `source`, `source_type`, `score`, `distance`, `chunk`, `doc_title`, `doc_author`, `doc_created`. Raises `CollectionNotFoundError` if no collection exists yet (single-collection mode). Missing collections are silently skipped in multi-collection mode.
 
 </details>
 
@@ -344,6 +370,10 @@ synapse/
 - [x] PyPI release — `pip install synapse-core`
 - [x] CLI — `synapse ingest`, `query --ai`, `purge`, `reset`, `sources`
 - [x] Typed API — `IngestResult`, `QueryResult`, `SynapseError` hierarchy
+- [x] Streaming ingest — pages through large files without loading them fully into memory
+- [x] Progress callback — `on_progress: Callable[[IngestProgress], None]` for tqdm / UIs
+- [x] Multi-collection query — merge results from several collections ranked by score
+- [x] Metadata filtering — `query(where={"source_type": {"$eq": "file"}})` ChromaDB filter
 - [ ] File watcher — `watch()` auto-ingest on change
 - [ ] Pluggable embedders — OpenAI, Cohere, HuggingFace Inference API
 - [ ] Pluggable vector stores — Qdrant, FAISS, Weaviate

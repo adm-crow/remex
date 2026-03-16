@@ -30,7 +30,7 @@ def cli() -> None:
 @click.option("--chunking", default="word", show_default=True,
               type=click.Choice(["word", "sentence"]),
               help="Chunking strategy.")
-@click.option("--streaming-threshold", default=50, show_default=True,
+@click.option("--streaming-threshold", default=50, show_default=True, type=click.IntRange(min=0),
               help="Stream files larger than this size (MB) to limit memory use. 0 = disable.")
 def ingest_cmd(
     source_dir: str,
@@ -104,7 +104,7 @@ def ingest_sqlite_cmd(
               help="ChromaDB persistence path.")
 @click.option("--collection", default="synapse", show_default=True,
               help="Collection name.")
-@click.option("-n", "--n-results", default=5, show_default=True,
+@click.option("-n", "--n-results", default=5, show_default=True, type=click.IntRange(min=1),
               help="Number of results to return.")
 @click.option("--ai", "use_ai", is_flag=True,
               help="Generate an AI answer from the retrieved chunks.")

@@ -4,7 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from synapse_core.extractors import extract, extract_metadata, is_supported
+from synapse_core.extractors import (
+    extract, extract_metadata, extract_streaming, is_supported, supports_streaming,
+)
 
 
 # --- helpers ---
@@ -269,3 +271,78 @@ def test_extract_metadata_never_raises(tmp_path):
     meta = extract_metadata(path)
     assert isinstance(meta, dict)
     assert all(isinstance(v, str) for v in meta.values())
+
+
+# =============================================================================
+# supports_streaming / extract_streaming
+# =============================================================================
+
+def test_supports_streaming_text_formats(tmp_path):
+    for suffix in (".txt", ".md", ".csv", ".jsonl"):
+        assert supports_streaming(tmp_path / f"file{suffix}") is True
+
+
+def test_supports_streaming_binary_formats(tmp_path):
+    for suffix in (".pdf", ".docx", ".xlsx", ".epub", ".odt", ".json", ".html", ".pptx"):
+        assert supports_streaming(tmp_path / f"file{suffix}") is False
+
+
+def test_extract_streaming_txt_yields_all_content(tmp_path):
+    content = "word " * 500  # ~2500 chars
+    path = write_temp(tmp_path, ".txt", content)
+    blocks = list(extract_streaming(path, block_size=512))
+    assert len(blocks) > 1  # must yield multiple blocks for this size
+    assert "".join(blocks) == content
+
+
+def test_extract_streaming_txt_small_file_single_block(tmp_path):
+    path = write_temp(tmp_path, ".txt", "short text")
+    blocks = list(extract_streaming(path, block_size=65536))
+    assert blocks == ["short text"]
+
+
+def test_extract_streaming_md_yields_all_content(tmp_path):
+    content = "# Title\n" + "paragraph " * 200
+    path = write_temp(tmp_path, ".md", content)
+    rejoined = "".join(extract_streaming(path, block_size=256))
+    assert rejoined == content
+
+
+def test_extract_streaming_csv_yields_all_rows(tmp_path):
+    rows = [f"col1_{i}, col2_{i}" for i in range(100)]
+    path = write_temp(tmp_path, ".csv", "\n".join(rows))
+    blocks = list(extract_streaming(path, block_size=128))
+    full = "\n".join(blocks)
+    # Every row value must appear somewhere in the output
+    assert "col1_0" in full
+    assert "col1_99" in full
+
+
+def test_extract_streaming_jsonl_yields_all_records(tmp_path):
+    lines = [f'{{"id": {i}, "text": "record {i}"}}' for i in range(50)]
+    path = write_temp(tmp_path, ".jsonl", "\n".join(lines))
+    blocks = list(extract_streaming(path, block_size=128))
+    full = "\n".join(blocks)
+    assert "record 0" in full
+    assert "record 49" in full
+
+
+def test_extract_streaming_jsonl_skips_bad_lines(tmp_path):
+    """Invalid JSON lines are skipped; valid lines must still appear in output."""
+    content = '{"ok": "yes"}\nnot valid json\n{"also": "fine"}'
+    path = write_temp(tmp_path, ".jsonl", content)
+    blocks = list(extract_streaming(path))
+    full = "".join(blocks)
+    assert "yes" in full
+    assert "fine" in full
+    # The bad line text itself must not leak into the output
+    assert "not valid json" not in full
+
+
+def test_extract_streaming_non_streaming_format_falls_back(tmp_path):
+    """Unsupported streaming formats must fall back to a single full-text block."""
+    content = '{"key": "value"}'
+    path = write_temp(tmp_path, ".json", content)
+    blocks = list(extract_streaming(path))
+    assert len(blocks) == 1
+    assert "value" in blocks[0]
