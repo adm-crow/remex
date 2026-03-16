@@ -1,6 +1,6 @@
 import hashlib
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 
 import chromadb
 from chromadb.errors import NotFoundError as ChromaNotFoundError
@@ -66,6 +66,12 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
     return client.get_collection(
         name=collection_name, embedding_function=ef  # type: ignore[arg-type]
     )
+
+
+def _make_id_abs(file_path: Path, chunk_index: int) -> str:
+    """Stable unique ID based on absolute path — used by ingest_many()."""
+    key = f"{file_path.resolve()}::{chunk_index}"
+    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
 
 
 _STREAM_BATCH = 100  # max chunks per ChromaDB upsert call during streaming
@@ -338,6 +344,9 @@ def query(
         List of :class:`~synapse_core.QueryResult` dicts sorted by relevance
         (highest score first).
     """
+    if n_results < 1:
+        raise ValueError("n_results must be >= 1")
+
     # ── multi-collection: query each, merge, return top-n ─────────────────
     if collection_names:
         all_results: List[QueryResult] = []
@@ -498,3 +507,125 @@ def sources(
             seen.add(src)
             unique.append(src)
     return sorted(unique)
+
+
+def ingest_many(
+    paths: List[Union[str, Path]],
+    db_path: str = "./synapse_db",
+    collection_name: str = "synapse",
+    chunk_size: int = 1000,
+    overlap: int = 200,
+    min_chunk_size: int = 50,
+    embedding_model: str = "all-MiniLM-L6-v2",
+    chunking: str = "word",
+    verbose: bool = True,
+    on_progress: Optional[Callable[[IngestProgress], None]] = None,
+) -> IngestResult:
+    """
+    Ingest a specific list of files into a ChromaDB collection.
+
+    Unlike :func:`ingest`, which scans a directory recursively, this function
+    accepts an explicit list of file paths — useful when you already know which
+    files to embed (e.g. recently modified files, a filtered subset, etc.).
+
+    Args:
+        paths:            List of file paths (``str`` or :class:`pathlib.Path`).
+                          Unsupported or missing files are skipped and recorded
+                          in :attr:`IngestResult.skipped_reasons`.
+        db_path:          Path where ChromaDB persists data.
+        collection_name:  Name of the ChromaDB collection.
+        chunk_size:       Target character count per chunk.
+        overlap:          Character overlap between consecutive chunks.
+        min_chunk_size:   Discard chunks shorter than this (chars).
+        embedding_model:  SentenceTransformer model name.
+        chunking:         ``"word"`` (default) or ``"sentence"`` (requires nltk).
+        verbose:          Emit progress via the synapse_core logger.
+        on_progress:      Optional callback invoked after each file is processed.
+                          Receives an :class:`IngestProgress` instance.
+    """
+    file_paths = [Path(p).resolve() for p in paths]
+    result = IngestResult(sources_found=len(file_paths))
+
+    if not file_paths:
+        return result
+
+    collection = _get_collection(db_path, collection_name, embedding_model)
+
+    for i, file_path in enumerate(file_paths, 1):
+        _status: str = "skipped"
+        _skip_reason: str = ""
+
+        try:
+            if not file_path.exists():
+                if verbose:
+                    logger.warning("[skip] %s: file not found", file_path.name)
+                _skip_reason = "extract_error: file not found"
+                result.sources_skipped += 1
+                continue
+
+            if not is_supported(file_path):
+                if verbose:
+                    logger.warning("[skip] %s: unsupported format", file_path.name)
+                _skip_reason = "extract_error: unsupported format"
+                result.sources_skipped += 1
+                continue
+
+            if verbose:
+                logger.info("Ingesting: %s", file_path.name)
+
+            try:
+                text = extract(file_path)
+            except Exception as e:
+                if verbose:
+                    logger.warning("[skip] %s: %s", file_path.name, e)
+                _skip_reason = f"extract_error: {e}"
+                result.sources_skipped += 1
+                continue
+
+            chunks = chunk_text(
+                text,
+                chunk_size=chunk_size,
+                overlap=overlap,
+                min_chunk_size=min_chunk_size,
+                mode=chunking,
+            )
+            if not chunks:
+                if verbose:
+                    logger.warning("[skip] %s: no text extracted", file_path.name)
+                _skip_reason = "empty"
+                result.sources_skipped += 1
+                continue
+
+            source_str = str(file_path)
+            ids = [_make_id_abs(file_path, j) for j in range(len(chunks))]
+            doc_meta = extract_metadata(file_path)
+            metadatas = [
+                {"source_type": "file", "source": source_str, "chunk": j, **doc_meta}
+                for j in range(len(chunks))
+            ]
+            collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
+            result.sources_ingested += 1
+            result.chunks_stored += len(chunks)
+            _status = "ingested"
+            if verbose:
+                logger.info("  -> %d chunks stored", len(chunks))
+
+        finally:
+            if _skip_reason:
+                result.skipped_reasons.append(f"{file_path.name}: {_skip_reason}")
+            if on_progress:
+                on_progress(IngestProgress(
+                    filename=file_path.name,
+                    files_done=i,
+                    files_total=len(file_paths),
+                    status=_status,  # type: ignore[arg-type]
+                    chunks_stored=result.chunks_stored,
+                ))
+
+    if verbose:
+        logger.info(
+            "Done. %d/%d files ingested, %d chunks stored.",
+            result.sources_ingested, len(file_paths), result.chunks_stored,
+        )
+
+    return result

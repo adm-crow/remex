@@ -1,3 +1,4 @@
+import json as _json
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -98,6 +99,14 @@ def test_cli_reset_aborts_without_confirmation(mock_reset):
     mock_reset.assert_not_called()
 
 
+@patch("synapse_core.cli.reset")
+def test_cli_reset_passes_confirm_true(mock_reset):
+    """CLI reset must always pass confirm=True to the API."""
+    result = CliRunner().invoke(cli, ["reset", "--yes"])
+    assert result.exit_code == 0
+    assert mock_reset.call_args.kwargs.get("confirm") is True
+
+
 def test_cli_version():
     result = CliRunner().invoke(cli, ["--version"])
     assert result.exit_code == 0
@@ -123,6 +132,42 @@ def test_cli_ingest_sqlite_missing_table_errors(mock_ingest_sqlite):
     result = CliRunner().invoke(cli, ["ingest-sqlite", "./data.db"])
     assert result.exit_code != 0
     mock_ingest_sqlite.assert_not_called()
+
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_columns_parsed_as_list(mock_ingest_sqlite):
+    result = CliRunner().invoke(cli, [
+        "ingest-sqlite", "./data.db", "--table", "articles", "--columns", "title,body"
+    ])
+    assert result.exit_code == 0
+    assert mock_ingest_sqlite.call_args.kwargs["columns"] == ["title", "body"]
+
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_id_column_passed(mock_ingest_sqlite):
+    result = CliRunner().invoke(cli, [
+        "ingest-sqlite", "./data.db", "--table", "articles", "--id-column", "uuid"
+    ])
+    assert result.exit_code == 0
+    assert mock_ingest_sqlite.call_args.kwargs["id_column"] == "uuid"
+
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_row_template_passed(mock_ingest_sqlite):
+    result = CliRunner().invoke(cli, [
+        "ingest-sqlite", "./data.db", "--table", "articles", "--row-template", "{title}: {body}"
+    ])
+    assert result.exit_code == 0
+    assert mock_ingest_sqlite.call_args.kwargs["row_template"] == "{title}: {body}"
+
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_chunking_sentence(mock_ingest_sqlite):
+    result = CliRunner().invoke(cli, [
+        "ingest-sqlite", "./data.db", "--table", "articles", "--chunking", "sentence"
+    ])
+    assert result.exit_code == 0
+    assert mock_ingest_sqlite.call_args.kwargs["chunking"] == "sentence"
 
 
 # --- --ai flag ---
@@ -192,7 +237,54 @@ def test_cli_query_ai_missing_sdk_shows_error(mock_query, mock_detect, mock_gene
     assert "Error:" in result.output
 
 
+# --- --format json ---
+
+@patch("synapse_core.cli.query")
+def test_cli_query_format_json_outputs_json(mock_query):
+    mock_query.return_value = [
+        {"text": "chunk", "source": "/a.txt", "score": 0.9, "chunk": 0,
+         "source_type": "file", "distance": 0.1, "doc_title": "", "doc_author": "", "doc_created": ""}
+    ]
+    result = CliRunner().invoke(cli, ["query", "test", "--format", "json"])
+    assert result.exit_code == 0
+    data = _json.loads(result.output)
+    assert isinstance(data, list)
+    assert data[0]["source"] == "/a.txt"
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_format_json_empty_results(mock_query):
+    mock_query.return_value = []
+    result = CliRunner().invoke(cli, ["query", "test", "--format", "json"])
+    assert result.exit_code == 0
+    assert _json.loads(result.output) == []
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_format_json_ai_flag_rejected(mock_query):
+    """--format json cannot be combined with --ai."""
+    result = CliRunner().invoke(cli, ["query", "test", "--format", "json", "--ai"])
+    assert result.exit_code != 0
+    mock_query.assert_not_called()
+
+
 # --- new v0.6 CLI options ---
+
+@patch("synapse_core.cli.ingest")
+def test_cli_ingest_min_chunk_size_passed(mock_ingest):
+    result = CliRunner().invoke(cli, ["ingest", "./docs", "--min-chunk-size", "100"])
+    assert result.exit_code == 0
+    assert mock_ingest.call_args.kwargs["min_chunk_size"] == 100
+
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_min_chunk_size_passed(mock_ingest_sqlite):
+    result = CliRunner().invoke(cli, [
+        "ingest-sqlite", "./data.db", "--table", "articles", "--min-chunk-size", "30"
+    ])
+    assert result.exit_code == 0
+    assert mock_ingest_sqlite.call_args.kwargs["min_chunk_size"] == 30
+
 
 @patch("synapse_core.cli.ingest")
 def test_cli_ingest_streaming_threshold_converted_to_bytes(mock_ingest):

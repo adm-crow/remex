@@ -1,12 +1,12 @@
 import hashlib
 import sqlite3
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from .chunker import chunk_text
 from .exceptions import SourceNotFoundError, TableNotFoundError
 from .logger import logger
-from .models import IngestResult
+from .models import IngestProgress, IngestResult
 from .pipeline import _get_collection
 
 
@@ -45,6 +45,7 @@ def ingest_sqlite(
     embedding_model: str = "all-MiniLM-L6-v2",
     chunking: str = "word",
     verbose: bool = True,
+    on_progress: Optional[Callable[[IngestProgress], None]] = None,
 ) -> IngestResult:
     """
     Ingest records from a SQLite table into a ChromaDB collection.
@@ -68,6 +69,8 @@ def ingest_sqlite(
         embedding_model:  SentenceTransformer model name.
         chunking:         "word" (default) or "sentence" (requires nltk).
         verbose:          Emit progress via the synapse_core logger.
+        on_progress:      Optional callback invoked after each row is processed.
+                          Receives an :class:`IngestProgress` instance.
     """
     if not Path(db_path).exists():
         raise SourceNotFoundError(f"SQLite database not found: {db_path}")
@@ -121,44 +124,58 @@ def ingest_sqlite(
     if verbose:
         logger.info("Ingesting: %s (%d records)", table, len(rows))
 
-    for row in rows:
+    for rows_done, row in enumerate(rows, 1):
         row_dict = dict(row)
+        row_id = None
+        _status = "skipped"
 
-        # Extract row identity
-        if use_rowid:
-            row_id = row_dict.pop("rowid")
-        else:
-            row_id = row_dict.get(id_column)
+        try:
+            # Extract row identity
+            if use_rowid:
+                row_id = row_dict.pop("rowid")
+            else:
+                row_id = row_dict.get(id_column)
 
-        # Only include selected columns in the text representation
-        text_dict = {k: row_dict[k] for k in selected if k in row_dict}
-        text = _row_to_text(text_dict, row_template)
+            # Only include selected columns in the text representation
+            text_dict = {k: row_dict[k] for k in selected if k in row_dict}
+            text = _row_to_text(text_dict, row_template)
 
-        chunks = chunk_text(
-            text,
-            chunk_size=chunk_size,
-            overlap=overlap,
-            min_chunk_size=min_chunk_size,
-            mode=chunking,
-        )
-        if not chunks:
-            result.sources_skipped += 1
-            continue
+            chunks = chunk_text(
+                text,
+                chunk_size=chunk_size,
+                overlap=overlap,
+                min_chunk_size=min_chunk_size,
+                mode=chunking,
+            )
+            if not chunks:
+                result.sources_skipped += 1
+                continue
 
-        ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(len(chunks))]
-        metadatas = [
-            {
-                "source_type": "sqlite",
-                "source": f"{Path(db_path).resolve()}::{table}",
-                "row_id": str(row_id),
-                "chunk": i,
-            }
-            for i in range(len(chunks))
-        ]
+            ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(len(chunks))]
+            metadatas = [
+                {
+                    "source_type": "sqlite",
+                    "source": f"{Path(db_path).resolve()}::{table}",
+                    "row_id": str(row_id),
+                    "chunk": i,
+                }
+                for i in range(len(chunks))
+            ]
 
-        collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
-        result.sources_ingested += 1
-        result.chunks_stored += len(chunks)
+            collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
+            result.sources_ingested += 1
+            result.chunks_stored += len(chunks)
+            _status = "ingested"
+
+        finally:
+            if on_progress:
+                on_progress(IngestProgress(
+                    filename=f"{table}[{row_id}]",
+                    files_done=rows_done,
+                    files_total=len(rows),
+                    status=_status,  # type: ignore[arg-type]
+                    chunks_stored=result.chunks_stored,
+                ))
 
     if verbose:
         logger.info("  -> %d chunks stored", result.chunks_stored)

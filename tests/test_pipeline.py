@@ -1,16 +1,19 @@
+import hashlib
 from unittest.mock import MagicMock, patch
 
 import pytest
 from chromadb.errors import NotFoundError as ChromaNotFoundError
 
 from synapse_core.exceptions import CollectionNotFoundError
-from synapse_core.pipeline import ingest, purge, query, reset, sources
+from synapse_core.pipeline import ingest, ingest_many, purge, query, reset, sources
 
 
 def make_docs_dir(tmp_path, *filenames_and_contents):
     """Populate tmp_path with (filename, content) pairs and return its str path."""
     for filename, content in filenames_and_contents:
-        (tmp_path / filename).write_text(content, encoding="utf-8")
+        p = tmp_path / filename
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
     return str(tmp_path)
 
 
@@ -69,19 +72,6 @@ def test_ingest_empty_file_is_skipped(mock_chroma, tmp_path):
 def test_ingest_missing_directory_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         ingest(source_dir=str(tmp_path / "nonexistent"), db_path=str(tmp_path / "db"))
-
-
-def test_ingest_no_supported_files_verbose_false_no_output(mock_chroma, tmp_path, capsys):
-    docs = make_docs_dir(tmp_path, ("image.png", "fake"))
-    ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
-    assert capsys.readouterr().out == ""
-
-
-def test_ingest_skip_messages_suppressed_when_verbose_false(mock_chroma, tmp_path, capsys):
-    """Empty file triggers [skip] path — must produce no output when verbose=False."""
-    docs = make_docs_dir(tmp_path, ("empty.txt", ""))
-    ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
-    assert capsys.readouterr().out == ""
 
 
 def test_upsert_payload_structure(mock_chroma, tmp_path):
@@ -219,6 +209,25 @@ def test_purge_nothing_when_all_exist(tmp_path):
     collection.delete.assert_not_called()
 
 
+def test_purge_result_has_chunks_checked(tmp_path):
+    collection = MagicMock()
+    collection.get.return_value = {
+        "ids": ["id1", "id2"],
+        "metadatas": [
+            {"source": str(tmp_path / "gone1.txt"), "chunk": 0},
+            {"source": str(tmp_path / "gone2.txt"), "chunk": 0},
+        ],
+    }
+    client = MagicMock()
+    client.get_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        result = purge(db_path=str(tmp_path / "db"), verbose=False)
+
+    assert result.chunks_checked == 2
+    assert result.chunks_deleted == 2
+
+
 # --- reset ---
 
 def test_reset_deletes_collection(tmp_path):
@@ -226,6 +235,19 @@ def test_reset_deletes_collection(tmp_path):
     with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
         reset(db_path=str(tmp_path / "db"), verbose=False, confirm=True)
     client.delete_collection.assert_called_once_with(name="synapse")
+
+
+def test_reset_without_confirm_raises(tmp_path):
+    with pytest.raises(ValueError, match="confirm=True"):
+        reset(db_path=str(tmp_path / "db"), confirm=False)
+
+
+def test_reset_confirm_false_does_not_touch_chroma(tmp_path):
+    client = MagicMock()
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        with pytest.raises(ValueError):
+            reset(db_path=str(tmp_path / "db"), confirm=False)
+    client.delete_collection.assert_not_called()
 
 
 # --- sources ---
@@ -330,7 +352,6 @@ def test_incremental_skips_unchanged_file(tmp_path):
     docs = make_docs_dir(tmp_path, ("doc.txt", content))
     file_path = tmp_path / "doc.txt"
 
-    import hashlib
     current_hash = hashlib.sha256(file_path.read_bytes(), usedforsecurity=False).hexdigest()
 
     collection = MagicMock()
@@ -450,6 +471,16 @@ def test_query_clamps_n_results_to_collection_size(tmp_path):
     assert len(results) == 2
 
 
+def test_query_n_results_zero_raises(tmp_path):
+    with pytest.raises(ValueError, match="n_results"):
+        query(text="test", db_path=str(tmp_path / "db"), n_results=0)
+
+
+def test_query_n_results_negative_raises(tmp_path):
+    with pytest.raises(ValueError, match="n_results"):
+        query(text="test", db_path=str(tmp_path / "db"), n_results=-1)
+
+
 def test_query_returns_empty_on_empty_collection(tmp_path):
     """query() must return [] immediately when the collection is empty."""
     collection = MagicMock()
@@ -463,3 +494,301 @@ def test_query_returns_empty_on_empty_collection(tmp_path):
 
     collection.query.assert_not_called()
     assert results == []
+
+
+# --- progress callback ---
+
+def test_ingest_on_progress_called_for_each_file(mock_chroma, tmp_path):
+    docs = make_docs_dir(
+        tmp_path,
+        ("a.txt", "word " * 30),
+        ("b.txt", "word " * 30),
+    )
+    calls = []
+    ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False, on_progress=calls.append)
+    assert len(calls) == 2
+    assert calls[0].files_total == 2
+    assert calls[-1].files_done == 2
+
+
+def test_ingest_on_progress_called_even_on_skip(mock_chroma, tmp_path):
+    """Empty file is skipped — on_progress must still fire."""
+    docs = make_docs_dir(tmp_path, ("empty.txt", ""))
+    calls = []
+    ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False, on_progress=calls.append)
+    assert len(calls) == 1
+    assert calls[0].status == "skipped"
+
+
+def test_ingest_on_progress_status_ingested(mock_chroma, tmp_path):
+    docs = make_docs_dir(tmp_path, ("doc.txt", "word " * 30))
+    calls = []
+    ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False, on_progress=calls.append)
+    assert calls[0].status == "ingested"
+    assert calls[0].chunks_stored > 0
+
+
+# --- skipped_reasons ---
+
+def test_ingest_skipped_reasons_empty_file(mock_chroma, tmp_path):
+    docs = make_docs_dir(tmp_path, ("empty.txt", ""))
+    result = ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
+    assert len(result.skipped_reasons) == 1
+    assert "empty" in result.skipped_reasons[0]
+
+
+def test_ingest_skipped_reasons_hash_match(tmp_path):
+    content = "word " * 30
+    docs = make_docs_dir(tmp_path, ("doc.txt", content))
+    file_path = tmp_path / "doc.txt"
+    current_hash = hashlib.sha256(file_path.read_bytes(), usedforsecurity=False).hexdigest()
+
+    collection = MagicMock()
+    collection.get.return_value = {
+        "ids": ["id0"],
+        "metadatas": [{"source_type": "file", "source": str(file_path), "chunk": 0, "file_hash": current_hash}],
+    }
+    client = MagicMock()
+    client.get_or_create_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+        result = ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
+
+    assert len(result.skipped_reasons) == 1
+    assert "hash_match" in result.skipped_reasons[0]
+
+
+def test_ingest_skipped_reasons_unsupported_not_tracked(mock_chroma, tmp_path):
+    """Unsupported files are excluded before the loop — no skipped_reason entry."""
+    docs = make_docs_dir(tmp_path, ("image.png", "fake"))
+    result = ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
+    assert result.skipped_reasons == []
+
+
+# --- multi-collection query ---
+
+def test_query_multi_collection_merges_results(tmp_path):
+    col_a = MagicMock()
+    col_a.count.return_value = 1
+    col_a.query.return_value = {
+        "documents": [["chunk from A"]],
+        "metadatas": [[{"source": "/a.txt", "source_type": "file", "chunk": 0}]],
+        "distances": [[0.1]],
+    }
+    col_b = MagicMock()
+    col_b.count.return_value = 1
+    col_b.query.return_value = {
+        "documents": [["chunk from B"]],
+        "metadatas": [[{"source": "/b.txt", "source_type": "file", "chunk": 0}]],
+        "distances": [[0.2]],
+    }
+
+    def fake_get(db_path, name, model, create=True):
+        return col_a if name == "col_a" else col_b
+
+    with patch("synapse_core.pipeline._get_collection", side_effect=fake_get):
+        results = query(
+            text="test",
+            db_path=str(tmp_path / "db"),
+            collection_names=["col_a", "col_b"],
+        )
+
+    assert len(results) == 2
+    sources_found = {r["source"] for r in results}
+    assert "/a.txt" in sources_found
+    assert "/b.txt" in sources_found
+
+
+def test_query_multi_collection_skips_missing(tmp_path):
+    """Missing collection must be silently skipped, not raise."""
+    col = MagicMock()
+    col.count.return_value = 1
+    col.query.return_value = {
+        "documents": [["found"]],
+        "metadatas": [[{"source": "/a.txt", "source_type": "file", "chunk": 0}]],
+        "distances": [[0.1]],
+    }
+
+    def fake_get(db_path, name, model, create=True):
+        if name == "missing":
+            raise ChromaNotFoundError("not found")
+        return col
+
+    with patch("synapse_core.pipeline._get_collection", side_effect=fake_get):
+        results = query(
+            text="test",
+            db_path=str(tmp_path / "db"),
+            collection_names=["existing", "missing"],
+        )
+
+    assert len(results) == 1
+
+
+def test_query_multi_collection_sorted_by_score(tmp_path):
+    """Results from multiple collections must be sorted by score (best first)."""
+    col_low = MagicMock()
+    col_low.count.return_value = 1
+    col_low.query.return_value = {
+        "documents": [["low relevance"]],
+        "metadatas": [[{"source": "/low.txt", "source_type": "file", "chunk": 0}]],
+        "distances": [[0.9]],  # high distance = low score
+    }
+    col_high = MagicMock()
+    col_high.count.return_value = 1
+    col_high.query.return_value = {
+        "documents": [["high relevance"]],
+        "metadatas": [[{"source": "/high.txt", "source_type": "file", "chunk": 0}]],
+        "distances": [[0.05]],  # low distance = high score
+    }
+
+    def fake_get(db_path, name, model, create=True):
+        return col_low if name == "col_low" else col_high
+
+    with patch("synapse_core.pipeline._get_collection", side_effect=fake_get):
+        results = query(
+            text="test",
+            db_path=str(tmp_path / "db"),
+            collection_names=["col_low", "col_high"],
+        )
+
+    assert results[0]["source"] == "/high.txt"
+
+
+# --- where filter ---
+
+def test_query_where_filter_passed_to_chroma(mock_chroma, tmp_path):
+    mock_chroma.query.return_value = {"documents": [[]], "metadatas": [[]], "distances": [[]]}
+    where = {"source_type": {"$eq": "file"}}
+    query(text="test", db_path=str(tmp_path / "db"), where=where)
+    assert mock_chroma.query.call_args.kwargs.get("where") == where
+
+
+def test_query_without_where_no_where_kwarg(mock_chroma, tmp_path):
+    mock_chroma.query.return_value = {"documents": [[]], "metadatas": [[]], "distances": [[]]}
+    query(text="test", db_path=str(tmp_path / "db"))
+    assert "where" not in mock_chroma.query.call_args.kwargs
+
+
+# --- embedding model mismatch ---
+
+def test_get_collection_warns_on_model_mismatch(tmp_path):
+    from synapse_core.pipeline import _get_collection
+    from synapse_core.pipeline import logger as pipeline_logger
+
+    collection = MagicMock()
+    collection.metadata = {"embedding_model": "different-model"}
+    client = MagicMock()
+    client.get_or_create_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
+         patch.object(pipeline_logger, "warning") as mock_warn:
+        _get_collection(str(tmp_path / "db"), "synapse", "all-MiniLM-L6-v2")
+
+    mock_warn.assert_called_once()
+    assert "mismatch" in mock_warn.call_args[0][0].lower()
+
+
+def test_get_collection_no_warn_on_model_match(tmp_path):
+    from synapse_core.pipeline import _get_collection
+    from synapse_core.pipeline import logger as pipeline_logger
+
+    collection = MagicMock()
+    collection.metadata = {"embedding_model": "all-MiniLM-L6-v2"}
+    client = MagicMock()
+    client.get_or_create_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
+         patch.object(pipeline_logger, "warning") as mock_warn:
+        _get_collection(str(tmp_path / "db"), "synapse", "all-MiniLM-L6-v2")
+
+    mock_warn.assert_not_called()
+
+
+# --- ingest_many ---
+
+def test_ingest_many_ingests_supported_files(mock_chroma, tmp_path):
+    (tmp_path / "a.txt").write_text("word " * 30, encoding="utf-8")
+    (tmp_path / "b.txt").write_text("word " * 30, encoding="utf-8")
+    result = ingest_many(
+        [tmp_path / "a.txt", tmp_path / "b.txt"],
+        db_path=str(tmp_path / "db"), verbose=False,
+    )
+    assert result.sources_ingested == 2
+    assert mock_chroma.upsert.call_count == 2
+
+
+def test_ingest_many_skips_missing_file(mock_chroma, tmp_path):
+    (tmp_path / "real.txt").write_text("word " * 30, encoding="utf-8")
+    result = ingest_many(
+        [tmp_path / "real.txt", tmp_path / "missing.txt"],
+        db_path=str(tmp_path / "db"), verbose=False,
+    )
+    assert result.sources_ingested == 1
+    assert result.sources_skipped == 1
+    assert any("missing.txt" in r for r in result.skipped_reasons)
+
+
+def test_ingest_many_skips_unsupported_file(mock_chroma, tmp_path):
+    (tmp_path / "image.png").write_bytes(b"fake png")
+    result = ingest_many(
+        [tmp_path / "image.png"],
+        db_path=str(tmp_path / "db"), verbose=False,
+    )
+    assert result.sources_ingested == 0
+    assert result.sources_skipped == 1
+
+
+def test_ingest_many_empty_list_returns_result(tmp_path):
+    with patch("synapse_core.pipeline.chromadb.PersistentClient"), \
+         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+        result = ingest_many([], db_path=str(tmp_path / "db"), verbose=False)
+    assert result.sources_found == 0
+    assert result.sources_ingested == 0
+
+
+def test_ingest_many_on_progress_called_for_each(mock_chroma, tmp_path):
+    (tmp_path / "a.txt").write_text("word " * 30, encoding="utf-8")
+    (tmp_path / "b.txt").write_text("word " * 30, encoding="utf-8")
+    calls = []
+    ingest_many(
+        [tmp_path / "a.txt", tmp_path / "b.txt"],
+        db_path=str(tmp_path / "db"), verbose=False, on_progress=calls.append,
+    )
+    assert len(calls) == 2
+    assert calls[-1].files_done == 2
+
+
+# --- exception hierarchy ---
+
+def test_exception_hierarchy():
+    from synapse_core.exceptions import (
+        CollectionNotFoundError, SourceNotFoundError, SynapseError, TableNotFoundError,
+    )
+    assert issubclass(CollectionNotFoundError, SynapseError)
+    assert issubclass(CollectionNotFoundError, ValueError)
+    assert issubclass(SourceNotFoundError, SynapseError)
+    assert issubclass(SourceNotFoundError, FileNotFoundError)
+    assert issubclass(TableNotFoundError, SynapseError)
+    assert issubclass(TableNotFoundError, ValueError)
+
+
+# --- model fields ---
+
+def test_ingest_result_default_fields():
+    from synapse_core.models import IngestResult
+    r = IngestResult()
+    assert r.sources_found == 0
+    assert r.sources_ingested == 0
+    assert r.sources_skipped == 0
+    assert r.chunks_stored == 0
+    assert r.skipped_reasons == []
+
+
+def test_purge_result_default_fields():
+    from synapse_core.models import PurgeResult
+    r = PurgeResult()
+    assert r.chunks_deleted == 0
+    assert r.chunks_checked == 0

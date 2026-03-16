@@ -1,15 +1,16 @@
-__version__ = "0.6.1"
+__version__ = "0.6.3"
 
 from .exceptions import CollectionNotFoundError, SourceNotFoundError, SynapseError, TableNotFoundError
 from .logger import setup_logging
 from .models import IngestProgress, IngestResult, PurgeResult, QueryResult
-from .pipeline import ingest, purge, query, reset, sources
+from .pipeline import ingest, ingest_many, purge, query, reset, sources
 from .sqlite_ingester import ingest_sqlite
 
 __all__ = [
     "__version__",
     # core API
     "ingest",
+    "ingest_many",
     "ingest_sqlite",
     "purge",
     "query",

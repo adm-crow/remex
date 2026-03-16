@@ -1,6 +1,6 @@
 [project]
 name = "synapse-core"
-version = "0.6.1"
+version = "0.6.3"
 description = "Local RAG library — ingest files and SQLite, query semantically, pipe results into any AI agent"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -47,10 +47,16 @@ build-backend = "hatchling.build"
 dev = [
     "pytest>=8.4.2",
     "nltk",
+    "python-pptx",
+    "openpyxl",
+    "beautifulsoup4",
+    "ebooklib",
+    "odfpy",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--tb=short -q"
 
 [tool.hatch.build.targets.wheel]
 packages = ["synapse_core"]

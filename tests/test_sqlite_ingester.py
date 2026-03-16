@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from synapse_core.exceptions import SourceNotFoundError, TableNotFoundError
+from synapse_core.models import IngestResult
 from synapse_core.sqlite_ingester import ingest_sqlite
 
 
@@ -196,3 +197,96 @@ def test_ingest_sqlite_sentence_chunking(mock_chroma, tmp_path):
         chunking="sentence", verbose=False,
     )
     assert mock_chroma.upsert.called
+
+
+# --- on_progress callback ---
+
+def test_ingest_sqlite_on_progress_called_for_each_row(mock_chroma, tmp_path):
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30), (2, "word " * 30), (3, "word " * 30)],
+    )
+    calls = []
+    ingest_sqlite(
+        db_path=db, table="articles",
+        chroma_path=str(tmp_path / "db"), verbose=False,
+        on_progress=calls.append,
+    )
+    assert len(calls) == 3
+    assert calls[-1].files_done == 3
+    assert calls[-1].files_total == 3
+
+
+def test_ingest_sqlite_on_progress_called_on_skip(mock_chroma, tmp_path):
+    """Row with no text (all nulls) is skipped — on_progress still fires."""
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, None)],  # null body → empty text → skipped
+    )
+    calls = []
+    ingest_sqlite(
+        db_path=db, table="articles",
+        chroma_path=str(tmp_path / "db"), verbose=False,
+        on_progress=calls.append,
+    )
+    assert len(calls) == 1
+    assert calls[0].status == "skipped"
+
+
+def test_ingest_sqlite_on_progress_status_ingested(mock_chroma, tmp_path):
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30)],
+    )
+    calls = []
+    ingest_sqlite(
+        db_path=db, table="articles",
+        chroma_path=str(tmp_path / "db"), verbose=False,
+        on_progress=calls.append,
+    )
+    assert calls[0].status == "ingested"
+    assert calls[0].chunks_stored > 0
+
+
+def test_ingest_sqlite_on_progress_counts_accumulate(mock_chroma, tmp_path):
+    """chunks_stored in progress must be cumulative across rows."""
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30), (2, "word " * 30)],
+    )
+    calls = []
+    ingest_sqlite(
+        db_path=db, table="articles",
+        chroma_path=str(tmp_path / "db"), verbose=False,
+        on_progress=calls.append,
+    )
+    assert calls[1].chunks_stored >= calls[0].chunks_stored
+
+
+# --- model/exception integration ---
+
+def test_ingest_sqlite_table_not_found_is_value_error(tmp_path):
+    """TableNotFoundError must also be catchable as ValueError."""
+    db = create_test_db(tmp_path, "articles",
+                        ["id INTEGER PRIMARY KEY", "title TEXT"], [(1, "Hello")])
+    with pytest.raises(ValueError):
+        ingest_sqlite(db_path=db, table="nonexistent", chroma_path=str(tmp_path / "db"))
+
+
+def test_ingest_sqlite_returns_ingest_result(mock_chroma, tmp_path):
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30)],
+    )
+    result = ingest_sqlite(
+        db_path=db, table="articles",
+        chroma_path=str(tmp_path / "db"), verbose=False,
+    )
+    assert isinstance(result, IngestResult)
+    assert result.sources_found == 1
+    assert result.sources_ingested == 1

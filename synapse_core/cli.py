@@ -32,6 +32,8 @@ def cli() -> None:
               help="Chunking strategy.")
 @click.option("--streaming-threshold", default=50, show_default=True, type=click.IntRange(min=0),
               help="Stream files larger than this size (MB) to limit memory use. 0 = disable.")
+@click.option("--min-chunk-size", default=50, show_default=True, type=click.IntRange(min=1),
+              help="Discard chunks shorter than this many characters.")
 def ingest_cmd(
     source_dir: str,
     db_path: str,
@@ -41,6 +43,7 @@ def ingest_cmd(
     incremental: bool,
     chunking: str,
     streaming_threshold: int,
+    min_chunk_size: int,
 ) -> None:
     """Ingest files from SOURCE_DIR into ChromaDB."""
     try:
@@ -50,6 +53,7 @@ def ingest_cmd(
             collection_name=collection,
             chunk_size=chunk_size,
             overlap=overlap,
+            min_chunk_size=min_chunk_size,
             incremental=incremental,
             chunking=chunking,
             streaming_threshold=streaming_threshold * 1024 * 1024,
@@ -66,6 +70,12 @@ def ingest_cmd(
               help="ChromaDB persistence path.")
 @click.option("--collection", default="synapse", show_default=True,
               help="Collection name.")
+@click.option("--columns", default=None,
+              help="Comma-separated column names to embed (default: all columns).")
+@click.option("--id-column", default="id", show_default=True,
+              help="Primary key column for stable chunk IDs.")
+@click.option("--row-template", default=None,
+              help='Row format string, e.g. "{title}: {body}".')
 @click.option("--chunk-size", default=1000, show_default=True, type=click.IntRange(min=1),
               help="Target characters per chunk.")
 @click.option("--overlap", default=200, show_default=True, type=click.IntRange(min=0),
@@ -73,24 +83,35 @@ def ingest_cmd(
 @click.option("--chunking", default="word", show_default=True,
               type=click.Choice(["word", "sentence"]),
               help="Chunking strategy.")
+@click.option("--min-chunk-size", default=50, show_default=True, type=click.IntRange(min=1),
+              help="Discard chunks shorter than this many characters.")
 def ingest_sqlite_cmd(
     db_path: str,
     table: str,
     chroma_path: str,
     collection: str,
+    columns: str | None,
+    id_column: str,
+    row_template: str | None,
     chunk_size: int,
     overlap: int,
     chunking: str,
+    min_chunk_size: int,
 ) -> None:
     """Ingest records from a SQLite DB_PATH table into ChromaDB."""
+    columns_list = [c.strip() for c in columns.split(",") if c.strip()] if columns else None
     try:
         ingest_sqlite(
             db_path=db_path,
             table=table,
+            columns=columns_list,
+            id_column=id_column,
+            row_template=row_template,
             chroma_path=chroma_path,
             collection_name=collection,
             chunk_size=chunk_size,
             overlap=overlap,
+            min_chunk_size=min_chunk_size,
             chunking=chunking,
         )
     except (SynapseError, FileNotFoundError, ValueError) as e:
@@ -117,6 +138,9 @@ def ingest_sqlite_cmd(
               help='Metadata filter as JSON (e.g. \'{"source_type": {"$eq": "file"}}\').')
 @click.option("--collections", default=None,
               help="Comma-separated list of collection names for multi-collection query.")
+@click.option("--format", "fmt", default="text", show_default=True,
+              type=click.Choice(["text", "json"]),
+              help="Output format. Use 'json' for scripting / piping.")
 def query_cmd(
     text: str,
     db_path: str,
@@ -127,6 +151,7 @@ def query_cmd(
     model: str | None,
     where: str | None,
     collections: str | None,
+    fmt: str,
 ) -> None:
     """Semantic search over the ChromaDB collection.
 
@@ -135,6 +160,10 @@ def query_cmd(
     Use --collections to query multiple collections and merge results.
     Use --where to filter by metadata (ChromaDB filter syntax).
     """
+    if fmt == "json" and use_ai:
+        click.echo("Error: --format json cannot be combined with --ai.", err=True)
+        raise SystemExit(1)
+
     where_dict = None
     if where:
         try:
@@ -157,6 +186,10 @@ def query_cmd(
     except (SynapseError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
+
+    if fmt == "json":
+        click.echo(_json.dumps(list(results), indent=2))
+        return
 
     if not results:
         click.echo("No results found.")

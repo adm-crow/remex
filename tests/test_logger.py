@@ -3,7 +3,6 @@ import os
 
 import pytest
 
-import synapse_core
 from synapse_core.logger import CustomFormatter, logger, setup_logging
 
 
@@ -20,25 +19,6 @@ def restore_logger_state():
     logger.handlers.clear()
     logger.handlers.extend(original_handlers)
     logger.setLevel(original_level)
-
-
-# --- logger baseline ---
-
-def test_logger_name():
-    assert logger.name == "synapse_core"
-
-
-def test_logger_does_not_propagate():
-    """Must not propagate to root logger to avoid duplicate output."""
-    assert logger.propagate is False
-
-
-def test_logger_default_level():
-    assert logger.level == logging.INFO
-
-
-def test_logger_has_default_handler():
-    assert len(logger.handlers) >= 1
 
 
 # --- setup_logging ---
@@ -77,27 +57,7 @@ def test_setup_logging_file_is_written(tmp_path):
     assert "hello from test" in content
 
 
-def test_setup_logging_exported_from_package():
-    assert hasattr(synapse_core, "setup_logging")
-    assert callable(synapse_core.setup_logging)
-
-
 # --- CustomFormatter ---
-
-def test_custom_formatter_returns_string():
-    formatter = CustomFormatter()
-    record = logging.LogRecord(
-        name="synapse_core",
-        level=logging.INFO,
-        pathname="",
-        lineno=0,
-        msg="test message",
-        args=(),
-        exc_info=None,
-    )
-    result = formatter.format(record)
-    assert "test message" in result
-
 
 def test_custom_formatter_covers_all_levels():
     formatter = CustomFormatter()

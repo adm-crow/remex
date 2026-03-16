@@ -210,3 +210,6 @@ __marimo__/
 synapse_db/
 .python-version
 .vscode/
+
+# Claude Code
+.claude/

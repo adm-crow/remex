@@ -33,7 +33,7 @@ Progress toward a stable, production-ready 1.0 release.
 - [x] **`purge()` returns `PurgeResult`** — typed return with `chunks_deleted` and `chunks_checked`, consistent with `IngestResult`. *(v0.6.1)*
 - [x] **`reset()` confirmation guard in API** — `confirm: bool = False` parameter; raises `ValueError` unless `confirm=True`. CLI passes `confirm=True` after prompting. *(v0.6.1)*
 - [ ] **EPUB / ODT metadata** — `extract_metadata()` only handles PDF/DOCX/HTML/PPTX; EPUB has rich OPF metadata.
-- [ ] **`ingest_sqlite` progress callback** — same `on_progress` pattern as `ingest()`.
+- [x] **`ingest_sqlite` progress callback** — same `on_progress` pattern as `ingest()`. *(v0.6.2)*
 
 ---
 
@@ -41,6 +41,11 @@ Progress toward a stable, production-ready 1.0 release.
 
 - [ ] **`synapse init`** — CLI command to scaffold a new project (`docs/`, `synapse_db/`, `synapse.toml`).
 - [ ] **Config file (`synapse.toml`)** — persist per-project defaults (db path, collection, model) so flags are not repeated on every command.
-- [ ] **`query --format json`** — CLI option to emit raw JSON for scripting / piping.
-- [ ] **Batch ingest API** — `ingest_many(paths: list[Path])` to ingest a specific list of files instead of scanning a directory.
+- [x] **`query --format json`** — CLI option to emit raw JSON for scripting / piping. *(v0.6.2)*
+- [x] **Batch ingest API** — `ingest_many(paths: list[Path])` to ingest a specific list of files instead of scanning a directory. *(v0.6.2)*
+- [x] **`ingest-sqlite` CLI options** — `--columns`, `--id-column`, `--row-template` now exposed as CLI flags. *(v0.6.2)*
+- [x] **`--min-chunk-size` CLI flag** — exposed on `ingest` and `ingest-sqlite` commands, consistent with the Python API default of 50 chars. *(v0.6.3)*
+- [x] **`query()` n_results validation** — raises `ValueError` when `n_results < 1`, consistent with the CLI's `IntRange(min=1)` guard. *(v0.6.3)*
+- [ ] **`ingest_many` incremental + streaming** — add `incremental=True` (hash-skip) and `streaming_threshold` support to `ingest_many()`, consistent with `ingest()`.
+- [ ] **`--embedding-model` CLI flag** — expose the embedding model override on `ingest`, `ingest-sqlite`, and `query` commands so users don't need the Python API to change it.
 - [ ] **Real integration tests** — at least one end-to-end test that hits a real `PersistentClient` (the ChromaDB `NotFoundError` bug was invisible with mocked tests).
