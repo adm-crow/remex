@@ -1,7 +1,7 @@
 import csv
 import json
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Iterator
 
 from .logger import logger
 
@@ -140,6 +140,82 @@ def extract_odt(path: Path) -> str:
         if text.strip():
             parts.append(text)
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Streaming extraction (text-based formats only)
+# ---------------------------------------------------------------------------
+
+_STREAMING_EXTENSIONS: frozenset[str] = frozenset({".txt", ".md", ".csv", ".jsonl"})
+
+
+def supports_streaming(path: Path) -> bool:
+    """Return True if the file can be extracted page-by-page without full memory load."""
+    return path.suffix.lower() in _STREAMING_EXTENSIONS
+
+
+def extract_streaming(path: Path, block_size: int = 65_536) -> Iterator[str]:
+    """Yield text blocks from a file without loading the entire content into memory.
+
+    Supported for ``.txt``, ``.md``, ``.csv``, and ``.jsonl``.
+    For any other format this function falls back to :func:`extract` and
+    yields the full text as a single block (same semantics, no memory benefit).
+
+    Args:
+        path:       File to read.
+        block_size: Target bytes per block for character-based formats.
+                    CSV/JSONL yield batches of rows whose total chars approach
+                    this threshold.
+    """
+    suffix = path.suffix.lower()
+
+    if suffix in (".txt", ".md"):
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            while True:
+                block = f.read(block_size)
+                if not block:
+                    break
+                yield block
+
+    elif suffix == ".csv":
+        with open(path, newline="", encoding="utf-8", errors="ignore") as f:
+            reader = csv.reader(f)
+            batch: list[str] = []
+            size = 0
+            for row in reader:
+                line = ", ".join(row)
+                batch.append(line)
+                size += len(line) + 1
+                if size >= block_size:
+                    yield "\n".join(batch)
+                    batch, size = [], 0
+            if batch:
+                yield "\n".join(batch)
+
+    elif suffix == ".jsonl":
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            batch_j: list[str] = []
+            size_j = 0
+            for raw_line in f:
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                try:
+                    line = _flatten_json(json.loads(raw_line))
+                except json.JSONDecodeError:
+                    logger.warning("Skipping invalid JSON line in %s", path.name)
+                    continue
+                batch_j.append(line)
+                size_j += len(line) + 1
+                if size_j >= block_size:
+                    yield "\n".join(batch_j)
+                    batch_j, size_j = [], 0
+            if batch_j:
+                yield "\n".join(batch_j)
+
+    else:
+        # Binary / non-streaming format — load once, yield once
+        yield extract(path)
 
 
 EXTRACTORS = {

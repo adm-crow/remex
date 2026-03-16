@@ -1,7 +1,7 @@
 """Public data models returned by synapse-core API functions."""
 
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 
 class QueryResult(TypedDict):
@@ -55,3 +55,34 @@ class IngestResult:
     """Sources skipped: extract errors, empty content, or unchanged (incremental)."""
     chunks_stored: int = 0
     """Total number of chunks written to ChromaDB."""
+
+
+@dataclass
+class IngestProgress:
+    """Per-file progress update emitted by :func:`~synapse_core.ingest` via the
+    ``on_progress`` callback after each file is processed.
+
+    Example (tqdm integration)::
+
+        from tqdm import tqdm
+        from synapse_core import ingest, IngestProgress
+
+        with tqdm(total=None, unit="file") as bar:
+            def _progress(p: IngestProgress) -> None:
+                bar.total = p.files_total
+                bar.update(1)
+                bar.set_postfix(file=p.filename, status=p.status)
+
+            ingest("./docs", on_progress=_progress)
+    """
+
+    filename: str
+    """Base name of the file just processed."""
+    files_done: int
+    """Number of files processed so far (including this one)."""
+    files_total: int
+    """Total number of supported files found in ``source_dir``."""
+    status: Literal["ingested", "skipped", "error"]
+    """Outcome for this file."""
+    chunks_stored: int
+    """Cumulative chunks written to ChromaDB so far in this run."""

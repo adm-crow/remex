@@ -1,3 +1,5 @@
+import json as _json
+
 import click
 
 from . import __version__
@@ -28,6 +30,8 @@ def cli() -> None:
 @click.option("--chunking", default="word", show_default=True,
               type=click.Choice(["word", "sentence"]),
               help="Chunking strategy.")
+@click.option("--streaming-threshold", default=50, show_default=True,
+              help="Stream files larger than this size (MB) to limit memory use. 0 = disable.")
 def ingest_cmd(
     source_dir: str,
     db_path: str,
@@ -36,6 +40,7 @@ def ingest_cmd(
     overlap: int,
     incremental: bool,
     chunking: str,
+    streaming_threshold: int,
 ) -> None:
     """Ingest files from SOURCE_DIR into ChromaDB."""
     try:
@@ -47,6 +52,7 @@ def ingest_cmd(
             overlap=overlap,
             incremental=incremental,
             chunking=chunking,
+            streaming_threshold=streaming_threshold * 1024 * 1024,
         )
     except (SynapseError, FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -107,6 +113,10 @@ def ingest_sqlite_cmd(
               help="LLM provider (anthropic, openai, ollama). Auto-detected if omitted.")
 @click.option("--model", default=None,
               help="Model name override (e.g. gpt-4o, llama3).")
+@click.option("--where", default=None,
+              help='Metadata filter as JSON (e.g. \'{"source_type": {"$eq": "file"}}\').')
+@click.option("--collections", default=None,
+              help="Comma-separated list of collection names for multi-collection query.")
 def query_cmd(
     text: str,
     db_path: str,
@@ -115,18 +125,34 @@ def query_cmd(
     use_ai: bool,
     provider: str | None,
     model: str | None,
+    where: str | None,
+    collections: str | None,
 ) -> None:
     """Semantic search over the ChromaDB collection.
 
     Add --ai to generate a synthesized answer via an LLM.
     Provider is auto-detected from ANTHROPIC_API_KEY / OPENAI_API_KEY / Ollama.
+    Use --collections to query multiple collections and merge results.
+    Use --where to filter by metadata (ChromaDB filter syntax).
     """
+    where_dict = None
+    if where:
+        try:
+            where_dict = _json.loads(where)
+        except _json.JSONDecodeError as e:
+            click.echo(f"Error: --where is not valid JSON: {e}", err=True)
+            raise SystemExit(1)
+
+    collection_names = [c.strip() for c in collections.split(",") if c.strip()] if collections else None
+
     try:
         results = query(
             text=text,
             db_path=db_path,
             collection_name=collection,
             n_results=n_results,
+            where=where_dict,
+            collection_names=collection_names,
         )
     except (SynapseError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
