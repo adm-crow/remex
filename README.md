@@ -280,5 +280,5 @@ See [ROADMAP.md](ROADMAP.md) for the full history and v1.0 progress.
 ---
 
 <div align="center">
-  <sub><a href="https://pypi.org/project/synapse-core/">PyPI</a> · <a href="LICENSE">Apache 2.0</a></sub>
+  <sub><a href="https://pypi.org/project/synapse-core/">PyPI</a> · <a href="CHANGELOG.md">Changelog</a> · <a href="LICENSE">Apache 2.0</a></sub>
 </div>
