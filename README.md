@@ -5,7 +5,7 @@
   <p><strong>Local-first RAG for Python — ingest files, query semantically, feed any AI agent.</strong></p>
 
   [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-  [![tests](https://img.shields.io/badge/tests-166%20passing-brightgreen?style=flat-square)](tests/)
+  [![tests](https://img.shields.io/badge/tests-187%20passing-brightgreen?style=flat-square)](tests/)
   [![PyPI](https://img.shields.io/pypi/v/synapse-core?style=flat-square&color=blue)](https://pypi.org/project/synapse-core/)
   [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
   [![License](https://img.shields.io/badge/license-Apache%202.0-green?style=flat-square)](LICENSE)
@@ -21,8 +21,10 @@
 - **SQLite ingestion** — embed table rows alongside files in the same collection
 - **Incremental ingestion** — SHA-256 hash check, skip unchanged files on re-runs
 - **Semantic search** — ranked results with scores, source path, and document metadata
+- **Document metadata** — title, author, created date extracted from PDF, DOCX, HTML, PPTX, EPUB, ODT
 - **Local embeddings** — `sentence-transformers`, fully offline
-- **CLI** — `synapse ingest`, `query --ai`, `sources`, `purge`, `reset`
+- **CLI** — `synapse init`, `ingest`, `query --ai`, `sources`, `purge`, `reset`
+- **Project config** — `synapse.toml` sets per-project defaults; no flags to repeat
 
 ---
 
@@ -72,28 +74,34 @@ Each query result is a typed dict with keys: `text`, `source`, `source_type`, `s
 ```bash
 # Ingest
 synapse ingest ./docs
-synapse ingest ./docs --incremental             # skip unchanged files
-synapse ingest ./docs --chunking sentence       # sentence-aware splitting
-synapse ingest ./docs --streaming-threshold 100 # stream files > 100 MB (default 50)
+synapse ingest ./docs --incremental                            # skip unchanged files
+synapse ingest ./docs --chunking sentence                      # sentence-aware splitting
+synapse ingest ./docs --streaming-threshold 100                # stream files > 100 MB (default 50)
+synapse ingest ./docs --embedding-model paraphrase-MiniLM-L6-v2
 synapse ingest-sqlite ./data.db --table articles
 synapse ingest-sqlite ./data.db --table articles --columns "title,body"
 synapse ingest-sqlite ./data.db --table articles --row-template "{title}: {body}"
 
 # Query
 synapse query "what is the refund policy?"
-synapse query "..." --format json               # emit JSON for scripting / piping
+synapse query "..." --format json                              # emit JSON for scripting / piping
 synapse query "..." --collections "docs,archive"
 synapse query "..." --where '{"source_type": {"$eq": "file"}}'
-synapse query "..." --ai                        # AI-synthesized answer (auto-detects provider)
+synapse query "..." --embedding-model paraphrase-MiniLM-L6-v2 # must match ingest model
+synapse query "..." --ai                                       # AI-synthesized answer (auto-detects provider)
 synapse query "..." --ai --provider anthropic --model claude-sonnet-4-5
 
 # Manage
+synapse init             # scaffold docs/, synapse.toml, update .gitignore
 synapse sources          # list all indexed sources
 synapse purge            # remove chunks from deleted files
 synapse reset --yes      # wipe the entire collection
 ```
 
-Every command accepts `--db PATH` and `--collection NAME`. Run `synapse <command> --help` for all options.
+Every command accepts `--db PATH`, `--collection NAME`, and `--embedding-model`. Run `synapse <command> --help` for all options.
+
+> [!TIP]
+> Run `synapse init` once per project. It creates a `synapse.toml` where you can set your default `db`, `collection`, `embedding_model`, and chunking options — so you stop repeating flags on every command.
 
 ---
 
@@ -167,15 +175,17 @@ Raises `SourceNotFoundError` if the database file is missing, `TableNotFoundErro
 
 ```python
 result = ingest_many(
-    paths           = ["./docs/a.pdf", "./reports/q1.docx"],  # explicit list
-    db_path         = "./synapse_db",
-    collection_name = "synapse",
-    chunk_size      = 1000,
-    overlap         = 200,
-    min_chunk_size  = 50,
-    embedding_model = "all-MiniLM-L6-v2",
-    chunking        = "word",
-    on_progress     = None,         # Callable[[IngestProgress], None]
+    paths                = ["./docs/a.pdf", "./reports/q1.docx"],  # explicit list
+    db_path              = "./synapse_db",
+    collection_name      = "synapse",
+    chunk_size           = 1000,
+    overlap              = 200,
+    min_chunk_size       = 50,
+    embedding_model      = "all-MiniLM-L6-v2",
+    chunking             = "word",
+    incremental          = False,               # skip unchanged files (SHA-256)
+    streaming_threshold  = 50 * 1024 * 1024,   # stream large text files; 0 = disable
+    on_progress          = None,                # Callable[[IngestProgress], None]
 )
 ```
 
@@ -244,6 +254,27 @@ All subclasses inherit from the matching Python built-in, so existing `except Va
 
 ---
 
+## synapse.toml
+
+Run `synapse init` once per project to generate a config file. Any key set there becomes the default for every CLI command — flags always override.
+
+```toml
+[synapse]
+db              = "./synapse_db"         # ChromaDB persistence path
+collection      = "myproject"            # collection name
+embedding_model = "all-MiniLM-L6-v2"    # SentenceTransformer model
+
+# Chunking (ingest / ingest-sqlite)
+# chunk_size     = 1000
+# overlap        = 200
+# min_chunk_size = 50
+# chunking       = "word"               # "word" or "sentence"
+```
+
+The file is looked up in the current working directory each time `synapse` runs. No `synapse.toml` = all defaults apply as before.
+
+---
+
 ## Connecting an AI agent
 
 synapse handles retrieval — wire `query()` to any LLM:
@@ -266,11 +297,6 @@ Set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` and use `synapse query "..." --ai` fo
 ## Roadmap
 
 - [ ] Async API — `async def aingest()` / `async def aquery()` for FastAPI
-- [ ] `ingest_many` incremental + streaming — consistent with `ingest()`
-- [ ] `--embedding-model` CLI flag — override model without touching Python code
-- [ ] EPUB / ODT metadata extraction
-- [ ] `synapse init` — scaffold a new project
-- [ ] Config file (`synapse.toml`) — persist per-project defaults
 - [ ] Pluggable embedders — OpenAI, Cohere, HuggingFace Inference API
 - [ ] Pluggable vector stores — Qdrant, FAISS, Weaviate
 - [ ] Re-ranking — cross-encoder re-ranking of retrieved chunks

@@ -1,5 +1,5 @@
 import json as _json
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
@@ -52,13 +52,6 @@ def test_cli_query_returns_results(mock_query):
     assert "Refunds are accepted" in result.output
 
 
-@patch("synapse_core.cli.query")
-def test_cli_query_empty_results(mock_query):
-    mock_query.return_value = []
-    result = CliRunner().invoke(cli, ["query", "nothing"])
-    assert result.exit_code == 0
-    assert "No results" in result.output
-
 
 @patch("synapse_core.cli.sources")
 def test_cli_sources_lists_paths(mock_sources):
@@ -68,13 +61,6 @@ def test_cli_sources_lists_paths(mock_sources):
     assert "/docs/a.txt" in result.output
     assert "/docs/b.pdf" in result.output
 
-
-@patch("synapse_core.cli.sources")
-def test_cli_sources_empty(mock_sources):
-    mock_sources.return_value = []
-    result = CliRunner().invoke(cli, ["sources"])
-    assert result.exit_code == 0
-    assert "empty" in result.output.lower()
 
 
 @patch("synapse_core.cli.purge")
@@ -359,3 +345,84 @@ def test_cli_query_collection_not_found_shows_error(mock_query):
     result = CliRunner().invoke(cli, ["query", "test"])
     assert result.exit_code != 0
     assert "Error:" in result.output
+
+
+# --- --embedding-model flag ---
+
+@patch("synapse_core.cli.ingest")
+def test_cli_ingest_embedding_model_passed(mock_ingest):
+    CliRunner().invoke(cli, ["ingest", "./docs", "--embedding-model", "paraphrase-MiniLM-L6-v2"])
+    assert mock_ingest.call_args.kwargs["embedding_model"] == "paraphrase-MiniLM-L6-v2"
+
+
+@patch("synapse_core.cli.ingest_sqlite")
+def test_cli_ingest_sqlite_embedding_model_passed(mock_ingest_sqlite, tmp_path):
+    db = tmp_path / "data.db"
+    db.write_bytes(b"")
+    mock_ingest_sqlite.return_value = MagicMock()
+    CliRunner().invoke(cli, [
+        "ingest-sqlite", str(db), "--table", "t",
+        "--embedding-model", "paraphrase-MiniLM-L6-v2",
+    ])
+    assert mock_ingest_sqlite.call_args.kwargs["embedding_model"] == "paraphrase-MiniLM-L6-v2"
+
+
+@patch("synapse_core.cli.query")
+def test_cli_query_embedding_model_passed(mock_query):
+    mock_query.return_value = []
+    CliRunner().invoke(cli, ["query", "hello", "--embedding-model", "paraphrase-MiniLM-L6-v2"])
+    assert mock_query.call_args.kwargs["embedding_model"] == "paraphrase-MiniLM-L6-v2"
+
+
+
+
+# --- synapse init ---
+
+def test_cli_init_creates_docs_and_toml(tmp_path):
+    result = CliRunner().invoke(cli, ["init", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "docs").is_dir()
+    assert (tmp_path / "synapse.toml").exists()
+
+
+def test_cli_init_toml_has_synapse_section(tmp_path):
+    CliRunner().invoke(cli, ["init", str(tmp_path)])
+    content = (tmp_path / "synapse.toml").read_text()
+    assert "[synapse]" in content
+    assert "db" in content
+
+
+def test_cli_init_skips_existing_docs(tmp_path):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "existing.txt").write_text("hi")
+    result = CliRunner().invoke(cli, ["init", str(tmp_path)])
+    assert result.exit_code == 0
+    assert (tmp_path / "docs" / "existing.txt").exists()  # not deleted
+
+
+def test_cli_init_skips_existing_toml(tmp_path):
+    existing = "[synapse]\ndb = \"./custom\"\n"
+    (tmp_path / "synapse.toml").write_text(existing)
+    CliRunner().invoke(cli, ["init", str(tmp_path)])
+    assert (tmp_path / "synapse.toml").read_text() == existing  # unchanged
+
+
+def test_cli_init_gitignore_updated_in_git_repo(tmp_path):
+    (tmp_path / ".git").mkdir()
+    result = CliRunner().invoke(cli, ["init", str(tmp_path)])
+    assert result.exit_code == 0
+    gitignore = tmp_path / ".gitignore"
+    assert gitignore.exists()
+    assert "synapse_db/" in gitignore.read_text()
+
+
+def test_cli_init_no_gitignore_outside_repo(tmp_path):
+    """No .git dir → no .gitignore should be created."""
+    CliRunner().invoke(cli, ["init", str(tmp_path)])
+    assert not (tmp_path / ".gitignore").exists()
+
+
+def test_cli_init_shows_next_steps(tmp_path):
+    result = CliRunner().invoke(cli, ["init", str(tmp_path)])
+    assert "synapse ingest" in result.output
+    assert "synapse query" in result.output

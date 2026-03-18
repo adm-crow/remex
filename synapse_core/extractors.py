@@ -305,4 +305,37 @@ def extract_metadata(path: Path) -> Dict[str, str]:
         except Exception as e:
             logger.debug("Could not read PPTX metadata from %s: %s", path.name, e)
 
+    elif suffix == ".epub":
+        try:
+            from ebooklib import epub
+            book = epub.read_epub(str(path))
+            titles = book.get_metadata("DC", "title")
+            if titles:
+                meta["doc_title"] = titles[0][0] or ""
+            creators = book.get_metadata("DC", "creator")
+            if creators:
+                meta["doc_author"] = creators[0][0] or ""
+            dates = book.get_metadata("DC", "date")
+            if dates:
+                meta["doc_created"] = dates[0][0] or ""
+        except Exception as e:
+            logger.debug("Could not read EPUB metadata from %s: %s", path.name, e)
+
+    elif suffix == ".odt":
+        try:
+            from odf.opendocument import load
+            from odf.dc import Title, Creator, Date
+            doc = load(str(path))
+            titles = doc.meta.getElementsByType(Title)
+            if titles:
+                meta["doc_title"] = str(titles[0])
+            creators = doc.meta.getElementsByType(Creator)
+            if creators:
+                meta["doc_author"] = str(creators[0])
+            dates = doc.meta.getElementsByType(Date)
+            if dates:
+                meta["doc_created"] = str(dates[0])
+        except Exception as e:
+            logger.debug("Could not read ODT metadata from %s: %s", path.name, e)
+
     return meta

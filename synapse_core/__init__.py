@@ -1,4 +1,4 @@
-__version__ = "0.6.3"
+__version__ = "0.7.0"
 
 from .exceptions import CollectionNotFoundError, SourceNotFoundError, SynapseError, TableNotFoundError
 from .logger import setup_logging

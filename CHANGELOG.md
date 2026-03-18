@@ -4,6 +4,19 @@ All notable changes to `synapse-core` are documented here.
 
 ---
 
+## [0.7.0] — 2026-03-18
+
+### Added
+- `--embedding-model` CLI flag on `ingest`, `ingest-sqlite`, and `query` — override the SentenceTransformer model without touching Python code
+- `ingest_many()` gains `incremental=True` (SHA-256 hash-skip) and `streaming_threshold` — now consistent with `ingest()`
+- `synapse init` CLI command — scaffolds `docs/`, writes `synapse.toml`, adds `synapse_db/` to `.gitignore`
+- `synapse.toml` project config — `[synapse]` section sets per-project defaults for all CLI commands; CLI flags always override
+- EPUB metadata extraction — `extract_metadata()` reads title, author, date from OPF/Dublin Core
+- ODT metadata extraction — `extract_metadata()` reads `dc:title`, `dc:creator`, `dc:date`
+- End-to-end integration test hitting a real ChromaDB `PersistentClient`
+
+---
+
 ## [0.6.3] — 2026-03-18
 
 ### Added

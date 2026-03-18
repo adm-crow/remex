@@ -37,6 +37,7 @@ def _get_source_chunks(collection, source_str: str) -> dict:
 
 
 def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True):
+    """Get or create a ChromaDB collection with the given embedding model."""
     client = chromadb.PersistentClient(path=db_path)
     ef = embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name=embedding_model
@@ -89,6 +90,7 @@ def _ingest_file_streaming(
     doc_meta: dict,
     incremental: bool,
     current_hash: str,
+    id_fn: Optional[Callable[[int], str]] = None,
 ) -> int:
     """Stream a large text file through the chunker, upserting in small batches.
 
@@ -115,7 +117,7 @@ def _ingest_file_streaming(
         if incremental and current_hash:
             meta["file_hash"] = current_hash
         buf_docs.append(chunk)
-        buf_ids.append(_make_id(file_path, source_dir, chunk_idx))
+        buf_ids.append(id_fn(chunk_idx) if id_fn else _make_id(file_path, source_dir, chunk_idx))
         buf_metas.append(meta)
         chunk_idx += 1
         if len(buf_docs) >= _STREAM_BATCH:
@@ -519,6 +521,8 @@ def ingest_many(
     embedding_model: str = "all-MiniLM-L6-v2",
     chunking: str = "word",
     verbose: bool = True,
+    incremental: bool = False,
+    streaming_threshold: int = 50 * 1024 * 1024,
     on_progress: Optional[Callable[[IngestProgress], None]] = None,
 ) -> IngestResult:
     """
@@ -529,19 +533,25 @@ def ingest_many(
     files to embed (e.g. recently modified files, a filtered subset, etc.).
 
     Args:
-        paths:            List of file paths (``str`` or :class:`pathlib.Path`).
-                          Unsupported or missing files are skipped and recorded
-                          in :attr:`IngestResult.skipped_reasons`.
-        db_path:          Path where ChromaDB persists data.
-        collection_name:  Name of the ChromaDB collection.
-        chunk_size:       Target character count per chunk.
-        overlap:          Character overlap between consecutive chunks.
-        min_chunk_size:   Discard chunks shorter than this (chars).
-        embedding_model:  SentenceTransformer model name.
-        chunking:         ``"word"`` (default) or ``"sentence"`` (requires nltk).
-        verbose:          Emit progress via the synapse_core logger.
-        on_progress:      Optional callback invoked after each file is processed.
-                          Receives an :class:`IngestProgress` instance.
+        paths:               List of file paths (``str`` or :class:`pathlib.Path`).
+                             Unsupported or missing files are skipped and recorded
+                             in :attr:`IngestResult.skipped_reasons`.
+        db_path:             Path where ChromaDB persists data.
+        collection_name:     Name of the ChromaDB collection.
+        chunk_size:          Target character count per chunk.
+        overlap:             Character overlap between consecutive chunks.
+        min_chunk_size:      Discard chunks shorter than this (chars).
+        embedding_model:     SentenceTransformer model name.
+        chunking:            ``"word"`` (default) or ``"sentence"`` (requires nltk).
+        verbose:             Emit progress via the synapse_core logger.
+        incremental:         Skip files whose content hash hasn't changed since the
+                             last ingest. Changed files are re-ingested.
+        streaming_threshold: Files larger than this many bytes are paged through the
+                             chunker instead of being fully loaded into memory
+                             (text-based formats only). Set to 0 to disable.
+                             Default: 50 MB.
+        on_progress:         Optional callback invoked after each file is processed.
+                             Receives an :class:`IngestProgress` instance.
     """
     file_paths = [Path(p).resolve() for p in paths]
     result = IngestResult(sources_found=len(file_paths))
@@ -554,6 +564,7 @@ def ingest_many(
     for i, file_path in enumerate(file_paths, 1):
         _status: str = "skipped"
         _skip_reason: str = ""
+        current_hash = ""
 
         try:
             if not file_path.exists():
@@ -570,45 +581,99 @@ def ingest_many(
                 result.sources_skipped += 1
                 continue
 
+            source_str = str(file_path)
+
+            if incremental:
+                current_hash = _file_hash(file_path)
+                existing = _get_source_chunks(collection, source_str)
+                if existing["ids"]:
+                    stored_hash = existing["metadatas"][0].get("file_hash")
+                    if stored_hash == current_hash:
+                        if verbose:
+                            logger.info("Skipping (unchanged): %s", file_path.name)
+                        _skip_reason = "hash_match"
+                        result.sources_skipped += 1
+                        continue
+                    collection.delete(ids=existing["ids"])
+
             if verbose:
                 logger.info("Ingesting: %s", file_path.name)
 
-            try:
-                text = extract(file_path)
-            except Exception as e:
-                if verbose:
-                    logger.warning("[skip] %s: %s", file_path.name, e)
-                _skip_reason = f"extract_error: {e}"
-                result.sources_skipped += 1
-                continue
-
-            chunks = chunk_text(
-                text,
-                chunk_size=chunk_size,
-                overlap=overlap,
-                min_chunk_size=min_chunk_size,
-                mode=chunking,
+            use_streaming = (
+                streaming_threshold > 0
+                and file_path.stat().st_size > streaming_threshold
+                and supports_streaming(file_path)
             )
-            if not chunks:
-                if verbose:
-                    logger.warning("[skip] %s: no text extracted", file_path.name)
-                _skip_reason = "empty"
-                result.sources_skipped += 1
-                continue
 
-            source_str = str(file_path)
-            ids = [_make_id_abs(file_path, j) for j in range(len(chunks))]
-            doc_meta = extract_metadata(file_path)
-            metadatas = [
-                {"source_type": "file", "source": source_str, "chunk": j, **doc_meta}
-                for j in range(len(chunks))
-            ]
-            collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
-            result.sources_ingested += 1
-            result.chunks_stored += len(chunks)
-            _status = "ingested"
-            if verbose:
-                logger.info("  -> %d chunks stored", len(chunks))
+            if use_streaming:
+                try:
+                    doc_meta = extract_metadata(file_path)
+                    n = _ingest_file_streaming(
+                        file_path, file_path.parent, collection, source_str,
+                        chunk_size, overlap, min_chunk_size, chunking,
+                        doc_meta, incremental, current_hash,
+                        id_fn=lambda j, fp=file_path: _make_id_abs(fp, j),
+                    )
+                except Exception as e:
+                    if verbose:
+                        logger.warning("[skip] %s: %s", file_path.name, e)
+                    _skip_reason = f"extract_error: {e}"
+                    result.sources_skipped += 1
+                    continue
+
+                if n == 0:
+                    if verbose:
+                        logger.warning("[skip] %s: no text extracted", file_path.name)
+                    _skip_reason = "empty"
+                    result.sources_skipped += 1
+                    continue
+
+                result.sources_ingested += 1
+                result.chunks_stored += n
+                _status = "ingested"
+                if verbose:
+                    logger.info("  -> %d chunks stored (streamed)", n)
+
+            else:
+                try:
+                    text = extract(file_path)
+                except Exception as e:
+                    if verbose:
+                        logger.warning("[skip] %s: %s", file_path.name, e)
+                    _skip_reason = f"extract_error: {e}"
+                    result.sources_skipped += 1
+                    continue
+
+                chunks = chunk_text(
+                    text,
+                    chunk_size=chunk_size,
+                    overlap=overlap,
+                    min_chunk_size=min_chunk_size,
+                    mode=chunking,
+                )
+                if not chunks:
+                    if verbose:
+                        logger.warning("[skip] %s: no text extracted", file_path.name)
+                    _skip_reason = "empty"
+                    result.sources_skipped += 1
+                    continue
+
+                ids = [_make_id_abs(file_path, j) for j in range(len(chunks))]
+                doc_meta = extract_metadata(file_path)
+                metadatas = [
+                    {"source_type": "file", "source": source_str, "chunk": j, **doc_meta}
+                    for j in range(len(chunks))
+                ]
+                if incremental:
+                    for meta in metadatas:
+                        meta["file_hash"] = current_hash
+
+                collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
+                result.sources_ingested += 1
+                result.chunks_stored += len(chunks)
+                _status = "ingested"
+                if verbose:
+                    logger.info("  -> %d chunks stored", len(chunks))
 
         finally:
             if _skip_reason:

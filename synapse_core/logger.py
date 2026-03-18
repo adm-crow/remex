@@ -6,7 +6,6 @@ from typing import Optional
 class CustomFormatter(logging.Formatter):
     white = "\x1b[37m"
     blue = "\x1b[34m"
-    cyan = "\x1b[3;36m"
     yellow = "\x1b[33m"
     red = "\x1b[31m"
     bold_red = "\x1b[1;31m"

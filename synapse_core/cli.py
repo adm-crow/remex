@@ -1,15 +1,41 @@
 import json as _json
+from pathlib import Path
 
 import click
 
 from . import __version__
+from .config import load_config
 from .exceptions import SynapseError
 from .pipeline import ingest, purge, query, reset, sources
 from .sqlite_ingester import ingest_sqlite
 from .ai import PROVIDERS, DEFAULT_MODELS, detect_provider, generate_answer
 
+_TOML_TEMPLATE = """\
+[synapse]
+# Default options applied to every synapse command.
+# Override any value with a CLI flag — flags always win.
 
-@click.group()
+db             = "./synapse_db"    # ChromaDB persistence path
+collection     = "synapse"         # collection name
+embedding_model = "all-MiniLM-L6-v2"
+
+# Chunking defaults (used by ingest / ingest-sqlite)
+# chunk_size     = 1000
+# overlap        = 200
+# min_chunk_size = 50
+# chunking       = "word"          # "word" or "sentence"
+"""
+
+
+class _SynapseGroup(click.Group):
+    """Click group that injects synapse.toml values as CLI defaults."""
+
+    def make_context(self, info_name, args, **kwargs):
+        kwargs.setdefault("default_map", load_config())
+        return super().make_context(info_name, args, **kwargs)
+
+
+@click.group(cls=_SynapseGroup)
 @click.version_option(__version__, prog_name="synapse")
 def cli() -> None:
     """synapse — local RAG: ingest files, query semantically."""
@@ -34,6 +60,8 @@ def cli() -> None:
               help="Stream files larger than this size (MB) to limit memory use. 0 = disable.")
 @click.option("--min-chunk-size", default=50, show_default=True, type=click.IntRange(min=1),
               help="Discard chunks shorter than this many characters.")
+@click.option("--embedding-model", default="all-MiniLM-L6-v2", show_default=True,
+              help="SentenceTransformer model name for embeddings.")
 def ingest_cmd(
     source_dir: str,
     db_path: str,
@@ -44,6 +72,7 @@ def ingest_cmd(
     chunking: str,
     streaming_threshold: int,
     min_chunk_size: int,
+    embedding_model: str,
 ) -> None:
     """Ingest files from SOURCE_DIR into ChromaDB."""
     try:
@@ -57,6 +86,7 @@ def ingest_cmd(
             incremental=incremental,
             chunking=chunking,
             streaming_threshold=streaming_threshold * 1024 * 1024,
+            embedding_model=embedding_model,
         )
     except (SynapseError, FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -85,6 +115,8 @@ def ingest_cmd(
               help="Chunking strategy.")
 @click.option("--min-chunk-size", default=50, show_default=True, type=click.IntRange(min=1),
               help="Discard chunks shorter than this many characters.")
+@click.option("--embedding-model", default="all-MiniLM-L6-v2", show_default=True,
+              help="SentenceTransformer model name for embeddings.")
 def ingest_sqlite_cmd(
     db_path: str,
     table: str,
@@ -97,6 +129,7 @@ def ingest_sqlite_cmd(
     overlap: int,
     chunking: str,
     min_chunk_size: int,
+    embedding_model: str,
 ) -> None:
     """Ingest records from a SQLite DB_PATH table into ChromaDB."""
     columns_list = [c.strip() for c in columns.split(",") if c.strip()] if columns else None
@@ -113,6 +146,7 @@ def ingest_sqlite_cmd(
             overlap=overlap,
             min_chunk_size=min_chunk_size,
             chunking=chunking,
+            embedding_model=embedding_model,
         )
     except (SynapseError, FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -141,6 +175,8 @@ def ingest_sqlite_cmd(
 @click.option("--format", "fmt", default="text", show_default=True,
               type=click.Choice(["text", "json"]),
               help="Output format. Use 'json' for scripting / piping.")
+@click.option("--embedding-model", default="all-MiniLM-L6-v2", show_default=True,
+              help="SentenceTransformer model name (must match the model used at ingest).")
 def query_cmd(
     text: str,
     db_path: str,
@@ -152,6 +188,7 @@ def query_cmd(
     where: str | None,
     collections: str | None,
     fmt: str,
+    embedding_model: str,
 ) -> None:
     """Semantic search over the ChromaDB collection.
 
@@ -182,6 +219,7 @@ def query_cmd(
             n_results=n_results,
             where=where_dict,
             collection_names=collection_names,
+            embedding_model=embedding_model,
         )
     except (SynapseError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -285,3 +323,53 @@ def reset_cmd(db_path: str, collection: str, yes: bool) -> None:
             abort=True,
         )
     reset(db_path=db_path, collection_name=collection, confirm=True)
+
+
+@cli.command(name="init")
+@click.argument("path", default=".", type=click.Path())
+def init_cmd(path: str) -> None:
+    """Scaffold a new synapse project in PATH (default: current directory).
+
+    Creates:
+      - docs/           directory for your source files
+      - synapse.toml    project config with default values
+      - .gitignore      entry for synapse_db/ (if inside a git repo)
+    """
+    root = Path(path).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+
+    # docs/ directory
+    docs = root / "docs"
+    if not docs.exists():
+        docs.mkdir()
+        click.echo(f"  created  docs/")
+    else:
+        click.echo(f"  exists   docs/  (skipped)")
+
+    # synapse.toml
+    config_file = root / "synapse.toml"
+    if not config_file.exists():
+        config_file.write_text(_TOML_TEMPLATE, encoding="utf-8")
+        click.echo(f"  created  synapse.toml")
+    else:
+        click.echo(f"  exists   synapse.toml  (skipped)")
+
+    # .gitignore — only touch if inside a git repo
+    git_dir = root / ".git"
+    if git_dir.exists():
+        gitignore = root / ".gitignore"
+        entry = "synapse_db/"
+        if gitignore.exists():
+            if entry not in gitignore.read_text():
+                with gitignore.open("a", encoding="utf-8") as f:
+                    f.write(f"\n# synapse\n{entry}\n")
+                click.echo(f"  updated  .gitignore  ({entry})")
+        else:
+            gitignore.write_text(f"# synapse\n{entry}\n", encoding="utf-8")
+            click.echo(f"  created  .gitignore  ({entry})")
+
+    click.echo()
+    click.echo("Ready. Next steps:")
+    click.echo("  1. Drop your files into docs/")
+    click.echo("  2. synapse ingest")
+    click.echo("  3. synapse query \"your question\"")

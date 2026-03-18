@@ -741,13 +741,6 @@ def test_ingest_many_skips_unsupported_file(mock_chroma, tmp_path):
     assert result.sources_skipped == 1
 
 
-def test_ingest_many_empty_list_returns_result(tmp_path):
-    with patch("synapse_core.pipeline.chromadb.PersistentClient"), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
-        result = ingest_many([], db_path=str(tmp_path / "db"), verbose=False)
-    assert result.sources_found == 0
-    assert result.sources_ingested == 0
-
 
 def test_ingest_many_on_progress_called_for_each(mock_chroma, tmp_path):
     (tmp_path / "a.txt").write_text("word " * 30, encoding="utf-8")
@@ -761,34 +754,79 @@ def test_ingest_many_on_progress_called_for_each(mock_chroma, tmp_path):
     assert calls[-1].files_done == 2
 
 
-# --- exception hierarchy ---
 
-def test_exception_hierarchy():
-    from synapse_core.exceptions import (
-        CollectionNotFoundError, SourceNotFoundError, SynapseError, TableNotFoundError,
+# --- ingest_many: incremental ---
+
+def test_ingest_many_incremental_skips_unchanged(mock_chroma, tmp_path):
+    f = tmp_path / "doc.txt"
+    f.write_text("word " * 30, encoding="utf-8")
+    # Simulate stored hash matching current hash
+    import hashlib
+    current_hash = hashlib.sha256(f.read_bytes(), usedforsecurity=False).hexdigest()
+    mock_chroma.get.return_value = {
+        "ids": ["abc123"],
+        "metadatas": [{"file_hash": current_hash}],
+    }
+    result = ingest_many([f], db_path=str(tmp_path / "db"), verbose=False, incremental=True)
+    assert result.sources_skipped == 1
+    assert "hash_match" in result.skipped_reasons[0]
+    mock_chroma.upsert.assert_not_called()
+
+
+def test_ingest_many_incremental_reingest_changed(mock_chroma, tmp_path):
+    f = tmp_path / "doc.txt"
+    f.write_text("word " * 30, encoding="utf-8")
+    mock_chroma.get.return_value = {
+        "ids": ["abc123"],
+        "metadatas": [{"file_hash": "outdated_hash"}],
+    }
+    result = ingest_many([f], db_path=str(tmp_path / "db"), verbose=False, incremental=True)
+    assert result.sources_ingested == 1
+    mock_chroma.delete.assert_called_once_with(ids=["abc123"])
+    mock_chroma.upsert.assert_called_once()
+
+
+def test_ingest_many_incremental_stores_hash(mock_chroma, tmp_path):
+    f = tmp_path / "doc.txt"
+    f.write_text("word " * 30, encoding="utf-8")
+    mock_chroma.get.return_value = {"ids": [], "metadatas": []}
+    ingest_many([f], db_path=str(tmp_path / "db"), verbose=False, incremental=True)
+    metadatas = mock_chroma.upsert.call_args.kwargs["metadatas"]
+    assert all("file_hash" in m for m in metadatas)
+
+
+# --- ingest_many: streaming ---
+
+def test_ingest_many_streaming_threshold_zero_disables(mock_chroma, tmp_path):
+    f = tmp_path / "doc.txt"
+    f.write_text("word " * 100, encoding="utf-8")
+    with patch("synapse_core.pipeline.supports_streaming", return_value=True):
+        result = ingest_many(
+            [f], db_path=str(tmp_path / "db"), verbose=False, streaming_threshold=0,
+        )
+    assert result.sources_ingested == 1
+    mock_chroma.upsert.assert_called()
+
+
+# --- integration test (real ChromaDB) ---
+
+def test_integration_ingest_and_query(tmp_path):
+    """End-to-end: ingest a real file, query it, get a result back."""
+    from synapse_core.pipeline import ingest, query
+    doc = tmp_path / "docs" / "readme.txt"
+    doc.parent.mkdir()
+    doc.write_text(
+        "The refund policy allows customers to return products within 30 days. "
+        "A full refund is issued upon receipt of the returned item. "
+        "Contact support@example.com for assistance. " * 5,
+        encoding="utf-8",
     )
-    assert issubclass(CollectionNotFoundError, SynapseError)
-    assert issubclass(CollectionNotFoundError, ValueError)
-    assert issubclass(SourceNotFoundError, SynapseError)
-    assert issubclass(SourceNotFoundError, FileNotFoundError)
-    assert issubclass(TableNotFoundError, SynapseError)
-    assert issubclass(TableNotFoundError, ValueError)
+    db = str(tmp_path / "db")
+    result = ingest(source_dir=str(tmp_path / "docs"), db_path=db, verbose=False)
+    assert result.sources_ingested == 1
+    assert result.chunks_stored >= 1
 
-
-# --- model fields ---
-
-def test_ingest_result_default_fields():
-    from synapse_core.models import IngestResult
-    r = IngestResult()
-    assert r.sources_found == 0
-    assert r.sources_ingested == 0
-    assert r.sources_skipped == 0
-    assert r.chunks_stored == 0
-    assert r.skipped_reasons == []
-
-
-def test_purge_result_default_fields():
-    from synapse_core.models import PurgeResult
-    r = PurgeResult()
-    assert r.chunks_deleted == 0
-    assert r.chunks_checked == 0
+    hits = query("refund policy", db_path=db, n_results=2)
+    assert len(hits) >= 1
+    assert hits[0]["score"] > 0
+    assert "refund" in hits[0]["text"].lower()

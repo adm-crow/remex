@@ -346,3 +346,44 @@ def test_extract_streaming_non_streaming_format_falls_back(tmp_path):
     blocks = list(extract_streaming(path))
     assert len(blocks) == 1
     assert "value" in blocks[0]
+
+
+# --- metadata: epub ---
+
+def test_extract_metadata_epub(tmp_path):
+    pytest.importorskip("ebooklib")
+    from ebooklib import epub
+
+    book = epub.EpubBook()
+    book.set_title("My EPUB Title")
+    book.add_author("Jane Doe")
+    chapter = epub.EpubHtml(title="Ch1", file_name="ch1.xhtml")
+    chapter.content = b"<html><body><p>hello</p></body></html>"
+    book.add_item(chapter)
+    book.add_item(epub.EpubNcx())
+    book.add_item(epub.EpubNav())
+    book.spine = ["nav", chapter]
+    path = tmp_path / "file.epub"
+    epub.write_epub(str(path), book)
+
+    meta = extract_metadata(path)
+    assert meta["doc_title"] == "My EPUB Title"
+    assert meta["doc_author"] == "Jane Doe"
+
+
+# --- metadata: odt ---
+
+def test_extract_metadata_odt(tmp_path):
+    pytest.importorskip("odf")
+    from odf.opendocument import OpenDocumentText
+    from odf.dc import Title, Creator
+
+    doc = OpenDocumentText()
+    doc.meta.addElement(Title(text="My ODT Title"))
+    doc.meta.addElement(Creator(text="John Smith"))
+    path = tmp_path / "file.odt"
+    doc.save(str(path))
+
+    meta = extract_metadata(path)
+    assert meta["doc_title"] == "My ODT Title"
+    assert meta["doc_author"] == "John Smith"
