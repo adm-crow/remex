@@ -4,21 +4,22 @@
   <h1>synapse-core</h1>
   <p><strong>Local-first RAG for Python — ingest files, query semantically, feed any AI.</strong></p>
 
-  [![CI](https://github.com/adm-crow/synapse/actions/workflows/ci.yml/badge.svg)](https://github.com/adm-crow/synapse/actions/workflows/ci.yml)
-  [![tests](https://img.shields.io/badge/tests-191%20passing-brightgreen?style=flat-square)](tests/)
-  [![PyPI](https://img.shields.io/pypi/v/synapse-core?style=flat-square&color=blue)](https://pypi.org/project/synapse-core/)
-  [![Python](https://img.shields.io/badge/python-3.11%2B-blue?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
-  [![License](https://img.shields.io/badge/license-Apache%202.0-green?style=flat-square)](LICENSE)
-  [![Downloads](https://img.shields.io/pypi/dm/synapse-core?style=flat-square&color=orange)](https://pypi.org/project/synapse-core/)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/synapse-core?style=flat-square&logo=python&logoColor=white)
+![PyPI - Version](https://img.shields.io/pypi/v/synapse-core?style=flat-square&logo=pypi&logoColor=white)
+![GitHub License](https://img.shields.io/github/license/adm-crow/synapse?style=flat-square&logo=github&logoColor=white)
+<br>
+![PyPI - Downloads](https://img.shields.io/pypi/dm/synapse-core?style=flat-square&logo=pypi&logoColor=white)
+![GitHub branch check runs](https://img.shields.io/github/check-runs/adm-crow/synapse/main?style=flat-square&logo=github&logoColor=white)
+![GitHub Release Date](https://img.shields.io/github/release-date/adm-crow/synapse?display_date=published_at&style=flat-square&logo=github&logoColor=white)
 </div>
 
 ---
 
-No cloud. No API key. No infrastructure. Point synapse at a folder (or a SQLite database), run one function, and query your documents semantically — offline, on your machine.
+No cloud, no API key, no infrastructure required. Just point Synapse to a folder (or a SQLite database), run a single function, and semantically query your documents — entirely offline, right on your machine.
 
 | | |
 |---|---|
-| **12 formats** | `txt` `md` `csv` `pdf` `docx` `json` `jsonl` `html` `pptx` `xlsx` `epub` `odt` |
+| **12 formats** | `.txt` `.md` `.csv` `.pdf` `.docx` `.json` `.jsonl` `.html` `.pptx` `.xlsx` `.epub` `.odt` |
 | **Embeddings** | Local `sentence-transformers` — fully offline, no data leaves your machine |
 | **Storage** | ChromaDB persistent vector store — survives restarts, idempotent upserts |
 | **Extras** | SQLite ingestion · Async API · CLI · `synapse.toml` project config |
@@ -33,17 +34,14 @@ pip install synapse-core
 uv add synapse-core
 ```
 
-<details>
-<summary>Optional extras</summary>
-
-```bash
-pip install "synapse-core[formats]"              # .html .pptx .xlsx .epub .odt support
-pip install "synapse-core[sentence]"             # sentence-aware chunking (requires NLTK)
-pip install "synapse-core[ai]"                   # Anthropic + OpenAI SDKs for --ai flag
-pip install "synapse-core[formats,sentence,ai]"  # everything
-```
-
-</details>
+> [!NOTE]
+> Optional extras
+> ```bash
+> pip install "synapse-core[formats]"              # .html .pptx .xlsx .epub .odt support
+> pip install "synapse-core[sentence]"             # sentence-aware chunking (requires NLTK)
+> pip install "synapse-core[ai]"                   # Anthropic + OpenAI SDKs for --ai flag
+> pip install "synapse-core[formats,sentence,ai]"  # everything
+> ```
 
 ---
 
@@ -52,13 +50,13 @@ pip install "synapse-core[formats,sentence,ai]"  # everything
 ```python
 from synapse_core import ingest, query
 
-result = ingest("./docs")
-print(f"{result.sources_ingested}/{result.sources_found} files ingested, {result.chunks_stored} chunks stored")
+data = ingest("./docs")
+print(f"{data.sources_ingested}/{data.sources_found} files ingested, {data.chunks_stored} chunks stored")
 
-hits = query("what is the refund policy?", n_results=4)
-for h in hits:
-    print(f"[{h['score']:.2f}]  {h['source']}")
-    print(h["text"])
+results = query("what is the refund policy?", n_results=4)
+for result in results:
+    print(f"[{result['score']:.2f}]  {result['source']}")
+    print(result["text"])
 ```
 
 > [!TIP]
@@ -69,10 +67,10 @@ for h in hits:
 ## CLI
 
 ```bash
-synapse init                          # scaffold docs/, synapse.toml, .gitignore
+synapse init                                      # scaffold docs/, synapse.toml, .gitignore
 
 synapse ingest ./docs
-synapse ingest ./docs --incremental   # skip unchanged files
+synapse ingest ./docs --incremental               # skip unchanged files
 synapse ingest ./docs --chunking sentence
 
 synapse ingest-sqlite ./data.db --table articles
@@ -86,19 +84,19 @@ synapse query "..." --where '{"source_type": {"$eq": "file"}}'
 synapse query "..." --ai                          # AI answer, provider auto-detected
 synapse query "..." --ai --provider anthropic --model claude-opus-4-6
 
-synapse sources                       # list all indexed sources
-synapse purge                         # remove chunks from deleted files
-synapse reset --yes                   # wipe the entire collection
+synapse sources                                   # list all indexed sources
+synapse purge                                     # remove chunks from deleted files
+synapse reset --yes                               # wipe the entire collection
 ```
 
-Every command accepts `--db PATH`, `--collection NAME`, and `--embedding-model`. Run `synapse <cmd> --help` for all options.
+> [!TIP]
+> Every command accepts `--db PATH`, `--collection NAME`, and `--embedding-model`. Run `synapse <cmd> --help` for all options.
 
 <details>
-<summary>Full flag reference — <code>synapse ingest</code></summary>
+<summary>Full CLI flag reference</summary>
 
+**`synapse ingest [SOURCE_DIR]`**
 ```
-synapse ingest [SOURCE_DIR]
-
   SOURCE_DIR                         Directory to scan recursively [default: ./docs]
   --db PATH                          ChromaDB persistence path [default: ./synapse_db]
   --collection NAME                  Collection name [default: synapse]
@@ -111,16 +109,10 @@ synapse ingest [SOURCE_DIR]
   --incremental                      Skip files unchanged since last run (SHA-256)
 ```
 
-</details>
-
-<details>
-<summary>Full flag reference — <code>synapse ingest-sqlite</code></summary>
-
+**`synapse ingest-sqlite DB_PATH --table TABLE`**
 ```
-synapse ingest-sqlite DB_PATH --table TABLE
-
   DB_PATH                            Path to the SQLite database file
-  --table NAME                  *    Table to ingest (required)
+  --table NAME              *        Table to ingest (required)
   --db PATH                          ChromaDB persistence path [default: ./synapse_db]
   --collection NAME                  Collection name [default: synapse]
   --columns col1,col2                Columns to embed (default: all columns)
@@ -133,14 +125,8 @@ synapse ingest-sqlite DB_PATH --table TABLE
   --embedding-model MODEL            SentenceTransformer model name
 ```
 
-</details>
-
-<details>
-<summary>Full flag reference — <code>synapse query</code></summary>
-
+**`synapse query TEXT`**
 ```
-synapse query TEXT
-
   TEXT                               Search query (required)
   --db PATH                          ChromaDB persistence path [default: ./synapse_db]
   --collection NAME                  Collection name [default: synapse]
@@ -161,7 +147,9 @@ synapse query TEXT
 ## API reference
 
 <details>
-<summary><strong>ingest()</strong></summary>
+<summary>Full API reference — ingest · query · ingest_sqlite · ingest_many · async · purge · reset · sources</summary>
+
+### `ingest()`
 
 Scan a directory recursively, chunk every supported file, embed it, and persist to ChromaDB.
 
@@ -199,10 +187,9 @@ with tqdm(unit="file") as bar:
     ingest("./docs", on_progress=_cb)
 ```
 
-</details>
+---
 
-<details>
-<summary><strong>query()</strong></summary>
+### `query()`
 
 Embed the query and return the closest matching chunks, ranked by relevance.
 
@@ -231,10 +218,9 @@ hits = query("...", collection_names=["docs", "archive", "notes"])
 
 > Supported operators: `$eq` `$ne` `$gt` `$gte` `$lt` `$lte` `$in` `$nin`
 
-</details>
+---
 
-<details>
-<summary><strong>ingest_sqlite()</strong></summary>
+### `ingest_sqlite()`
 
 Ingest rows from a SQLite table. Files and database records coexist in the same collection and are queried together.
 
@@ -264,10 +250,9 @@ result = ingest_sqlite(
 
 Raises `SourceNotFoundError` · `TableNotFoundError` · `ValueError` (bad column names).
 
-</details>
+---
 
-<details>
-<summary><strong>ingest_many()</strong></summary>
+### `ingest_many()`
 
 Ingest an explicit list of files instead of scanning a directory.
 
@@ -292,10 +277,9 @@ result = ingest_many(
 
 Unsupported or missing files are skipped — reasons recorded in `result.skipped_reasons`.
 
-</details>
+---
 
-<details>
-<summary><strong>Async API</strong></summary>
+### Async API
 
 `ingest_async()` and `query_async()` are drop-in async equivalents backed by `asyncio.to_thread()`. All parameters are identical to their sync counterparts.
 
@@ -324,10 +308,9 @@ async def search_endpoint(q: str, n: int = 5):
     return await query_async(q, n_results=n)
 ```
 
-</details>
+---
 
-<details>
-<summary><strong>purge() · reset() · sources()</strong></summary>
+### `purge()` · `reset()` · `sources()`
 
 ```python
 from synapse_core import purge, reset, sources
@@ -354,8 +337,56 @@ synapse_core.setup_logging(level=logging.WARNING)   # suppress info messages
 
 </details>
 
+---
+
+## synapse.toml
+
+Run `synapse init` once per project. Defaults for every command — CLI flags always override. Looked up in the **current working directory** at runtime.
+
+```toml
+[synapse]
+db              = "./synapse_db"
+collection      = "myproject"
+embedding_model = "all-MiniLM-L6-v2"
+
+# chunk_size     = 1000
+# overlap        = 200
+# min_chunk_size = 50
+# chunking       = "word"     # "word" or "sentence"
+```
+
+---
+
+## Use with any LLM
+
+```python
+from synapse_core import ingest, query
+
+ingest("./docs")  # run once — idempotent
+
+def ask(question: str, client) -> str:
+    context = "\n\n".join(r["text"] for r in query(question, n_results=5))
+    response = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        system=f"Answer using only the context below:\n\n{context}",
+        messages=[{"role": "user", "content": question}],
+    )
+    return response.content[0].text
+```
+
+Or zero-code from the CLI — set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` and use `--ai`:
+
+```bash
+synapse query "what changed in v2?" --ai
+```
+
+---
+
 <details>
-<summary><strong>Return types</strong></summary>
+<summary>Reference — Return types · Exceptions · Metadata · Chunking · AI providers</summary>
+
+### Return types
 
 **`IngestResult`** — returned by `ingest()`, `ingest_many()`, `ingest_sqlite()`
 
@@ -398,10 +429,9 @@ synapse_core.setup_logging(level=logging.WARNING)   # suppress info messages
 | `doc_author` | `str` | Extracted author (empty string if unavailable) |
 | `doc_created` | `str` | ISO-8601 creation date (empty string if unavailable) |
 
-</details>
+---
 
-<details>
-<summary><strong>Exceptions</strong></summary>
+### Exceptions
 
 ```
 SynapseError                    ← base class, catch-all
@@ -412,28 +442,9 @@ SynapseError                    ← base class, catch-all
 
 Every exception inherits from both `SynapseError` and the matching Python built-in — existing `except ValueError` / `except FileNotFoundError` handlers keep working unchanged.
 
-</details>
-
 ---
 
-## synapse.toml
-
-Run `synapse init` once per project. Defaults for every command — CLI flags always override. Looked up in the **current working directory** at runtime.
-
-```toml
-[synapse]
-db              = "./synapse_db"
-collection      = "myproject"
-embedding_model = "all-MiniLM-L6-v2"
-
-# chunk_size     = 1000
-# overlap        = 200
-# min_chunk_size = 50
-# chunking       = "word"     # "word" or "sentence"
-```
-
-<details>
-<summary>Metadata extraction support per format</summary>
+### Metadata extraction
 
 | Format | Title | Author | Date |
 |--------|:-----:|:------:|:----:|
@@ -447,10 +458,9 @@ embedding_model = "all-MiniLM-L6-v2"
 
 All fields are always present in `QueryResult` — empty string when unavailable.
 
-</details>
+---
 
-<details>
-<summary>Chunking modes</summary>
+### Chunking modes
 
 | Mode | Flag | Extra | Description |
 |------|------|-------|-------------|
@@ -461,10 +471,9 @@ Chunks shorter than `min_chunk_size` (default 50 chars) are discarded. Consecuti
 
 Large text-based files (`txt`, `md`, `csv`, `jsonl`) are streamed through the chunker in pages when the file exceeds `streaming_threshold` (default 50 MB), keeping memory flat regardless of file size.
 
-</details>
+---
 
-<details>
-<summary>AI providers</summary>
+### AI providers
 
 `--ai` and `generate_answer()` support three providers, auto-detected in priority order:
 
@@ -486,32 +495,6 @@ synapse query "..." --ai --provider ollama --model llama3
 The AI answer is generated from retrieved chunks only — your full corpus is never sent to any provider.
 
 </details>
-
----
-
-## Use with any LLM
-
-```python
-from synapse_core import ingest, query
-
-ingest("./docs")  # run once — idempotent
-
-def ask(question: str, client) -> str:
-    context = "\n\n".join(r["text"] for r in query(question, n_results=5))
-    response = client.messages.create(
-        model="claude-opus-4-6",
-        max_tokens=1024,
-        system=f"Answer using only the context below:\n\n{context}",
-        messages=[{"role": "user", "content": question}],
-    )
-    return response.content[0].text
-```
-
-Or zero-code from the CLI — set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` and use `--ai`:
-
-```bash
-synapse query "what changed in v2?" --ai
-```
 
 ---
 
