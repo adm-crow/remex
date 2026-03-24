@@ -7,7 +7,7 @@ from . import __version__
 from .ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
 from .config import load_config
 from .exceptions import SynapseError
-from .pipeline import ingest, purge, query, reset, sources
+from .pipeline import collection_stats, delete_source, ingest, list_collections, purge, query, reset, sources
 from .sqlite_ingester import ingest_sqlite
 
 _TOML_TEMPLATE = """\
@@ -288,6 +288,12 @@ def ingest_sqlite_cmd(
     show_default=True,
     help="SentenceTransformer model name (must match the model used at ingest).",
 )
+@click.option(
+    "--min-score",
+    default=None,
+    type=click.FloatRange(min=0.0, max=1.0),
+    help="Minimum relevance score (0–1). Drop results below this threshold.",
+)
 def query_cmd(
     text: str,
     db_path: str,
@@ -300,6 +306,7 @@ def query_cmd(
     collections: str | None,
     fmt: str,
     embedding_model: str,
+    min_score: float | None,
 ) -> None:
     """Semantic search over the ChromaDB collection.
 
@@ -335,6 +342,7 @@ def query_cmd(
             where=where_dict,
             collection_names=collection_names,
             embedding_model=embedding_model,
+            min_score=min_score,
         )
     except (SynapseError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
@@ -506,3 +514,79 @@ def init_cmd(path: str) -> None:
     click.echo("  1. Drop your files into docs/")
     click.echo("  2. synapse ingest")
     click.echo('  3. synapse query "your question"')
+
+
+@cli.command(name="list-collections")
+@click.option(
+    "--db",
+    "db_path",
+    default="./synapse_db",
+    show_default=True,
+    help="ChromaDB persistence path.",
+)
+def list_collections_cmd(db_path: str) -> None:
+    """List all collection names in a ChromaDB directory."""
+    names = list_collections(db_path=db_path)
+    if not names:
+        click.echo("No collections found.")
+        return
+    for name in names:
+        click.echo(name)
+
+
+@cli.command(name="stats")
+@click.option(
+    "--db",
+    "db_path",
+    default="./synapse_db",
+    show_default=True,
+    help="ChromaDB persistence path.",
+)
+@click.option(
+    "--collection", default="synapse", show_default=True, help="Collection name."
+)
+def stats_cmd(db_path: str, collection: str) -> None:
+    """Show statistics for a ChromaDB collection."""
+    try:
+        stats = collection_stats(db_path=db_path, collection_name=collection)
+    except SynapseError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+    click.echo(f"Collection : {stats.name}")
+    click.echo(f"Chunks     : {stats.total_chunks}")
+    click.echo(f"Sources    : {stats.total_sources}")
+    click.echo(f"Model      : {stats.embedding_model or '(unknown)'}")
+
+
+@cli.command(name="delete-source")
+@click.argument("source")
+@click.option(
+    "--db",
+    "db_path",
+    default="./synapse_db",
+    show_default=True,
+    help="ChromaDB persistence path.",
+)
+@click.option(
+    "--collection", default="synapse", show_default=True, help="Collection name."
+)
+@click.option("--yes", is_flag=True, help="Skip confirmation prompt.")
+def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> None:
+    """Remove all chunks for SOURCE from the collection.
+
+    SOURCE is a file path or a SQLite source string (as shown by 'synapse sources').
+    """
+    if not yes:
+        click.confirm(
+            f"Remove all chunks for '{source}' from collection '{collection}'?",
+            abort=True,
+        )
+    try:
+        deleted = delete_source(source=source, db_path=db_path, collection_name=collection)
+    except SynapseError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise SystemExit(1)
+    if deleted:
+        click.echo(f"Deleted {deleted} chunk(s).")
+    else:
+        click.echo("No chunks found for that source.")

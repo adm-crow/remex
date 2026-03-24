@@ -11,7 +11,7 @@ from .chunker import chunk_text
 from .exceptions import CollectionNotFoundError, SourceNotFoundError
 from .extractors import extract, extract_metadata, extract_streaming, is_supported, supports_streaming
 from .logger import logger
-from .models import IngestProgress, IngestResult, PurgeResult, QueryResult
+from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, QueryResult
 
 
 def _make_id(file_path: Path, source_dir: Path, chunk_index: int) -> str:
@@ -326,6 +326,7 @@ def query(
     embedding_model: str = "all-MiniLM-L6-v2",
     where: Optional[dict] = None,
     collection_names: Optional[List[str]] = None,
+    min_score: Optional[float] = None,
 ) -> List[QueryResult]:
     """
     Semantic search over one or more ChromaDB collections.
@@ -342,6 +343,9 @@ def query(
         collection_names:  Query multiple collections and merge results by score.
                            When provided, ``collection_name`` is ignored.
                            Missing collections are silently skipped.
+        min_score:         Minimum relevance score (0–1) to include in results.
+                           Results with a score below this threshold are dropped.
+                           ``None`` (default) returns all results up to ``n_results``.
 
     Returns:
         List of :class:`~synapse_core.QueryResult` dicts sorted by relevance
@@ -349,6 +353,8 @@ def query(
     """
     if n_results < 1:
         raise ValueError("n_results must be >= 1")
+    if min_score is not None and not (0.0 <= min_score <= 1.0):
+        raise ValueError("min_score must be between 0.0 and 1.0")
 
     # ── multi-collection: query each, merge, return top-n ─────────────────
     if collection_names:
@@ -362,6 +368,7 @@ def query(
                     n_results=n_results,
                     embedding_model=embedding_model,
                     where=where,
+                    min_score=min_score,
                 )
                 all_results.extend(partial)
             except CollectionNotFoundError:
@@ -393,7 +400,7 @@ def query(
     documents = results["documents"][0]  # type: ignore[index]
     metadatas = results["metadatas"][0]  # type: ignore[index]
     distances = results["distances"][0]  # type: ignore[index]
-    return cast(List[QueryResult], [
+    rows = cast(List[QueryResult], [
         {
             "text": doc,
             "source": meta.get("source", ""),
@@ -407,6 +414,9 @@ def query(
         }
         for doc, meta, dist in zip(documents, metadatas, distances)
     ])
+    if min_score is not None:
+        rows = [r for r in rows if r["score"] >= min_score]
+    return rows
 
 
 def _source_exists(meta: dict) -> bool:
@@ -510,6 +520,116 @@ def sources(
             seen.add(src)
             unique.append(src)
     return sorted(unique)
+
+
+def list_collections(db_path: str = "./synapse_db") -> List[str]:
+    """Return a sorted list of all collection names in a ChromaDB directory.
+
+    Returns an empty list if the path does not exist or contains no collections.
+
+    Args:
+        db_path: ChromaDB persistence path.
+    """
+    try:
+        client = chromadb.PersistentClient(path=db_path)
+        return sorted(c.name for c in client.list_collections())
+    except Exception:
+        return []
+
+
+def collection_stats(
+    db_path: str = "./synapse_db",
+    collection_name: str = "synapse",
+) -> CollectionStats:
+    """Return statistics for a ChromaDB collection.
+
+    Args:
+        db_path:          ChromaDB persistence path.
+        collection_name:  Name of the collection.
+
+    Returns:
+        A :class:`~synapse_core.CollectionStats` instance with ``name``,
+        ``total_chunks``, ``total_sources``, and ``embedding_model``.
+
+    Raises:
+        CollectionNotFoundError: If the collection does not exist.
+    """
+    client = chromadb.PersistentClient(path=db_path)
+    try:
+        collection = client.get_collection(name=collection_name)
+    except (ValueError, ChromaNotFoundError):
+        raise CollectionNotFoundError(
+            f"Collection '{collection_name}' not found in '{db_path}'."
+        ) from None
+
+    total_chunks = collection.count()
+    results = collection.get(include=["metadatas"])
+    unique_sources = len({
+        str(meta.get("source", ""))
+        for meta in (results["metadatas"] or [])
+        if meta.get("source")
+    })
+    embedding_model = (
+        collection.metadata.get("embedding_model", "")
+        if isinstance(collection.metadata, dict)
+        else ""
+    )
+    return CollectionStats(
+        name=collection_name,
+        total_chunks=total_chunks,
+        total_sources=unique_sources,
+        embedding_model=embedding_model,
+    )
+
+
+def delete_source(
+    source: str,
+    db_path: str = "./synapse_db",
+    collection_name: str = "synapse",
+    verbose: bool = True,
+) -> int:
+    """Remove all chunks for a given source from the collection.
+
+    For file sources, ``source`` is the file path (resolved to absolute
+    internally). For SQLite sources, pass the stored string as returned by
+    :func:`sources` (e.g. ``"/abs/path/to/db::table"``).
+
+    Args:
+        source:           File path or SQLite source string.
+        db_path:          ChromaDB persistence path.
+        collection_name:  Name of the collection.
+        verbose:          Log a summary line when chunks are deleted.
+
+    Returns:
+        Number of chunks deleted (0 if the source was not found).
+
+    Raises:
+        CollectionNotFoundError: If the collection does not exist.
+    """
+    client = chromadb.PersistentClient(path=db_path)
+    try:
+        collection = client.get_collection(name=collection_name)
+    except (ValueError, ChromaNotFoundError):
+        raise CollectionNotFoundError(
+            f"Collection '{collection_name}' not found in '{db_path}'."
+        ) from None
+
+    # SQLite sources contain "::" — leave as-is.
+    # File sources: resolve to absolute path to match stored values.
+    source_str = source if "::" in source else str(Path(source).resolve())
+
+    results = collection.get(
+        where={"source": {"$eq": source_str}},
+        include=["metadatas"],
+    )
+    ids = results["ids"]
+    if ids:
+        collection.delete(ids=ids)
+        if verbose:
+            logger.info("Deleted %d chunk(s) for source '%s'.", len(ids), source_str)
+    elif verbose:
+        logger.warning("No chunks found for source '%s'.", source_str)
+    return len(ids)
 
 
 def ingest_many(
@@ -739,6 +859,7 @@ async def query_async(
     embedding_model: str = "all-MiniLM-L6-v2",
     where: Optional[dict] = None,
     collection_names: Optional[List[str]] = None,
+    min_score: Optional[float] = None,
 ) -> List[QueryResult]:
     """Async wrapper around :func:`query`. Runs in a thread pool so the event
     loop is never blocked. All parameters are identical to :func:`query`."""
@@ -751,4 +872,5 @@ async def query_async(
         embedding_model=embedding_model,
         where=where,
         collection_names=collection_names,
+        min_score=min_score,
     )

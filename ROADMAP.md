@@ -49,3 +49,8 @@ Progress toward a stable, production-ready 1.0 release.
 - [x] **`ingest_many` incremental + streaming** — `incremental=True` (hash-skip) and `streaming_threshold` now supported in `ingest_many()`, consistent with `ingest()`. *(v0.7.0)*
 - [x] **`--embedding-model` CLI flag** — exposed on `ingest`, `ingest-sqlite`, and `query` commands. *(v0.7.0)*
 - [x] **Real integration tests** — end-to-end test hitting a real `PersistentClient` added. *(v0.7.0)*
+- [x] **`list_collections()`** — list all collection names in a ChromaDB path. *(v1.1.0)*
+- [x] **`collection_stats()`** — total chunks, sources, and embedding model for a collection. *(v1.1.0)*
+- [x] **`delete_source()`** — remove all chunks for a specific source without touching the file. *(v1.1.0)*
+- [x] **`query(min_score=…)`** — filter results below a minimum relevance threshold. *(v1.1.0)*
+- [x] **`py.typed` marker** — downstream type checkers now resolve synapse-core's type hints. *(v1.1.0)*

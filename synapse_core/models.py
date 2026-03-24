@@ -81,6 +81,28 @@ class PurgeResult:
 
 
 @dataclass
+class CollectionStats:
+    """Statistics for a ChromaDB collection.
+
+    Returned by :func:`~synapse_core.collection_stats`.
+
+    Example::
+
+        stats = collection_stats()
+        print(f"{stats.name}: {stats.total_sources} sources, {stats.total_chunks} chunks")
+    """
+
+    name: str
+    """Collection name."""
+    total_chunks: int
+    """Total number of chunks stored in the collection."""
+    total_sources: int
+    """Number of unique source documents (files or SQLite tables) in the collection."""
+    embedding_model: str
+    """Embedding model used when the collection was created; empty string if unknown."""
+
+
+@dataclass
 class IngestProgress:
     """Per-file progress update emitted by :func:`~synapse_core.ingest` via the
     ``on_progress`` callback after each file is processed.

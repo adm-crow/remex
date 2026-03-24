@@ -243,6 +243,10 @@ def extract(path: Path) -> str:
     return extractor(path)
 
 
+SUPPORTED_EXTENSIONS: frozenset[str] = frozenset(EXTRACTORS.keys())
+"""Frozenset of file extensions (with leading dot) that synapse-core can ingest."""
+
+
 def is_supported(path: Path) -> bool:
     return path.suffix.lower() in EXTRACTORS
 

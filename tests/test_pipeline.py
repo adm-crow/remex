@@ -5,7 +5,19 @@ import pytest
 from chromadb.errors import NotFoundError as ChromaNotFoundError
 
 from synapse_core.exceptions import CollectionNotFoundError
-from synapse_core.pipeline import ingest, ingest_async, ingest_many, purge, query, query_async, reset, sources
+from synapse_core.pipeline import (
+    collection_stats,
+    delete_source,
+    ingest,
+    ingest_async,
+    ingest_many,
+    list_collections,
+    purge,
+    query,
+    query_async,
+    reset,
+    sources,
+)
 
 
 def make_docs_dir(tmp_path, *filenames_and_contents):
@@ -866,3 +878,208 @@ async def test_ingest_async_propagates_exception(tmp_path):
 async def test_query_async_validates_n_results(tmp_path, mock_chroma):
     with pytest.raises(ValueError):
         await query_async("hello", db_path=str(tmp_path / "db"), n_results=0)
+
+
+# --- list_collections ---
+
+def test_list_collections_returns_sorted_names(tmp_path):
+    col_a = MagicMock()
+    col_a.name = "alpha"
+    col_b = MagicMock()
+    col_b.name = "beta"
+    client = MagicMock()
+    client.list_collections.return_value = [col_b, col_a]  # unsorted on purpose
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        result = list_collections(db_path=str(tmp_path / "db"))
+
+    assert result == ["alpha", "beta"]
+
+
+def test_list_collections_empty_when_no_collections(tmp_path):
+    client = MagicMock()
+    client.list_collections.return_value = []
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        result = list_collections(db_path=str(tmp_path / "db"))
+
+    assert result == []
+
+
+def test_list_collections_returns_empty_on_error(tmp_path):
+    """If the ChromaDB path doesn't exist, return [] instead of raising."""
+    client = MagicMock()
+    client.list_collections.side_effect = Exception("path not found")
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        result = list_collections(db_path=str(tmp_path / "db"))
+
+    assert result == []
+
+
+# --- collection_stats ---
+
+def test_collection_stats_returns_correct_values(tmp_path):
+    from synapse_core.models import CollectionStats
+
+    collection = MagicMock()
+    collection.count.return_value = 10
+    collection.metadata = {"embedding_model": "all-MiniLM-L6-v2"}
+    collection.get.return_value = {
+        "ids": ["id1", "id2", "id3"],
+        "metadatas": [
+            {"source": "/docs/a.txt"},
+            {"source": "/docs/b.txt"},
+            {"source": "/docs/a.txt"},  # duplicate
+        ],
+    }
+    client = MagicMock()
+    client.get_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        stats = collection_stats(db_path=str(tmp_path / "db"), collection_name="synapse")
+
+    assert isinstance(stats, CollectionStats)
+    assert stats.name == "synapse"
+    assert stats.total_chunks == 10
+    assert stats.total_sources == 2  # deduplicated
+    assert stats.embedding_model == "all-MiniLM-L6-v2"
+
+
+def test_collection_stats_unknown_model_when_no_metadata(tmp_path):
+    collection = MagicMock()
+    collection.count.return_value = 5
+    collection.metadata = None  # old collection without metadata
+    collection.get.return_value = {"ids": [], "metadatas": []}
+    client = MagicMock()
+    client.get_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        stats = collection_stats(db_path=str(tmp_path / "db"))
+
+    assert stats.embedding_model == ""
+
+
+def test_collection_stats_raises_if_collection_not_found(tmp_path):
+    client = MagicMock()
+    client.get_collection.side_effect = ValueError("not found")
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        with pytest.raises(CollectionNotFoundError):
+            collection_stats(db_path=str(tmp_path / "db"), collection_name="missing")
+
+
+# --- delete_source ---
+
+def test_delete_source_removes_chunks(tmp_path):
+    existing_file = tmp_path / "report.txt"
+    existing_file.write_text("hello", encoding="utf-8")
+    source_str = str(existing_file.resolve())
+
+    collection = MagicMock()
+    collection.get.return_value = {"ids": ["id1", "id2"], "metadatas": [{}, {}]}
+    client = MagicMock()
+    client.get_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        deleted = delete_source(
+            source=str(existing_file),
+            db_path=str(tmp_path / "db"),
+            verbose=False,
+        )
+
+    assert deleted == 2
+    collection.delete.assert_called_once_with(ids=["id1", "id2"])
+    called_where = collection.get.call_args.kwargs["where"]
+    assert called_where == {"source": {"$eq": source_str}}
+
+
+def test_delete_source_returns_zero_when_not_found(tmp_path):
+    collection = MagicMock()
+    collection.get.return_value = {"ids": [], "metadatas": []}
+    client = MagicMock()
+    client.get_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        deleted = delete_source(source="/nonexistent/file.txt", db_path=str(tmp_path / "db"), verbose=False)
+
+    assert deleted == 0
+    collection.delete.assert_not_called()
+
+
+def test_delete_source_raises_if_collection_not_found(tmp_path):
+    client = MagicMock()
+    client.get_collection.side_effect = ValueError("not found")
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        with pytest.raises(CollectionNotFoundError):
+            delete_source(source="/some/file.txt", db_path=str(tmp_path / "db"))
+
+
+def test_delete_source_sqlite_source_not_normalized(tmp_path):
+    """SQLite sources (containing '::') must be passed as-is, not path-resolved."""
+    sqlite_source = "/abs/path/to/data.db::articles"
+
+    collection = MagicMock()
+    collection.get.return_value = {"ids": ["id1"], "metadatas": [{}]}
+    client = MagicMock()
+    client.get_collection.return_value = collection
+
+    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+        delete_source(source=sqlite_source, db_path=str(tmp_path / "db"), verbose=False)
+
+    called_where = collection.get.call_args.kwargs["where"]
+    assert called_where == {"source": {"$eq": sqlite_source}}
+
+
+# --- query: min_score ---
+
+def test_query_min_score_filters_low_results(mock_chroma, tmp_path):
+    mock_chroma.query.return_value = {
+        "documents": [["strong match", "weak match"]],
+        "metadatas": [[
+            {"source": "/a.txt", "source_type": "file", "chunk": 0},
+            {"source": "/b.txt", "source_type": "file", "chunk": 0},
+        ]],
+        "distances": [[0.05, 2.0]],  # scores: ~0.95, ~0.33
+    }
+    results = query(text="test", db_path=str(tmp_path / "db"), min_score=0.5)
+    assert len(results) == 1
+    assert results[0]["text"] == "strong match"
+
+
+def test_query_min_score_zero_returns_all(mock_chroma, tmp_path):
+    mock_chroma.query.return_value = {
+        "documents": [["a", "b"]],
+        "metadatas": [[
+            {"source": "/a.txt", "source_type": "file", "chunk": 0},
+            {"source": "/b.txt", "source_type": "file", "chunk": 0},
+        ]],
+        "distances": [[0.1, 0.9]],
+    }
+    results = query(text="test", db_path=str(tmp_path / "db"), min_score=0.0)
+    assert len(results) == 2
+
+
+def test_query_min_score_one_returns_only_perfect(mock_chroma, tmp_path):
+    mock_chroma.query.return_value = {
+        "documents": [["exact", "close"]],
+        "metadatas": [[
+            {"source": "/a.txt", "source_type": "file", "chunk": 0},
+            {"source": "/b.txt", "source_type": "file", "chunk": 0},
+        ]],
+        "distances": [[0.0, 0.1]],  # scores: 1.0, ~0.91
+    }
+    results = query(text="test", db_path=str(tmp_path / "db"), min_score=1.0)
+    assert len(results) == 1
+    assert results[0]["score"] == 1.0
+
+
+def test_query_min_score_invalid_raises(tmp_path):
+    with pytest.raises(ValueError, match="min_score"):
+        query(text="test", db_path=str(tmp_path / "db"), min_score=1.5)
+
+
+def test_query_min_score_negative_raises(tmp_path):
+    with pytest.raises(ValueError, match="min_score"):
+        query(text="test", db_path=str(tmp_path / "db"), min_score=-0.1)

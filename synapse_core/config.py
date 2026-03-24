@@ -1,4 +1,4 @@
-"""Load project-level defaults from synapse.toml."""
+"""Load and save project-level defaults from/to synapse.toml."""
 
 from __future__ import annotations
 
@@ -79,10 +79,87 @@ def load_config(root: Optional[Path] = None) -> dict[str, dict[str, Any]]:
         return m
 
     return {
-        "ingest":        {**_common(), **_chunking_opts()},
-        "ingest-sqlite": {**_common(use_chroma_path=True), **_chunking_opts()},
-        "query":         _common(),
-        "sources":       _common(),
-        "purge":         _common(),
-        "reset":         _common(),
+        "ingest":            {**_common(), **_chunking_opts()},
+        "ingest-sqlite":     {**_common(use_chroma_path=True), **_chunking_opts()},
+        "query":             _common(),
+        "sources":           _common(),
+        "purge":             _common(),
+        "reset":             _common(),
+        "list-collections":  _common(),
+        "stats":             _common(),
+        "delete-source":     _common(),
     }
+
+
+# Keys accepted in the [synapse] section, in display order.
+_KNOWN_KEYS: tuple[str, ...] = (
+    "db",
+    "collection",
+    "embedding_model",
+    "chunk_size",
+    "overlap",
+    "min_chunk_size",
+    "chunking",
+)
+
+
+def save_config(
+    settings: dict[str, Any],
+    root: Optional[Path] = None,
+) -> Path:
+    """Write *settings* to ``synapse.toml`` under the ``[synapse]`` section.
+
+    Only keys listed in :data:`_KNOWN_KEYS` are written; unknown keys are
+    silently ignored to protect the file from accidental pollution.
+
+    If the file already exists its ``[synapse]`` section is replaced while
+    any other sections are preserved.  If the file does not exist it is
+    created.
+
+    Args:
+        settings: Flat dict of ``[synapse]`` values, e.g.
+                  ``{"db": "./mydb", "collection": "docs"}``.
+        root:     Directory containing ``synapse.toml``.
+                  Defaults to the current working directory.
+
+    Returns:
+        Absolute :class:`~pathlib.Path` to the written file.
+    """
+    config_path = (root or Path.cwd()) / _CONFIG_FILE
+
+    # Read any existing content that is NOT the [synapse] section.
+    other_lines: list[str] = []
+    if config_path.exists():
+        in_synapse = False
+        for line in config_path.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if stripped == f"[{_SECTION}]":
+                in_synapse = True
+                continue
+            if in_synapse and stripped.startswith("["):
+                in_synapse = False
+            if not in_synapse:
+                other_lines.append(line)
+
+    # Build the new [synapse] block.
+    synapse_lines: list[str] = [f"[{_SECTION}]"]
+    for key in _KNOWN_KEYS:
+        if key not in settings:
+            continue
+        value = settings[key]
+        if isinstance(value, str):
+            synapse_lines.append(f'{key} = "{value}"')
+        else:
+            synapse_lines.append(f"{key} = {value}")
+
+    # Assemble: other sections first, then the [synapse] block.
+    # Strip trailing blank lines from other_lines to avoid double-spacing.
+    trimmed_other = "\n".join(other_lines).rstrip()
+    new_content = (
+        (trimmed_other + "\n\n" if trimmed_other else "")
+        + "\n".join(synapse_lines)
+        + "\n"
+    )
+
+    config_path.write_text(new_content, encoding="utf-8")
+    return config_path.resolve()

@@ -4,6 +4,28 @@ All notable changes to `synapse-core` are documented here.
 
 ---
 
+## [1.1.1] — 2026-03-24
+
+### Added
+- `save_config(settings, root)` — writes a `[synapse]` section to `synapse.toml`; preserves other sections; exported from top-level namespace
+- `load_config()` exported from top-level namespace (previously only used internally by the CLI)
+- `detect_provider()`, `generate_answer()`, `PROVIDERS`, `DEFAULT_MODELS` exported from top-level namespace (previously only accessible via `synapse_core.ai`)
+- `SUPPORTED_EXTENSIONS` frozenset and `is_supported()` exported from top-level namespace (previously only accessible via `synapse_core.extractors`)
+
+---
+
+## [1.1.0] — 2026-03-24
+
+### Added
+- `list_collections(db_path)` — returns all collection names in a ChromaDB directory; exposed in CLI as `synapse list-collections`
+- `collection_stats(db_path, collection_name)` — returns a `CollectionStats` dataclass with `total_chunks`, `total_sources`, and `embedding_model`; CLI: `synapse stats`
+- `delete_source(source, db_path, collection_name)` — explicitly removes all chunks for a given source (file path or SQLite source string); CLI: `synapse delete-source SOURCE [--yes]`
+- `query(…, min_score=…)` / `query_async(…, min_score=…)` — optional float 0–1 to filter out low-relevance results; CLI: `synapse query --min-score 0.5`
+- `CollectionStats` dataclass exported from the top-level `synapse_core` namespace
+- `py.typed` marker — downstream type checkers (Pylance, mypy) now pick up synapse-core's type hints automatically
+
+---
+
 ## [1.0.0] — 2026-03-24
 
 ### Added
