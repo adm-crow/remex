@@ -1,7 +1,7 @@
 import csv
 import json
 from pathlib import Path
-from typing import Dict, Iterator
+from typing import Iterator
 
 from .logger import logger
 
@@ -85,8 +85,8 @@ def extract_pptx(path: Path) -> str:
     texts = []
     for slide in prs.slides:
         for shape in slide.shapes:
-            if hasattr(shape, "text") and shape.text.strip():
-                texts.append(shape.text.strip())
+            if hasattr(shape, "text") and shape.text.strip():  # type: ignore[attr-defined]
+                texts.append(shape.text.strip())  # type: ignore[attr-defined]
     return "\n".join(texts)
 
 
@@ -247,14 +247,14 @@ def is_supported(path: Path) -> bool:
     return path.suffix.lower() in EXTRACTORS
 
 
-def extract_metadata(path: Path) -> Dict[str, str]:
+def extract_metadata(path: Path) -> dict[str, str]:
     """Extract document-level metadata (title, author, created) where available.
 
     Returns a dict with keys ``doc_title``, ``doc_author``, ``doc_created``.
     Missing or unreadable fields are returned as empty strings.
     Guaranteed never to raise.
     """
-    meta: Dict[str, str] = {"doc_title": "", "doc_author": "", "doc_created": ""}
+    meta: dict[str, str] = {"doc_title": "", "doc_author": "", "doc_created": ""}
     suffix = path.suffix.lower()
 
     if suffix == ".pdf":

@@ -22,7 +22,7 @@ Progress toward a stable, production-ready 1.0 release.
 - [x] **Progress callback** — `ingest()` accepts `on_progress: Callable[[IngestProgress], None]` for tqdm / custom UIs. *(v0.6)*
 - [x] **Multi-collection query** — `query(collection_names=[...])` queries multiple collections and merges results ranked by score. *(v0.6)*
 - [x] **Metadata filtering** — `query(where={...})` passes a ChromaDB `where` filter so callers can restrict results by source type, date range, etc. *(v0.6)*
-- [ ] **Async API** — `async def aingest()` / `async def aquery()` for FastAPI / async frameworks.
+- [x] **Async API** — `ingest_async()` / `query_async()` for FastAPI / async frameworks; backed by `asyncio.to_thread()`. *(v1.0.0)*
 - [x] **`ingest()` skip reasons** — `IngestResult.skipped_reasons: list[str]` exposes *why* each file was skipped (`"hash_match"`, `"empty"`, `"extract_error: …"`). *(v0.6.1)*
 
 ---

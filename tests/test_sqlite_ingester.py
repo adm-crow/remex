@@ -290,3 +290,20 @@ def test_ingest_sqlite_returns_ingest_result(mock_chroma, tmp_path):
     assert isinstance(result, IngestResult)
     assert result.sources_found == 1
     assert result.sources_ingested == 1
+
+
+def test_ingest_sqlite_row_error_is_skipped(mock_chroma, tmp_path):
+    """A row that raises during processing is skipped, not propagated."""
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30)],
+    )
+    with patch("synapse_core.sqlite_ingester.chunk_text", side_effect=RuntimeError("boom")):
+        result = ingest_sqlite(
+            db_path=db, table="articles",
+            chroma_path=str(tmp_path / "db"), verbose=False,
+        )
+    assert result.sources_ingested == 0
+    assert result.sources_skipped == 1
+    assert any("extract_error" in r for r in result.skipped_reasons)

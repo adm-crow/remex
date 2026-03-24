@@ -1,9 +1,9 @@
 """Provider-agnostic LLM answer generation for the CLI --ai flag."""
 
-import os
-import urllib.request
-import urllib.error
 import json
+import os
+import urllib.error
+import urllib.request
 from typing import Optional
 
 PROVIDERS = ("anthropic", "openai", "ollama")
@@ -63,14 +63,13 @@ def generate_answer(
 
 # ── providers ────────────────────────────────────────────────────────────────
 
+
 def _answer_anthropic(question: str, system: str, model: str) -> str:
     try:
-        import anthropic
-        from anthropic.types import TextBlock
+        import anthropic  # type: ignore[import-untyped]
+        from anthropic.types import TextBlock  # type: ignore[import-untyped]
     except ImportError:
-        raise ImportError(
-            "Anthropic SDK not installed. Run: pip install anthropic"
-        )
+        raise ImportError("Anthropic SDK not installed. Run: pip install anthropic")
     client = anthropic.Anthropic()
     response = client.messages.create(
         model=model,
@@ -86,11 +85,9 @@ def _answer_anthropic(question: str, system: str, model: str) -> str:
 
 def _answer_openai(question: str, system: str, model: str) -> str:
     try:
-        import openai
+        import openai  # type: ignore[import-untyped]
     except ImportError:
-        raise ImportError(
-            "OpenAI SDK not installed. Run: pip install openai"
-        )
+        raise ImportError("OpenAI SDK not installed. Run: pip install openai")
     client = openai.OpenAI()
     response = client.chat.completions.create(
         model=model,
@@ -103,11 +100,13 @@ def _answer_openai(question: str, system: str, model: str) -> str:
 
 
 def _answer_ollama(question: str, system: str, model: str) -> str:
-    payload = json.dumps({
-        "model": model,
-        "prompt": f"{system}\n\nQuestion: {question}",
-        "stream": False,
-    }).encode()
+    payload = json.dumps(
+        {
+            "model": model,
+            "prompt": f"{system}\n\nQuestion: {question}",
+            "stream": False,
+        }
+    ).encode()
     req = urllib.request.Request(
         "http://localhost:11434/api/generate",
         data=payload,
@@ -118,9 +117,7 @@ def _answer_ollama(question: str, system: str, model: str) -> str:
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read())
     except urllib.error.URLError as e:
-        raise RuntimeError(
-            f"Ollama request failed: {e}. Is 'ollama serve' running?"
-        )
+        raise RuntimeError(f"Ollama request failed: {e}. Is 'ollama serve' running?")
     except json.JSONDecodeError as e:
         raise RuntimeError(f"Ollama returned invalid JSON: {e}")
     try:

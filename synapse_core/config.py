@@ -6,6 +6,8 @@ import tomllib
 from pathlib import Path
 from typing import Any, Optional
 
+from .logger import logger
+
 
 _CONFIG_FILE = "synapse.toml"
 _SECTION = "synapse"
@@ -38,7 +40,8 @@ def load_config(root: Optional[Path] = None) -> dict[str, dict[str, Any]]:
     try:
         with open(config_path, "rb") as f:
             data = tomllib.load(f)
-    except Exception:
+    except Exception as e:
+        logger.warning("Could not parse %s: %s — using defaults.", config_path.name, e)
         return {}
 
     section = data.get(_SECTION, {})

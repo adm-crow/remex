@@ -45,11 +45,12 @@ def test_load_config_embedding_model(tmp_path):
 
 
 def test_load_config_chunking_options(tmp_path):
-    _write_toml(tmp_path, '[synapse]\nchunk_size = 500\noverlap = 50\nmin_chunk_size = 20\nchuning = "word"\n')
+    _write_toml(tmp_path, '[synapse]\nchunk_size = 500\noverlap = 50\nmin_chunk_size = 20\nchunking = "word"\n')
     cfg = load_config(tmp_path)
     assert cfg["ingest"]["chunk_size"] == 500
     assert cfg["ingest"]["overlap"] == 50
     assert cfg["ingest"]["min_chunk_size"] == 20
+    assert cfg["ingest"]["chunking"] == "word"
 
 
 def test_load_config_tolerates_malformed_toml(tmp_path):
@@ -80,7 +81,7 @@ def test_cli_uses_config_db(mock_ingest, tmp_path):
         CliRunner().invoke(cli, ["ingest", str(tmp_path)])
     # Direct approach: patch load_config
     with patch("synapse_core.cli.load_config", return_value=load_config(tmp_path)):
-        result = CliRunner().invoke(cli, ["ingest", str(tmp_path)])
+        CliRunner().invoke(cli, ["ingest", str(tmp_path)])
     assert mock_ingest.called
 
 

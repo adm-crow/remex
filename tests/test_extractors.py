@@ -143,6 +143,7 @@ def test_extract_xlsx(tmp_path):
 
     wb = openpyxl.Workbook()
     ws = wb.active
+    assert ws is not None
     ws.append(["Name", "Score"])
     ws.append(["Alice", 95])
     path = tmp_path / "file.xlsx"
@@ -184,7 +185,7 @@ def test_extract_odt(tmp_path):
     doc = OpenDocumentText()
     p = P()
     p.addText("Hello from ODT")
-    doc.text.addElement(p)
+    doc.text.addElement(p)  # type: ignore[attr-defined]
     path = tmp_path / "file.odt"
     doc.save(str(path))
 

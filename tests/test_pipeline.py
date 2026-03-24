@@ -5,7 +5,7 @@ import pytest
 from chromadb.errors import NotFoundError as ChromaNotFoundError
 
 from synapse_core.exceptions import CollectionNotFoundError
-from synapse_core.pipeline import ingest, ingest_many, purge, query, reset, sources
+from synapse_core.pipeline import ingest, ingest_async, ingest_many, purge, query, query_async, reset, sources
 
 
 def make_docs_dir(tmp_path, *filenames_and_contents):
@@ -830,3 +830,39 @@ def test_integration_ingest_and_query(tmp_path):
     assert len(hits) >= 1
     assert hits[0]["score"] > 0
     assert "refund" in hits[0]["text"].lower()
+
+
+# --- async API ---
+
+@pytest.mark.asyncio
+async def test_ingest_async_returns_ingest_result(tmp_path, mock_chroma):
+    docs = make_docs_dir(tmp_path / "docs", ("file.txt", "word " * 30))
+    result = await ingest_async(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
+    from synapse_core.models import IngestResult
+    assert isinstance(result, IngestResult)
+    assert result.sources_ingested == 1
+
+
+@pytest.mark.asyncio
+async def test_query_async_returns_list(tmp_path, mock_chroma):
+    mock_chroma.query.return_value = {
+        "ids": [["id1"]],
+        "documents": [["some text"]],
+        "metadatas": [[{"source": "f.txt"}]],
+        "distances": [[0.1]],
+    }
+    results = await query_async("hello", db_path=str(tmp_path / "db"))
+    assert isinstance(results, list)
+
+
+@pytest.mark.asyncio
+async def test_ingest_async_propagates_exception(tmp_path):
+    from synapse_core.exceptions import SourceNotFoundError
+    with pytest.raises(SourceNotFoundError):
+        await ingest_async(source_dir=str(tmp_path / "missing"), db_path=str(tmp_path / "db"), verbose=False)
+
+
+@pytest.mark.asyncio
+async def test_query_async_validates_n_results(tmp_path, mock_chroma):
+    with pytest.raises(ValueError):
+        await query_async("hello", db_path=str(tmp_path / "db"), n_results=0)

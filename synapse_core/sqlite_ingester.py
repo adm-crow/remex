@@ -1,7 +1,7 @@
 import hashlib
 import sqlite3
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Any, Callable, List, Optional
 
 from .chunker import chunk_text
 from .exceptions import SourceNotFoundError, TableNotFoundError
@@ -25,7 +25,7 @@ def _row_to_text(row: dict, template: Optional[str]) -> str:
     )
 
 
-def _make_sqlite_id(db_path: str, table: str, row_id, chunk_index: int) -> str:
+def _make_sqlite_id(db_path: str, table: str, row_id: Any, chunk_index: int) -> str:
     """Stable unique ID: hash of db path + table + row pk + chunk index."""
     key = f"sqlite::{Path(db_path).resolve()}::{table}::{row_id}::{chunk_index}"
     return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
@@ -119,6 +119,11 @@ def ingest_sqlite(
             logger.info("No records found in %s::%s", db_path, table)
         return result
 
+    # Validate row_template against the column schema before processing any rows.
+    # A bad template key is a config error — fail fast rather than silently skipping every row.
+    if row_template:
+        _row_to_text({c: "" for c in selected}, row_template)
+
     collection = _get_collection(chroma_path, collection_name, embedding_model)
 
     if verbose:
@@ -166,6 +171,13 @@ def ingest_sqlite(
             result.sources_ingested += 1
             result.chunks_stored += len(chunks)
             _status = "ingested"
+
+        except Exception as e:
+            if verbose:
+                logger.warning("[skip] %s[%s]: %s", table, row_id, e)
+            result.sources_skipped += 1
+            result.skipped_reasons.append(f"{table}[{row_id}]: extract_error: {e}")
+            _status = "error"
 
         finally:
             if on_progress:

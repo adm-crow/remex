@@ -1,6 +1,7 @@
+import asyncio
 import hashlib
 from pathlib import Path
-from typing import Callable, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union, cast
 
 import chromadb
 from chromadb.errors import NotFoundError as ChromaNotFoundError
@@ -28,7 +29,7 @@ def _file_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes(), usedforsecurity=False).hexdigest()
 
 
-def _get_source_chunks(collection, source_str: str) -> dict:
+def _get_source_chunks(collection: Any, source_str: str) -> dict[str, Any]:
     """Return all ChromaDB entries for a given source path."""
     return collection.get(
         where={"source": {"$eq": source_str}},
@@ -36,7 +37,7 @@ def _get_source_chunks(collection, source_str: str) -> dict:
     )
 
 
-def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True):
+def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True) -> Any:
     """Get or create a ChromaDB collection with the given embedding model."""
     client = chromadb.PersistentClient(path=db_path)
     ef = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -392,7 +393,7 @@ def query(
     documents = results["documents"][0]  # type: ignore[index]
     metadatas = results["metadatas"][0]  # type: ignore[index]
     distances = results["distances"][0]  # type: ignore[index]
-    return [
+    return cast(List[QueryResult], [
         {
             "text": doc,
             "source": meta.get("source", ""),
@@ -405,7 +406,7 @@ def query(
             "doc_created": meta.get("doc_created", ""),
         }
         for doc, meta, dist in zip(documents, metadatas, distances)
-    ]
+    ])
 
 
 def _source_exists(meta: dict) -> bool:
@@ -692,5 +693,62 @@ def ingest_many(
             "Done. %d/%d files ingested, %d chunks stored.",
             result.sources_ingested, len(file_paths), result.chunks_stored,
         )
-
     return result
+
+
+# ── Async API ─────────────────────────────────────────────────────────────────
+
+async def ingest_async(
+    source_dir: str = "./docs",
+    db_path: str = "./synapse_db",
+    collection_name: str = "synapse",
+    chunk_size: int = 1000,
+    overlap: int = 200,
+    min_chunk_size: int = 50,
+    embedding_model: str = "all-MiniLM-L6-v2",
+    incremental: bool = False,
+    chunking: str = "word",
+    verbose: bool = True,
+    streaming_threshold: int = 50 * 1024 * 1024,
+    on_progress: Optional[Callable[[IngestProgress], None]] = None,
+) -> IngestResult:
+    """Async wrapper around :func:`ingest`. Runs in a thread pool so the event
+    loop is never blocked. All parameters are identical to :func:`ingest`."""
+    return await asyncio.to_thread(
+        ingest,
+        source_dir=source_dir,
+        db_path=db_path,
+        collection_name=collection_name,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        min_chunk_size=min_chunk_size,
+        embedding_model=embedding_model,
+        incremental=incremental,
+        chunking=chunking,
+        verbose=verbose,
+        streaming_threshold=streaming_threshold,
+        on_progress=on_progress,
+    )
+
+
+async def query_async(
+    text: str,
+    db_path: str = "./synapse_db",
+    collection_name: str = "synapse",
+    n_results: int = 5,
+    embedding_model: str = "all-MiniLM-L6-v2",
+    where: Optional[dict] = None,
+    collection_names: Optional[List[str]] = None,
+) -> List[QueryResult]:
+    """Async wrapper around :func:`query`. Runs in a thread pool so the event
+    loop is never blocked. All parameters are identical to :func:`query`."""
+    return await asyncio.to_thread(
+        query,
+        text=text,
+        db_path=db_path,
+        collection_name=collection_name,
+        n_results=n_results,
+        embedding_model=embedding_model,
+        where=where,
+        collection_names=collection_names,
+    )

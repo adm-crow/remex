@@ -4,6 +4,18 @@ All notable changes to `synapse-core` are documented here.
 
 ---
 
+## [1.0.0] — 2026-03-24
+
+### Added
+- `ingest_async()` — async wrapper around `ingest()`, runs in a thread pool via `asyncio.to_thread()`; full parameter parity with `ingest()`
+- `query_async()` — async wrapper around `query()`, runs in a thread pool via `asyncio.to_thread()`; full parameter parity with `query()`
+- Both functions exported from the top-level `synapse_core` namespace
+
+### Fixed
+- `ingest_many()` was not returning its `IngestResult` (returned `None`)
+
+---
+
 ## [0.7.0] — 2026-03-18
 
 ### Added
