@@ -498,11 +498,23 @@ The AI answer is generated from retrieved chunks only — your full corpus is ne
 
 ---
 
+## Related
+
+**[synapse-studio](https://github.com/adm-crow/synapse-studio)** — visual interface for synapse-core. Browse your collections, run queries, chat with your AI agent, and manage settings — all from a browser UI. Built on top of this library.
+
+```bash
+pip install synapse-studio
+synapse studio   # opens the UI in your browser
+```
+
+---
+
 <div align="center">
   <sub>
     <a href="CHANGELOG.md">Changelog</a> ·
     <a href="ROADMAP.md">Roadmap</a> ·
     <a href="https://pypi.org/project/synapse-core/">PyPI</a> ·
+    <a href="https://github.com/adm-crow/synapse-studio">synapse-studio</a> ·
     <a href="LICENSE">Apache 2.0</a>
   </sub>
 </div>
