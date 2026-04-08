@@ -376,19 +376,19 @@ def test_cli_query_embedding_model_passed(mock_query):
 
 
 
-# --- synapse init ---
+# --- remex init ---
 
 def test_cli_init_creates_docs_and_toml(tmp_path):
     result = CliRunner().invoke(cli, ["init", str(tmp_path)])
     assert result.exit_code == 0
     assert (tmp_path / "docs").is_dir()
-    assert (tmp_path / "synapse.toml").exists()
+    assert (tmp_path / "remex.toml").exists()
 
 
-def test_cli_init_toml_has_synapse_section(tmp_path):
+def test_cli_init_toml_has_remex_section(tmp_path):
     CliRunner().invoke(cli, ["init", str(tmp_path)])
-    content = (tmp_path / "synapse.toml").read_text()
-    assert "[synapse]" in content
+    content = (tmp_path / "remex.toml").read_text()
+    assert "[remex]" in content
     assert "db" in content
 
 
@@ -401,10 +401,10 @@ def test_cli_init_skips_existing_docs(tmp_path):
 
 
 def test_cli_init_skips_existing_toml(tmp_path):
-    existing = "[synapse]\ndb = \"./custom\"\n"
-    (tmp_path / "synapse.toml").write_text(existing)
+    existing = "[remex]\ndb = \"./custom\"\n"
+    (tmp_path / "remex.toml").write_text(existing)
     CliRunner().invoke(cli, ["init", str(tmp_path)])
-    assert (tmp_path / "synapse.toml").read_text() == existing  # unchanged
+    assert (tmp_path / "remex.toml").read_text() == existing  # unchanged
 
 
 def test_cli_init_gitignore_updated_in_git_repo(tmp_path):
@@ -413,7 +413,7 @@ def test_cli_init_gitignore_updated_in_git_repo(tmp_path):
     assert result.exit_code == 0
     gitignore = tmp_path / ".gitignore"
     assert gitignore.exists()
-    assert "synapse_db/" in gitignore.read_text()
+    assert "remex_db/" in gitignore.read_text()
 
 
 def test_cli_init_no_gitignore_outside_repo(tmp_path):
