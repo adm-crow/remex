@@ -424,5 +424,30 @@ def test_cli_init_no_gitignore_outside_repo(tmp_path):
 
 def test_cli_init_shows_next_steps(tmp_path):
     result = CliRunner().invoke(cli, ["init", str(tmp_path)])
-    assert "synapse ingest" in result.output
-    assert "synapse query" in result.output
+    assert "remex ingest" in result.output
+    assert "remex query" in result.output
+
+
+# --- remex serve ---
+
+def test_cli_serve_help():
+    result = CliRunner().invoke(cli, ["serve", "--help"])
+    assert result.exit_code == 0
+    assert "--host" in result.output
+    assert "--port" in result.output
+
+
+def test_cli_serve_missing_api_dep():
+    import sys
+    with patch.dict(sys.modules, {"uvicorn": None}):
+        result = CliRunner().invoke(cli, ["serve"])
+    assert result.exit_code != 0
+    assert "pip install remex[api]" in result.output
+
+
+# --- remex studio ---
+
+def test_cli_studio_placeholder():
+    result = CliRunner().invoke(cli, ["studio"])
+    assert result.exit_code == 0
+    assert "not yet available" in result.output.lower()
