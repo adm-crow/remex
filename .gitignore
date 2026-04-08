@@ -213,3 +213,6 @@ synapse_db/
 
 # Claude Code
 .claude/
+
+# Git worktrees
+.worktrees/
