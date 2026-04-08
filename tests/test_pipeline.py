@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from chromadb.errors import NotFoundError as ChromaNotFoundError
 
-from synapse_core.exceptions import CollectionNotFoundError
-from synapse_core.pipeline import (
+from remex.core.exceptions import CollectionNotFoundError
+from remex.core.pipeline import (
     collection_stats,
     delete_source,
     ingest,
@@ -38,8 +38,8 @@ def mock_chroma():
     client.get_or_create_collection.return_value = collection
     client.get_collection.return_value = collection  # used by query()
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         yield collection
 
 
@@ -154,7 +154,7 @@ def test_purge_removes_stale_chunks(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = purge(db_path=str(tmp_path / "db"), verbose=False)
 
     assert result.chunks_deleted == 1
@@ -177,7 +177,7 @@ def test_purge_keeps_sqlite_chunks_when_db_exists(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = purge(db_path=str(tmp_path / "db"), verbose=False)
 
     assert result.chunks_deleted == 0  # db file still exists — chunks must NOT be purged
@@ -196,7 +196,7 @@ def test_purge_removes_sqlite_chunks_when_db_missing(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = purge(db_path=str(tmp_path / "db"), verbose=False)
 
     assert result.chunks_deleted == 1  # db file is gone — chunks must be purged
@@ -214,7 +214,7 @@ def test_purge_nothing_when_all_exist(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = purge(db_path=str(tmp_path / "db"), verbose=False)
 
     assert result.chunks_deleted == 0
@@ -233,7 +233,7 @@ def test_purge_result_has_chunks_checked(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = purge(db_path=str(tmp_path / "db"), verbose=False)
 
     assert result.chunks_checked == 2
@@ -244,9 +244,9 @@ def test_purge_result_has_chunks_checked(tmp_path):
 
 def test_reset_deletes_collection(tmp_path):
     client = MagicMock()
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         reset(db_path=str(tmp_path / "db"), verbose=False, confirm=True)
-    client.delete_collection.assert_called_once_with(name="synapse")
+    client.delete_collection.assert_called_once_with(name="remex")
 
 
 def test_reset_without_confirm_raises(tmp_path):
@@ -256,7 +256,7 @@ def test_reset_without_confirm_raises(tmp_path):
 
 def test_reset_confirm_false_does_not_touch_chroma(tmp_path):
     client = MagicMock()
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         with pytest.raises(ValueError):
             reset(db_path=str(tmp_path / "db"), confirm=False)
     client.delete_collection.assert_not_called()
@@ -277,7 +277,7 @@ def test_sources_returns_unique_sorted_files(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = sources(db_path=str(tmp_path / "db"))
 
     assert result == ["/docs/a.txt", "/docs/b.txt"]
@@ -287,7 +287,7 @@ def test_sources_returns_empty_if_no_collection(tmp_path):
     client = MagicMock()
     client.get_collection.side_effect = ValueError("Collection not found")
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = sources(db_path=str(tmp_path / "db"))
 
     assert result == []
@@ -339,8 +339,8 @@ def test_query_raises_if_collection_not_found(tmp_path):
     client = MagicMock()
     client.get_collection.side_effect = ValueError("Collection not found")
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         with pytest.raises(CollectionNotFoundError):
             query(text="test", db_path=str(tmp_path / "db"))
 
@@ -350,8 +350,8 @@ def test_query_raises_collection_not_found_on_chroma_not_found_error(tmp_path):
     client = MagicMock()
     client.get_collection.side_effect = ChromaNotFoundError("Collection nonexistent does not exist")
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         with pytest.raises(CollectionNotFoundError):
             query(text="test", db_path=str(tmp_path / "db"))
 
@@ -374,8 +374,8 @@ def test_incremental_skips_unchanged_file(tmp_path):
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     collection.upsert.assert_not_called()
@@ -395,8 +395,8 @@ def test_incremental_reingests_changed_file(tmp_path):
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     collection.delete.assert_called_once_with(ids=["old_id0"])
@@ -412,8 +412,8 @@ def test_incremental_ingests_new_file(tmp_path):
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     collection.delete.assert_not_called()
@@ -429,8 +429,8 @@ def test_incremental_stores_hash_in_metadata(tmp_path):
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     metadatas = collection.upsert.call_args.kwargs["metadatas"]
@@ -474,8 +474,8 @@ def test_query_clamps_n_results_to_collection_size(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         results = query(text="test", db_path=str(tmp_path / "db"), n_results=10)
 
     called_n = collection.query.call_args.kwargs["n_results"]
@@ -500,8 +500,8 @@ def test_query_returns_empty_on_empty_collection(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         results = query(text="test", db_path=str(tmp_path / "db"))
 
     collection.query.assert_not_called()
@@ -563,8 +563,8 @@ def test_ingest_skipped_reasons_hash_match(tmp_path):
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         result = ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     assert len(result.skipped_reasons) == 1
@@ -599,7 +599,7 @@ def test_query_multi_collection_merges_results(tmp_path):
     def fake_get(db_path, name, model, create=True):
         return col_a if name == "col_a" else col_b
 
-    with patch("synapse_core.pipeline._get_collection", side_effect=fake_get):
+    with patch("remex.core.pipeline._get_collection", side_effect=fake_get):
         results = query(
             text="test",
             db_path=str(tmp_path / "db"),
@@ -627,7 +627,7 @@ def test_query_multi_collection_skips_missing(tmp_path):
             raise ChromaNotFoundError("not found")
         return col
 
-    with patch("synapse_core.pipeline._get_collection", side_effect=fake_get):
+    with patch("remex.core.pipeline._get_collection", side_effect=fake_get):
         results = query(
             text="test",
             db_path=str(tmp_path / "db"),
@@ -657,7 +657,7 @@ def test_query_multi_collection_sorted_by_score(tmp_path):
     def fake_get(db_path, name, model, create=True):
         return col_low if name == "col_low" else col_high
 
-    with patch("synapse_core.pipeline._get_collection", side_effect=fake_get):
+    with patch("remex.core.pipeline._get_collection", side_effect=fake_get):
         results = query(
             text="test",
             db_path=str(tmp_path / "db"),
@@ -685,36 +685,36 @@ def test_query_without_where_no_where_kwarg(mock_chroma, tmp_path):
 # --- embedding model mismatch ---
 
 def test_get_collection_warns_on_model_mismatch(tmp_path):
-    from synapse_core.pipeline import _get_collection
-    from synapse_core.pipeline import logger as pipeline_logger
+    from remex.core.pipeline import _get_collection
+    from remex.core.pipeline import logger as pipeline_logger
 
     collection = MagicMock()
     collection.metadata = {"embedding_model": "different-model"}
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
          patch.object(pipeline_logger, "warning") as mock_warn:
-        _get_collection(str(tmp_path / "db"), "synapse", "all-MiniLM-L6-v2")
+        _get_collection(str(tmp_path / "db"), "remex", "all-MiniLM-L6-v2")
 
     mock_warn.assert_called_once()
     assert "mismatch" in mock_warn.call_args[0][0].lower()
 
 
 def test_get_collection_no_warn_on_model_match(tmp_path):
-    from synapse_core.pipeline import _get_collection
-    from synapse_core.pipeline import logger as pipeline_logger
+    from remex.core.pipeline import _get_collection
+    from remex.core.pipeline import logger as pipeline_logger
 
     collection = MagicMock()
     collection.metadata = {"embedding_model": "all-MiniLM-L6-v2"}
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
          patch.object(pipeline_logger, "warning") as mock_warn:
-        _get_collection(str(tmp_path / "db"), "synapse", "all-MiniLM-L6-v2")
+        _get_collection(str(tmp_path / "db"), "remex", "all-MiniLM-L6-v2")
 
     mock_warn.assert_not_called()
 
@@ -812,7 +812,7 @@ def test_ingest_many_incremental_stores_hash(mock_chroma, tmp_path):
 def test_ingest_many_streaming_threshold_zero_disables(mock_chroma, tmp_path):
     f = tmp_path / "doc.txt"
     f.write_text("word " * 100, encoding="utf-8")
-    with patch("synapse_core.pipeline.supports_streaming", return_value=True):
+    with patch("remex.core.pipeline.supports_streaming", return_value=True):
         result = ingest_many(
             [f], db_path=str(tmp_path / "db"), verbose=False, streaming_threshold=0,
         )
@@ -824,7 +824,7 @@ def test_ingest_many_streaming_threshold_zero_disables(mock_chroma, tmp_path):
 
 def test_integration_ingest_and_query(tmp_path):
     """End-to-end: ingest a real file, query it, get a result back."""
-    from synapse_core.pipeline import ingest, query
+    from remex.core.pipeline import ingest, query
     doc = tmp_path / "docs" / "readme.txt"
     doc.parent.mkdir()
     doc.write_text(
@@ -850,7 +850,7 @@ def test_integration_ingest_and_query(tmp_path):
 async def test_ingest_async_returns_ingest_result(tmp_path, mock_chroma):
     docs = make_docs_dir(tmp_path / "docs", ("file.txt", "word " * 30))
     result = await ingest_async(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
-    from synapse_core.models import IngestResult
+    from remex.core.models import IngestResult
     assert isinstance(result, IngestResult)
     assert result.sources_ingested == 1
 
@@ -869,7 +869,7 @@ async def test_query_async_returns_list(tmp_path, mock_chroma):
 
 @pytest.mark.asyncio
 async def test_ingest_async_propagates_exception(tmp_path):
-    from synapse_core.exceptions import SourceNotFoundError
+    from remex.core.exceptions import SourceNotFoundError
     with pytest.raises(SourceNotFoundError):
         await ingest_async(source_dir=str(tmp_path / "missing"), db_path=str(tmp_path / "db"), verbose=False)
 
@@ -890,7 +890,7 @@ def test_list_collections_returns_sorted_names(tmp_path):
     client = MagicMock()
     client.list_collections.return_value = [col_b, col_a]  # unsorted on purpose
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = list_collections(db_path=str(tmp_path / "db"))
 
     assert result == ["alpha", "beta"]
@@ -900,7 +900,7 @@ def test_list_collections_empty_when_no_collections(tmp_path):
     client = MagicMock()
     client.list_collections.return_value = []
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = list_collections(db_path=str(tmp_path / "db"))
 
     assert result == []
@@ -911,7 +911,7 @@ def test_list_collections_returns_empty_on_error(tmp_path):
     client = MagicMock()
     client.list_collections.side_effect = Exception("path not found")
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         result = list_collections(db_path=str(tmp_path / "db"))
 
     assert result == []
@@ -920,7 +920,7 @@ def test_list_collections_returns_empty_on_error(tmp_path):
 # --- collection_stats ---
 
 def test_collection_stats_returns_correct_values(tmp_path):
-    from synapse_core.models import CollectionStats
+    from remex.core.models import CollectionStats
 
     collection = MagicMock()
     collection.count.return_value = 10
@@ -936,11 +936,11 @@ def test_collection_stats_returns_correct_values(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
-        stats = collection_stats(db_path=str(tmp_path / "db"), collection_name="synapse")
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
+        stats = collection_stats(db_path=str(tmp_path / "db"), collection_name="remex")
 
     assert isinstance(stats, CollectionStats)
-    assert stats.name == "synapse"
+    assert stats.name == "remex"
     assert stats.total_chunks == 10
     assert stats.total_sources == 2  # deduplicated
     assert stats.embedding_model == "all-MiniLM-L6-v2"
@@ -954,7 +954,7 @@ def test_collection_stats_unknown_model_when_no_metadata(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         stats = collection_stats(db_path=str(tmp_path / "db"))
 
     assert stats.embedding_model == ""
@@ -964,7 +964,7 @@ def test_collection_stats_raises_if_collection_not_found(tmp_path):
     client = MagicMock()
     client.get_collection.side_effect = ValueError("not found")
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         with pytest.raises(CollectionNotFoundError):
             collection_stats(db_path=str(tmp_path / "db"), collection_name="missing")
 
@@ -981,7 +981,7 @@ def test_delete_source_removes_chunks(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         deleted = delete_source(
             source=str(existing_file),
             db_path=str(tmp_path / "db"),
@@ -1000,7 +1000,7 @@ def test_delete_source_returns_zero_when_not_found(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         deleted = delete_source(source="/nonexistent/file.txt", db_path=str(tmp_path / "db"), verbose=False)
 
     assert deleted == 0
@@ -1011,7 +1011,7 @@ def test_delete_source_raises_if_collection_not_found(tmp_path):
     client = MagicMock()
     client.get_collection.side_effect = ValueError("not found")
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         with pytest.raises(CollectionNotFoundError):
             delete_source(source="/some/file.txt", db_path=str(tmp_path / "db"))
 
@@ -1025,7 +1025,7 @@ def test_delete_source_sqlite_source_not_normalized(tmp_path):
     client = MagicMock()
     client.get_collection.return_value = collection
 
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client):
         delete_source(source=sqlite_source, db_path=str(tmp_path / "db"), verbose=False)
 
     called_where = collection.get.call_args.kwargs["where"]

@@ -1,4 +1,4 @@
-"""Load and save project-level defaults from/to synapse.toml."""
+"""Load and save project-level defaults from/to remex.toml."""
 
 from __future__ import annotations
 
@@ -9,23 +9,23 @@ from typing import Any, Optional
 from .logger import logger
 
 
-_CONFIG_FILE = "synapse.toml"
-_SECTION = "synapse"
+_CONFIG_FILE = "remex.toml"
+_SECTION = "remex"
 
 
 def load_config(root: Optional[Path] = None) -> dict[str, dict[str, Any]]:
-    """Read ``synapse.toml`` and return a Click ``default_map``.
+    """Read ``remex.toml`` and return a Click ``default_map``.
 
-    Searches for ``synapse.toml`` in *root* (defaults to the current working
+    Searches for ``remex.toml`` in *root* (defaults to the current working
     directory).  Returns an empty dict if the file is absent or malformed so
     the CLI always starts cleanly.
 
-    The ``[synapse]`` section supports:
+    The ``[remex]`` section supports:
 
     .. code-block:: toml
 
-        [synapse]
-        db             = "./synapse_db"
+        [remex]
+        db             = "./remex_db"
         collection     = "myproject"
         embedding_model = "all-MiniLM-L6-v2"
         chunk_size     = 1000
@@ -91,7 +91,7 @@ def load_config(root: Optional[Path] = None) -> dict[str, dict[str, Any]]:
     }
 
 
-# Keys accepted in the [synapse] section, in display order.
+# Keys accepted in the [remex] section, in display order.
 _KNOWN_KEYS: tuple[str, ...] = (
     "db",
     "collection",
@@ -107,19 +107,19 @@ def save_config(
     settings: dict[str, Any],
     root: Optional[Path] = None,
 ) -> Path:
-    """Write *settings* to ``synapse.toml`` under the ``[synapse]`` section.
+    """Write *settings* to ``remex.toml`` under the ``[remex]`` section.
 
     Only keys listed in :data:`_KNOWN_KEYS` are written; unknown keys are
     silently ignored to protect the file from accidental pollution.
 
-    If the file already exists its ``[synapse]`` section is replaced while
+    If the file already exists its ``[remex]`` section is replaced while
     any other sections are preserved.  If the file does not exist it is
     created.
 
     Args:
-        settings: Flat dict of ``[synapse]`` values, e.g.
+        settings: Flat dict of ``[remex]`` values, e.g.
                   ``{"db": "./mydb", "collection": "docs"}``.
-        root:     Directory containing ``synapse.toml``.
+        root:     Directory containing ``remex.toml``.
                   Defaults to the current working directory.
 
     Returns:
@@ -127,37 +127,37 @@ def save_config(
     """
     config_path = (root or Path.cwd()) / _CONFIG_FILE
 
-    # Read any existing content that is NOT the [synapse] section.
+    # Read any existing content that is NOT the [remex] section.
     other_lines: list[str] = []
     if config_path.exists():
-        in_synapse = False
+        in_remex = False
         for line in config_path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
             if stripped == f"[{_SECTION}]":
-                in_synapse = True
+                in_remex = True
                 continue
-            if in_synapse and stripped.startswith("["):
-                in_synapse = False
-            if not in_synapse:
+            if in_remex and stripped.startswith("["):
+                in_remex = False
+            if not in_remex:
                 other_lines.append(line)
 
-    # Build the new [synapse] block.
-    synapse_lines: list[str] = [f"[{_SECTION}]"]
+    # Build the new [remex] block.
+    remex_lines: list[str] = [f"[{_SECTION}]"]
     for key in _KNOWN_KEYS:
         if key not in settings:
             continue
         value = settings[key]
         if isinstance(value, str):
-            synapse_lines.append(f'{key} = "{value}"')
+            remex_lines.append(f'{key} = "{value}"')
         else:
-            synapse_lines.append(f"{key} = {value}")
+            remex_lines.append(f"{key} = {value}")
 
-    # Assemble: other sections first, then the [synapse] block.
+    # Assemble: other sections first, then the [remex] block.
     # Strip trailing blank lines from other_lines to avoid double-spacing.
     trimmed_other = "\n".join(other_lines).rstrip()
     new_content = (
         (trimmed_other + "\n\n" if trimmed_other else "")
-        + "\n".join(synapse_lines)
+        + "\n".join(remex_lines)
         + "\n"
     )
 

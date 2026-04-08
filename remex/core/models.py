@@ -1,4 +1,4 @@
-"""Public data models returned by synapse-core API functions."""
+"""Public data models returned by remex API functions."""
 
 from dataclasses import dataclass, field
 from typing import Literal, TypedDict
@@ -7,7 +7,7 @@ from typing import Literal, TypedDict
 class QueryResult(TypedDict):
     """A single result from a semantic search query.
 
-    Returned as items in the list from :func:`~synapse_core.query`.
+    Returned as items in the list from :func:`~remex.core.query`.
     This is a :class:`~typing.TypedDict` — it is a plain :class:`dict` at
     runtime, so existing code that uses ``result["text"]`` continues to work
     while type checkers now understand the exact shape.
@@ -37,8 +37,8 @@ class QueryResult(TypedDict):
 class IngestResult:
     """Summary of a completed ingestion run.
 
-    Returned by :func:`~synapse_core.ingest` and
-    :func:`~synapse_core.ingest_sqlite`.
+    Returned by :func:`~remex.core.ingest` and
+    :func:`~remex.core.ingest_sqlite`.
 
     Example::
 
@@ -65,7 +65,7 @@ class IngestResult:
 class PurgeResult:
     """Summary of a completed purge run.
 
-    Returned by :func:`~synapse_core.purge`.
+    Returned by :func:`~remex.core.purge`.
 
     Example::
 
@@ -84,7 +84,7 @@ class PurgeResult:
 class CollectionStats:
     """Statistics for a ChromaDB collection.
 
-    Returned by :func:`~synapse_core.collection_stats`.
+    Returned by :func:`~remex.core.collection_stats`.
 
     Example::
 
@@ -104,13 +104,13 @@ class CollectionStats:
 
 @dataclass
 class IngestProgress:
-    """Per-file progress update emitted by :func:`~synapse_core.ingest` via the
+    """Per-file progress update emitted by :func:`~remex.core.ingest` via the
     ``on_progress`` callback after each file is processed.
 
     Example (tqdm integration)::
 
         from tqdm import tqdm
-        from synapse_core import ingest, IngestProgress
+        from remex.core import ingest, IngestProgress
 
         with tqdm(total=None, unit="file") as bar:
             def _progress(p: IngestProgress) -> None:

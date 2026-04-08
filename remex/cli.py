@@ -3,20 +3,20 @@ from pathlib import Path
 
 import click
 
-from . import __version__
-from .ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
-from .config import load_config
-from .exceptions import SynapseError
-from .pipeline import collection_stats, delete_source, ingest, list_collections, purge, query, reset, sources
-from .sqlite_ingester import ingest_sqlite
+from remex.core import __version__
+from remex.core.ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
+from remex.core.config import load_config
+from remex.core.exceptions import SynapseError
+from remex.core.pipeline import collection_stats, delete_source, ingest, list_collections, purge, query, reset, sources
+from remex.core.sqlite_ingester import ingest_sqlite
 
 _TOML_TEMPLATE = """\
-[synapse]
-# Default options applied to every synapse command.
+[remex]
+# Default options applied to every remex command.
 # Override any value with a CLI flag — flags always win.
 
-db             = "./synapse_db"    # ChromaDB persistence path
-collection     = "synapse"         # collection name
+db             = "./remex_db"      # ChromaDB persistence path
+collection     = "remex"           # collection name
 embedding_model = "all-MiniLM-L6-v2"
 
 # Chunking defaults (used by ingest / ingest-sqlite)
@@ -27,18 +27,18 @@ embedding_model = "all-MiniLM-L6-v2"
 """
 
 
-class _SynapseGroup(click.Group):
-    """Click group that injects synapse.toml values as CLI defaults."""
+class _RemexGroup(click.Group):
+    """Click group that injects remex.toml values as CLI defaults."""
 
     def make_context(self, info_name, args, parent=None, **kwargs):  # type: ignore[override]
         kwargs.setdefault("default_map", load_config())
         return super().make_context(info_name, args, parent=parent, **kwargs)
 
 
-@click.group(cls=_SynapseGroup)
-@click.version_option(__version__, prog_name="synapse")
+@click.group(cls=_RemexGroup)
+@click.version_option(__version__, prog_name="remex")
 def cli() -> None:
-    """synapse — local RAG: ingest files, query semantically."""
+    """remex — local RAG: ingest files, query semantically."""
 
 
 @cli.command(name="ingest")
@@ -46,12 +46,12 @@ def cli() -> None:
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 @click.option(
     "--chunk-size",
@@ -136,12 +136,12 @@ def ingest_cmd(
 @click.option(
     "--db",
     "chroma_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 @click.option(
     "--columns",
@@ -234,12 +234,12 @@ def ingest_sqlite_cmd(
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 @click.option(
     "-n",
@@ -411,12 +411,12 @@ def query_cmd(
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 def sources_cmd(db_path: str, collection: str) -> None:
     """List all ingested source paths."""
@@ -432,12 +432,12 @@ def sources_cmd(db_path: str, collection: str) -> None:
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 def purge_cmd(db_path: str, collection: str) -> None:
     """Remove chunks whose source file no longer exists on disk."""
@@ -448,12 +448,12 @@ def purge_cmd(db_path: str, collection: str) -> None:
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 @click.option("--yes", is_flag=True, help="Skip confirmation prompt.")
 def reset_cmd(db_path: str, collection: str, yes: bool) -> None:
@@ -469,12 +469,12 @@ def reset_cmd(db_path: str, collection: str, yes: bool) -> None:
 @cli.command(name="init")
 @click.argument("path", default=".", type=click.Path())
 def init_cmd(path: str) -> None:
-    """Scaffold a new synapse project in PATH (default: current directory).
+    """Scaffold a new remex project in PATH (default: current directory).
 
     Creates:
       - docs/           directory for your source files
-      - synapse.toml    project config with default values
-      - .gitignore      entry for synapse_db/ (if inside a git repo)
+      - remex.toml      project config with default values
+      - .gitignore      entry for remex_db/ (if inside a git repo)
     """
     root = Path(path).resolve()
     root.mkdir(parents=True, exist_ok=True)
@@ -487,40 +487,40 @@ def init_cmd(path: str) -> None:
     else:
         click.echo("  exists   docs/  (skipped)")
 
-    # synapse.toml
-    config_file = root / "synapse.toml"
+    # remex.toml
+    config_file = root / "remex.toml"
     if not config_file.exists():
         config_file.write_text(_TOML_TEMPLATE, encoding="utf-8")
-        click.echo("  created  synapse.toml")
+        click.echo("  created  remex.toml")
     else:
-        click.echo("  exists   synapse.toml  (skipped)")
+        click.echo("  exists   remex.toml  (skipped)")
 
     # .gitignore — only touch if inside a git repo
     git_dir = root / ".git"
     if git_dir.exists():
         gitignore = root / ".gitignore"
-        entry = "synapse_db/"
+        entry = "remex_db/"
         if gitignore.exists():
             if entry not in gitignore.read_text():
                 with gitignore.open("a", encoding="utf-8") as f:
-                    f.write(f"\n# synapse\n{entry}\n")
+                    f.write(f"\n# remex\n{entry}\n")
                 click.echo(f"  updated  .gitignore  ({entry})")
         else:
-            gitignore.write_text(f"# synapse\n{entry}\n", encoding="utf-8")
+            gitignore.write_text(f"# remex\n{entry}\n", encoding="utf-8")
             click.echo(f"  created  .gitignore  ({entry})")
 
     click.echo()
     click.echo("Ready. Next steps:")
     click.echo("  1. Drop your files into docs/")
-    click.echo("  2. synapse ingest")
-    click.echo('  3. synapse query "your question"')
+    click.echo("  2. remex ingest")
+    click.echo('  3. remex query "your question"')
 
 
 @cli.command(name="list-collections")
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
@@ -538,12 +538,12 @@ def list_collections_cmd(db_path: str) -> None:
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 def stats_cmd(db_path: str, collection: str) -> None:
     """Show statistics for a ChromaDB collection."""
@@ -563,18 +563,18 @@ def stats_cmd(db_path: str, collection: str) -> None:
 @click.option(
     "--db",
     "db_path",
-    default="./synapse_db",
+    default="./remex_db",
     show_default=True,
     help="ChromaDB persistence path.",
 )
 @click.option(
-    "--collection", default="synapse", show_default=True, help="Collection name."
+    "--collection", default="remex", show_default=True, help="Collection name."
 )
 @click.option("--yes", is_flag=True, help="Skip confirmation prompt.")
 def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> None:
     """Remove all chunks for SOURCE from the collection.
 
-    SOURCE is a file path or a SQLite source string (as shown by 'synapse sources').
+    SOURCE is a file path or a SQLite source string (as shown by 'remex sources').
     """
     if not yes:
         click.confirm(
@@ -590,3 +590,22 @@ def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> 
         click.echo(f"Deleted {deleted} chunk(s).")
     else:
         click.echo("No chunks found for that source.")
+
+
+@cli.command(name="serve")
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind host.")
+@click.option("--port", default=8000, show_default=True, type=int, help="Bind port.")
+@click.option("--reload", is_flag=True, help="Enable auto-reload (development only).")
+def serve_cmd(host: str, port: int, reload: bool) -> None:
+    """Start the remex FastAPI sidecar."""
+    try:
+        import uvicorn
+    except ImportError:
+        raise click.ClickException("Run: pip install remex[api]")
+    uvicorn.run("remex.api.main:app", host=host, port=port, reload=reload)
+
+
+@cli.command(name="studio")
+def studio_cmd() -> None:
+    """Launch the remex Studio GUI."""
+    click.echo("Studio not yet available. Install the Tauri app separately.")

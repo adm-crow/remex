@@ -1,6 +1,6 @@
 import pytest
 
-from synapse_core.chunker import chunk_text
+from remex.core.chunker import chunk_text
 
 
 @pytest.fixture

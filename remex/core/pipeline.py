@@ -146,8 +146,8 @@ def _ingest_file_streaming(
 
 def ingest(
     source_dir: str = "./docs",
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     chunk_size: int = 1000,
     overlap: int = 200,
     min_chunk_size: int = 50,
@@ -173,7 +173,7 @@ def ingest(
         incremental:          Skip files whose content hash hasn't changed since
                               the last ingest. Changed files are re-ingested.
         chunking:             "word" (default) or "sentence" (requires nltk).
-        verbose:              Emit progress via the synapse_core logger.
+        verbose:              Emit progress via the remex.core logger.
         streaming_threshold:  Files larger than this many bytes are paged
                               through the chunker instead of being fully loaded
                               into memory (text-based formats only).
@@ -320,8 +320,8 @@ def ingest(
 
 def query(
     text: str,
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     n_results: int = 5,
     embedding_model: str = "all-MiniLM-L6-v2",
     where: Optional[dict] = None,
@@ -348,7 +348,7 @@ def query(
                            ``None`` (default) returns all results up to ``n_results``.
 
     Returns:
-        List of :class:`~synapse_core.QueryResult` dicts sorted by relevance
+        List of :class:`~remex.core.QueryResult` dicts sorted by relevance
         (highest score first).
     """
     if n_results < 1:
@@ -433,14 +433,14 @@ def _source_exists(meta: dict) -> bool:
 
 
 def purge(
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     verbose: bool = True,
 ) -> PurgeResult:
     """
     Remove chunks from ChromaDB whose source file no longer exists on disk.
 
-    Returns a :class:`~synapse_core.PurgeResult` with ``chunks_deleted`` and
+    Returns a :class:`~remex.core.PurgeResult` with ``chunks_deleted`` and
     ``chunks_checked``.
     """
     client = chromadb.PersistentClient(path=db_path)
@@ -470,8 +470,8 @@ def purge(
 
 
 def reset(
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     verbose: bool = True,
     confirm: bool = False,
 ) -> None:
@@ -488,7 +488,7 @@ def reset(
     if not confirm:
         raise ValueError(
             "reset() permanently deletes the collection. "
-            "Pass confirm=True to proceed, or use the CLI (`synapse reset --yes`)."
+            "Pass confirm=True to proceed, or use the CLI (`remex reset --yes`)."
         )
     client = chromadb.PersistentClient(path=db_path)
     try:
@@ -501,8 +501,8 @@ def reset(
 
 
 def sources(
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
 ) -> List[str]:
     """Return a sorted list of unique source file paths stored in the collection."""
     client = chromadb.PersistentClient(path=db_path)
@@ -522,7 +522,7 @@ def sources(
     return sorted(unique)
 
 
-def list_collections(db_path: str = "./synapse_db") -> List[str]:
+def list_collections(db_path: str = "./remex_db") -> List[str]:
     """Return a sorted list of all collection names in a ChromaDB directory.
 
     Returns an empty list if the path does not exist or contains no collections.
@@ -538,8 +538,8 @@ def list_collections(db_path: str = "./synapse_db") -> List[str]:
 
 
 def collection_stats(
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
 ) -> CollectionStats:
     """Return statistics for a ChromaDB collection.
 
@@ -548,7 +548,7 @@ def collection_stats(
         collection_name:  Name of the collection.
 
     Returns:
-        A :class:`~synapse_core.CollectionStats` instance with ``name``,
+        A :class:`~remex.core.CollectionStats` instance with ``name``,
         ``total_chunks``, ``total_sources``, and ``embedding_model``.
 
     Raises:
@@ -584,8 +584,8 @@ def collection_stats(
 
 def delete_source(
     source: str,
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     verbose: bool = True,
 ) -> int:
     """Remove all chunks for a given source from the collection.
@@ -634,8 +634,8 @@ def delete_source(
 
 def ingest_many(
     paths: List[Union[str, Path]],
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     chunk_size: int = 1000,
     overlap: int = 200,
     min_chunk_size: int = 50,
@@ -664,7 +664,7 @@ def ingest_many(
         min_chunk_size:      Discard chunks shorter than this (chars).
         embedding_model:     SentenceTransformer model name.
         chunking:            ``"word"`` (default) or ``"sentence"`` (requires nltk).
-        verbose:             Emit progress via the synapse_core logger.
+        verbose:             Emit progress via the remex.core logger.
         incremental:         Skip files whose content hash hasn't changed since the
                              last ingest. Changed files are re-ingested.
         streaming_threshold: Files larger than this many bytes are paged through the
@@ -820,8 +820,8 @@ def ingest_many(
 
 async def ingest_async(
     source_dir: str = "./docs",
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     chunk_size: int = 1000,
     overlap: int = 200,
     min_chunk_size: int = 50,
@@ -853,8 +853,8 @@ async def ingest_async(
 
 async def query_async(
     text: str,
-    db_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
     n_results: int = 5,
     embedding_model: str = "all-MiniLM-L6-v2",
     where: Optional[dict] = None,

@@ -27,7 +27,7 @@ class CustomFormatter(logging.Formatter):
         return logging.Formatter(log_fmt, date_fmt).format(record)
 
 
-logger = logging.getLogger("synapse_core")
+logger = logging.getLogger("remex.core")
 logger.setLevel(logging.INFO)
 logger.propagate = False  # prevent double output when the root logger has handlers
 
@@ -42,9 +42,9 @@ def setup_logging(
     log_file: Optional[str] = None,
 ) -> None:
     """
-    Configure synapse_core logging output.
+    Configure remex.core logging output.
 
-    By default synapse_core writes colored INFO messages to stdout.
+    By default remex.core writes colored INFO messages to stdout.
     Call this function to change the level, silence output, or add a log file.
 
     Args:
@@ -56,13 +56,13 @@ def setup_logging(
     Example::
 
         import logging
-        import synapse_core
+        import remex.core
 
         # Colored stdout + persistent log file
-        synapse_core.setup_logging(level=logging.DEBUG, log_file="ingest.log")
+        remex.core.setup_logging(level=logging.DEBUG, log_file="ingest.log")
 
-        # Silence all synapse_core output
-        synapse_core.setup_logging(level=logging.CRITICAL)
+        # Silence all remex.core output
+        remex.core.setup_logging(level=logging.CRITICAL)
     """
     logger.setLevel(level)
     for handler in logger.handlers[:]:

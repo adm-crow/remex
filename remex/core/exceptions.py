@@ -1,8 +1,8 @@
-"""Public exception hierarchy for synapse-core.
+"""Public exception hierarchy for remex.
 
-All synapse-specific errors inherit from :class:`SynapseError`, so callers
-can write a single ``except SynapseError`` to catch everything, or catch the
-more specific subclasses for finer-grained handling.
+All remex errors inherit from :class:`SynapseError`, so callers can write a
+single ``except SynapseError`` to catch everything, or catch the more specific
+subclasses for finer-grained handling.
 
 Each subclass also inherits from the matching Python built-in (``ValueError``,
 ``FileNotFoundError``) so existing code that catches those continues to work.
@@ -10,7 +10,7 @@ Each subclass also inherits from the matching Python built-in (``ValueError``,
 
 
 class SynapseError(Exception):
-    """Base class for all synapse-core errors."""
+    """Base class for all remex errors."""
 
 
 class CollectionNotFoundError(SynapseError, ValueError):

@@ -3,9 +3,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from synapse_core.exceptions import SourceNotFoundError, TableNotFoundError
-from synapse_core.models import IngestResult
-from synapse_core.sqlite_ingester import ingest_sqlite
+from remex.core.exceptions import SourceNotFoundError, TableNotFoundError
+from remex.core.models import IngestResult
+from remex.core.sqlite_ingester import ingest_sqlite
 
 
 def create_test_db(tmp_path, table_name, columns_def, rows):
@@ -26,8 +26,8 @@ def mock_chroma():
     collection = MagicMock()
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
-    with patch("synapse_core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("synapse_core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
         yield collection
 
 
@@ -299,7 +299,7 @@ def test_ingest_sqlite_row_error_is_skipped(mock_chroma, tmp_path):
         ["id INTEGER PRIMARY KEY", "body TEXT"],
         [(1, "word " * 30)],
     )
-    with patch("synapse_core.sqlite_ingester.chunk_text", side_effect=RuntimeError("boom")):
+    with patch("remex.core.sqlite_ingester.chunk_text", side_effect=RuntimeError("boom")):
         result = ingest_sqlite(
             db_path=db, table="articles",
             chroma_path=str(tmp_path / "db"), verbose=False,

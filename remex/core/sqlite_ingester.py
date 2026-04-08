@@ -37,8 +37,8 @@ def ingest_sqlite(
     columns: Optional[List[str]] = None,
     id_column: str = "id",
     row_template: Optional[str] = None,
-    chroma_path: str = "./synapse_db",
-    collection_name: str = "synapse",
+    chroma_path: str = "./remex_db",
+    collection_name: str = "remex",
     chunk_size: int = 1000,
     overlap: int = 200,
     min_chunk_size: int = 50,
@@ -68,7 +68,7 @@ def ingest_sqlite(
         min_chunk_size:   Discard chunks shorter than this.
         embedding_model:  SentenceTransformer model name.
         chunking:         "word" (default) or "sentence" (requires nltk).
-        verbose:          Emit progress via the synapse_core logger.
+        verbose:          Emit progress via the remex.core logger.
         on_progress:      Optional callback invoked after each row is processed.
                           Receives an :class:`IngestProgress` instance.
     """
