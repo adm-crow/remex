@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from synapse_core.extractors import (
+from remex.core.extractors import (
     extract, extract_metadata, extract_streaming, is_supported, supports_streaming,
 )
 

@@ -3,7 +3,7 @@ import os
 
 import pytest
 
-from synapse_core.logger import CustomFormatter, logger, setup_logging
+from remex.core.logger import CustomFormatter, logger, setup_logging
 
 
 @pytest.fixture(autouse=True)
@@ -63,7 +63,7 @@ def test_custom_formatter_covers_all_levels():
     formatter = CustomFormatter()
     for level in (logging.DEBUG, logging.INFO, logging.WARNING, logging.ERROR, logging.CRITICAL):
         record = logging.LogRecord(
-            name="synapse_core",
+            name="remex.core",
             level=level,
             pathname="",
             lineno=0,
