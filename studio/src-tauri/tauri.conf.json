@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "studio",
+  "productName": "Remex Studio",
   "version": "0.1.0",
   "identifier": "com.remex.studio",
   "build": {
@@ -12,9 +12,11 @@
   "app": {
     "windows": [
       {
-        "title": "studio",
-        "width": 800,
-        "height": 600
+        "title": "Remex Studio",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600
       }
     ],
     "security": {
