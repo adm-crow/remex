@@ -1,0 +1,3 @@
+[remex]
+db = "./remex_db"
+collection = "remex"

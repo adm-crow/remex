@@ -2,7 +2,7 @@ __version__ = "0.2.0"
 
 from .ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
 from .config import load_config, save_config
-from .exceptions import CollectionNotFoundError, SourceNotFoundError, SynapseError, TableNotFoundError
+from .exceptions import CollectionNotFoundError, RemexError, SourceNotFoundError, SynapseError, TableNotFoundError
 from .extractors import SUPPORTED_EXTENSIONS, is_supported
 from .logger import setup_logging
 from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, QueryResult
@@ -55,8 +55,9 @@ __all__ = [
     "PurgeResult",
     "QueryResult",
     # exceptions
+    "RemexError",
+    "SynapseError",  # backward-compat alias
     "CollectionNotFoundError",
     "SourceNotFoundError",
-    "SynapseError",
     "TableNotFoundError",
 ]

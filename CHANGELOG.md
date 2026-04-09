@@ -1,6 +1,20 @@
 # Changelog
 
-All notable changes to `synapse-core` are documented here.
+All notable changes to `remex` are documented here.
+
+---
+
+## [0.2.0] — 2026-04-09
+
+### Changed
+- **Package renamed** from `synapse-core` to `remex`. Import path: `from remex import ingest, query` (was `from synapse_core import ...`)
+- Unified CLI entry point: `remex` command replaces `synapse` (all subcommands unchanged)
+- `remex.toml` / `[remex]` section replaces `synapse.toml` / `[synapse]` for project config
+- Default ChromaDB path changed from `./synapse_db` to `./remex_db`
+- Default collection name changed from `synapse` to `remex`
+- Base exception renamed from `SynapseError` to `RemexError` (`SynapseError` kept as a backward-compat alias)
+- `remex.api` FastAPI sidecar added — start with `remex serve` (requires `remex[api]`)
+- Top-level `remex` package now re-exports the full public API (previously only `remex.core`)
 
 ---
 
@@ -22,7 +36,7 @@ All notable changes to `synapse-core` are documented here.
 - `delete_source(source, db_path, collection_name)` — explicitly removes all chunks for a given source (file path or SQLite source string); CLI: `synapse delete-source SOURCE [--yes]`
 - `query(…, min_score=…)` / `query_async(…, min_score=…)` — optional float 0–1 to filter out low-relevance results; CLI: `synapse query --min-score 0.5`
 - `CollectionStats` dataclass exported from the top-level `synapse_core` namespace
-- `py.typed` marker — downstream type checkers (Pylance, mypy) now pick up synapse-core's type hints automatically
+- `py.typed` marker — downstream type checkers (Pylance, mypy) now pick up remex's type hints automatically
 
 ---
 

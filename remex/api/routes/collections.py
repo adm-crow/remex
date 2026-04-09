@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from remex.core import collection_stats, delete_source, list_collections, purge, reset, sources
-from remex.core.exceptions import CollectionNotFoundError, SynapseError
+from remex.core.exceptions import CollectionNotFoundError, RemexError
 from remex.api.schemas import (
     CollectionStatsResponse,
     DeletedChunksResponse,
@@ -45,7 +45,7 @@ def remove_source(
 ) -> DeletedChunksResponse:
     try:
         deleted = delete_source(source=source, db_path=db_path, collection_name=collection)
-    except SynapseError as e:
+    except RemexError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return DeletedChunksResponse(deleted_chunks=deleted)
 
@@ -56,7 +56,7 @@ def reset_collection(
 ) -> DeletedResponse:
     try:
         reset(db_path=db_path, collection_name=collection, confirm=True)
-    except SynapseError as e:
+    except RemexError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return DeletedResponse(deleted=True)
 

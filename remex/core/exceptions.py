@@ -1,7 +1,7 @@
 """Public exception hierarchy for remex.
 
-All remex errors inherit from :class:`SynapseError`, so callers can write a
-single ``except SynapseError`` to catch everything, or catch the more specific
+All remex errors inherit from :class:`RemexError`, so callers can write a
+single ``except RemexError`` to catch everything, or catch the more specific
 subclasses for finer-grained handling.
 
 Each subclass also inherits from the matching Python built-in (``ValueError``,
@@ -9,25 +9,29 @@ Each subclass also inherits from the matching Python built-in (``ValueError``,
 """
 
 
-class SynapseError(Exception):
+class RemexError(Exception):
     """Base class for all remex errors."""
 
 
-class CollectionNotFoundError(SynapseError, ValueError):
+# Backward-compatible alias — will be removed in a future major version.
+SynapseError = RemexError
+
+
+class CollectionNotFoundError(RemexError, ValueError):
     """Raised when the requested ChromaDB collection does not exist.
 
     Also inherits from :class:`ValueError` for backward compatibility.
     """
 
 
-class SourceNotFoundError(SynapseError, FileNotFoundError):
+class SourceNotFoundError(RemexError, FileNotFoundError):
     """Raised when an ingestion source (directory or SQLite file) is not found.
 
     Also inherits from :class:`FileNotFoundError` for backward compatibility.
     """
 
 
-class TableNotFoundError(SynapseError, ValueError):
+class TableNotFoundError(RemexError, ValueError):
     """Raised when the specified SQLite table does not exist in the database.
 
     Also inherits from :class:`ValueError` for backward compatibility.

@@ -341,7 +341,7 @@ def test_cli_ingest_file_not_found_shows_error(mock_ingest):
 
 @patch("remex.cli.query")
 def test_cli_query_collection_not_found_shows_error(mock_query):
-    mock_query.side_effect = ValueError("Collection 'synapse' not found — run ingest() first.")
+    mock_query.side_effect = ValueError("Collection 'remex' not found — run ingest() first.")
     result = CliRunner().invoke(cli, ["query", "test"])
     assert result.exit_code != 0
     assert "Error:" in result.output

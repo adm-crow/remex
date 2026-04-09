@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from remex.core import ingest, ingest_sqlite
-from remex.core.exceptions import SynapseError
+from remex.core.exceptions import RemexError
 from remex.core.models import IngestProgress
 from remex.api.schemas import IngestRequest, IngestResultResponse, IngestSQLiteRequest
 
@@ -30,7 +30,7 @@ async def ingest_files(collection: str, req: IngestRequest) -> IngestResultRespo
             streaming_threshold=req.streaming_threshold_mb * 1024 * 1024,
             embedding_model=req.embedding_model,
         )
-    except (SynapseError, FileNotFoundError, ValueError) as e:
+    except (RemexError, FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     return IngestResultResponse(
         sources_found=result.sources_found,
@@ -92,7 +92,7 @@ async def ingest_files_stream(collection: str, req: IngestRequest) -> StreamingR
                     "skipped_reasons": result.skipped_reasons,
                 },
             })
-        except (SynapseError, FileNotFoundError, ValueError) as e:
+        except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
 
     asyncio.create_task(_run())
@@ -128,7 +128,7 @@ async def ingest_sqlite_table(
             chunking=req.chunking,
             embedding_model=req.embedding_model,
         )
-    except (SynapseError, FileNotFoundError, ValueError) as e:
+    except (RemexError, FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     return IngestResultResponse(
         sources_found=result.sources_found,

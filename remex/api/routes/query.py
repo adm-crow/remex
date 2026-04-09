@@ -3,7 +3,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException
 
 from remex.core import DEFAULT_MODELS, detect_provider, generate_answer, query
-from remex.core.exceptions import SynapseError
+from remex.core.exceptions import RemexError
 from remex.api.schemas import ChatRequest, ChatResponse, QueryRequest, QueryResultItem
 
 router = APIRouter(prefix="/collections", tags=["query"])
@@ -24,7 +24,7 @@ async def query_collection(
             embedding_model=req.embedding_model,
             min_score=req.min_score,
         )
-    except (SynapseError, ValueError) as e:
+    except (RemexError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     return list(results)
 
@@ -42,7 +42,7 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
             embedding_model=req.embedding_model,
             min_score=req.min_score,
         )
-    except (SynapseError, ValueError) as e:
+    except (RemexError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     if not results:

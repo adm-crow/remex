@@ -1,46 +1,47 @@
 <div align="center">
-  <img src="logo.svg" alt="Synapse" width="110" /><br/><br/>
+  <img src="logo.svg" alt="remex" width="110" /><br/><br/>
 
-  <h1>synapse-core</h1>
+  <h1>remex</h1>
   <p><strong>Local-first RAG for Python — ingest files, query semantically, feed any AI.</strong></p>
 
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/synapse-core?style=flat-square&logo=python&logoColor=white)
-![PyPI - Version](https://img.shields.io/pypi/v/synapse-core?style=flat-square&logo=pypi&logoColor=white)
-![GitHub License](https://img.shields.io/github/license/adm-crow/synapse?style=flat-square&logo=github&logoColor=white)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/remex?style=flat-square&logo=python&logoColor=white)
+![PyPI - Version](https://img.shields.io/pypi/v/remex?style=flat-square&logo=pypi&logoColor=white)
+![GitHub License](https://img.shields.io/github/license/adm-crow/remex?style=flat-square&logo=github&logoColor=white)
 <br>
-![PyPI - Downloads](https://img.shields.io/pypi/dm/synapse-core?style=flat-square&logo=pypi&logoColor=white)
-![GitHub branch check runs](https://img.shields.io/github/check-runs/adm-crow/synapse/main?style=flat-square&logo=github&logoColor=white)
-![GitHub Release Date](https://img.shields.io/github/release-date/adm-crow/synapse?display_date=published_at&style=flat-square&logo=github&logoColor=white)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/remex?style=flat-square&logo=pypi&logoColor=white)
+![GitHub branch check runs](https://img.shields.io/github/check-runs/adm-crow/remex/main?style=flat-square&logo=github&logoColor=white)
+![GitHub Release Date](https://img.shields.io/github/release-date/adm-crow/remex?display_date=published_at&style=flat-square&logo=github&logoColor=white)
 </div>
 
 ---
 
-No cloud, no API key, no infrastructure required. Just point Synapse to a folder (or a SQLite database), run a single function, and semantically query your documents — entirely offline, right on your machine.
+No cloud, no API key, no infrastructure required. Just point remex to a folder (or a SQLite database), run a single function, and semantically query your documents — entirely offline, right on your machine.
 
 | | |
 |---|---|
 | **12 formats** | `.txt` `.md` `.csv` `.pdf` `.docx` `.json` `.jsonl` `.html` `.pptx` `.xlsx` `.epub` `.odt` |
 | **Embeddings** | Local `sentence-transformers` — fully offline, no data leaves your machine |
 | **Storage** | ChromaDB persistent vector store — survives restarts, idempotent upserts |
-| **Extras** | SQLite ingestion · Async API · CLI · `synapse.toml` project config |
+| **Extras** | SQLite ingestion · Async API · CLI · FastAPI sidecar · `remex.toml` project config |
 
 ---
 
 ## Install
 
 ```bash
-pip install synapse-core
+pip install remex
 # or
-uv add synapse-core
+uv add remex
 ```
 
 > [!NOTE]
 > Optional extras
 > ```bash
-> pip install "synapse-core[formats]"              # .html .pptx .xlsx .epub .odt support
-> pip install "synapse-core[sentence]"             # sentence-aware chunking (requires NLTK)
-> pip install "synapse-core[ai]"                   # Anthropic + OpenAI SDKs for --ai flag
-> pip install "synapse-core[formats,sentence,ai]"  # everything
+> pip install "remex[formats]"              # .html .pptx .xlsx .epub .odt support
+> pip install "remex[sentence]"             # sentence-aware chunking (requires NLTK)
+> pip install "remex[ai]"                   # Anthropic + OpenAI SDKs for --ai flag
+> pip install "remex[api]"                  # FastAPI sidecar (remex serve)
+> pip install "remex[all]"                  # everything
 > ```
 
 ---
@@ -48,7 +49,7 @@ uv add synapse-core
 ## Quickstart
 
 ```python
-from synapse_core import ingest, query
+from remex import ingest, query
 
 data = ingest("./docs")
 print(f"{data.sources_ingested}/{data.sources_found} files ingested, {data.chunks_stored} chunks stored")
@@ -67,39 +68,41 @@ for result in results:
 ## CLI
 
 ```bash
-synapse init                                      # scaffold docs/, synapse.toml, .gitignore
+remex init                                      # scaffold docs/, remex.toml, .gitignore
 
-synapse ingest ./docs
-synapse ingest ./docs --incremental               # skip unchanged files
-synapse ingest ./docs --chunking sentence
+remex ingest ./docs
+remex ingest ./docs --incremental               # skip unchanged files
+remex ingest ./docs --chunking sentence
 
-synapse ingest-sqlite ./data.db --table articles
-synapse ingest-sqlite ./data.db --table articles --columns "title,body"
-synapse ingest-sqlite ./data.db --table articles --row-template "{title}: {body}"
+remex ingest-sqlite ./data.db --table articles
+remex ingest-sqlite ./data.db --table articles --columns "title,body"
+remex ingest-sqlite ./data.db --table articles --row-template "{title}: {body}"
 
-synapse query "refund policy"
-synapse query "..." -n 10 --format json
-synapse query "..." --collections "docs,archive"
-synapse query "..." --where '{"source_type": {"$eq": "file"}}'
-synapse query "..." --ai                          # AI answer, provider auto-detected
-synapse query "..." --ai --provider anthropic --model claude-opus-4-6
+remex query "refund policy"
+remex query "..." -n 10 --format json
+remex query "..." --collections "docs,archive"
+remex query "..." --where '{"source_type": {"$eq": "file"}}'
+remex query "..." --ai                          # AI answer, provider auto-detected
+remex query "..." --ai --provider anthropic --model claude-opus-4-6
 
-synapse sources                                   # list all indexed sources
-synapse purge                                     # remove chunks from deleted files
-synapse reset --yes                               # wipe the entire collection
+remex sources                                   # list all indexed sources
+remex purge                                     # remove chunks from deleted files
+remex reset --yes                               # wipe the entire collection
+
+remex serve                                     # start the FastAPI sidecar (requires remex[api])
 ```
 
 > [!TIP]
-> Every command accepts `--db PATH`, `--collection NAME`, and `--embedding-model`. Run `synapse <cmd> --help` for all options.
+> Every command accepts `--db PATH`, `--collection NAME`, and `--embedding-model`. Run `remex <cmd> --help` for all options.
 
 <details>
 <summary>Full CLI flag reference</summary>
 
-**`synapse ingest [SOURCE_DIR]`**
+**`remex ingest [SOURCE_DIR]`**
 ```
   SOURCE_DIR                         Directory to scan recursively [default: ./docs]
-  --db PATH                          ChromaDB persistence path [default: ./synapse_db]
-  --collection NAME                  Collection name [default: synapse]
+  --db PATH                          ChromaDB persistence path [default: ./remex_db]
+  --collection NAME                  Collection name [default: remex]
   --chunk-size INT                   Target characters per chunk [default: 1000]
   --overlap INT                      Character overlap between chunks [default: 200]
   --min-chunk-size INT               Discard chunks shorter than this [default: 50]
@@ -109,12 +112,12 @@ synapse reset --yes                               # wipe the entire collection
   --incremental                      Skip files unchanged since last run (SHA-256)
 ```
 
-**`synapse ingest-sqlite DB_PATH --table TABLE`**
+**`remex ingest-sqlite DB_PATH --table TABLE`**
 ```
   DB_PATH                            Path to the SQLite database file
   --table NAME              *        Table to ingest (required)
-  --db PATH                          ChromaDB persistence path [default: ./synapse_db]
-  --collection NAME                  Collection name [default: synapse]
+  --db PATH                          ChromaDB persistence path [default: ./remex_db]
+  --collection NAME                  Collection name [default: remex]
   --columns col1,col2                Columns to embed (default: all columns)
   --id-column NAME                   Primary key column [default: id]
   --row-template STR                 Row format string, e.g. "{title}: {body}"
@@ -125,11 +128,11 @@ synapse reset --yes                               # wipe the entire collection
   --embedding-model MODEL            SentenceTransformer model name
 ```
 
-**`synapse query TEXT`**
+**`remex query TEXT`**
 ```
   TEXT                               Search query (required)
-  --db PATH                          ChromaDB persistence path [default: ./synapse_db]
-  --collection NAME                  Collection name [default: synapse]
+  --db PATH                          ChromaDB persistence path [default: ./remex_db]
+  --collection NAME                  Collection name [default: remex]
   -n, --n-results INT                Number of results to return [default: 5]
   --embedding-model MODEL            SentenceTransformer model (must match ingest)
   --where JSON                       ChromaDB metadata filter as JSON
@@ -138,6 +141,13 @@ synapse reset --yes                               # wipe the entire collection
   --ai                               Generate an AI answer from retrieved chunks
   --provider [anthropic|openai|ollama]  LLM provider (auto-detected if omitted)
   --model NAME                       Model name override (e.g. gpt-4o, llama3)
+```
+
+**`remex serve`**
+```
+  --host TEXT                        Bind host [default: 127.0.0.1]
+  --port INT                         Bind port [default: 8000]
+  --reload                           Enable auto-reload (development only)
 ```
 
 </details>
@@ -154,12 +164,12 @@ synapse reset --yes                               # wipe the entire collection
 Scan a directory recursively, chunk every supported file, embed it, and persist to ChromaDB.
 
 ```python
-from synapse_core import ingest
+from remex import ingest
 
 result = ingest(
     source_dir          = "./docs",
-    db_path             = "./synapse_db",
-    collection_name     = "synapse",
+    db_path             = "./remex_db",
+    collection_name     = "remex",
     chunk_size          = 1000,                # target characters per chunk
     overlap             = 200,                 # character overlap between chunks
     min_chunk_size      = 50,                  # discard chunks shorter than this
@@ -177,7 +187,7 @@ Raises `SourceNotFoundError` if `source_dir` does not exist.
 **tqdm example:**
 ```python
 from tqdm import tqdm
-from synapse_core import ingest, IngestProgress
+from remex import ingest, IngestProgress
 
 with tqdm(unit="file") as bar:
     def _cb(p: IngestProgress) -> None:
@@ -194,12 +204,12 @@ with tqdm(unit="file") as bar:
 Embed the query and return the closest matching chunks, ranked by relevance.
 
 ```python
-from synapse_core import query
+from remex import query
 
 hits = query(
     text             = "what is the refund policy?",
-    db_path          = "./synapse_db",
-    collection_name  = "synapse",
+    db_path          = "./remex_db",
+    collection_name  = "remex",
     n_results        = 5,                      # must be >= 1
     embedding_model  = "all-MiniLM-L6-v2",    # must match the model used at ingest
     where            = None,                   # ChromaDB metadata filter dict
@@ -225,7 +235,7 @@ hits = query("...", collection_names=["docs", "archive", "notes"])
 Ingest rows from a SQLite table. Files and database records coexist in the same collection and are queried together.
 
 ```python
-from synapse_core import ingest_sqlite
+from remex import ingest_sqlite
 
 result = ingest_sqlite(
     db_path         = "./data.db",
@@ -233,8 +243,8 @@ result = ingest_sqlite(
     columns         = None,           # list of columns to embed; None = all
     id_column       = "id",           # primary key for stable chunk IDs
     row_template    = None,           # e.g. "{title}: {body}" — overrides default serialization
-    chroma_path     = "./synapse_db",
-    collection_name = "synapse",
+    chroma_path     = "./remex_db",
+    collection_name = "remex",
     chunk_size      = 1000,
     overlap         = 200,
     min_chunk_size  = 50,
@@ -257,12 +267,12 @@ Raises `SourceNotFoundError` · `TableNotFoundError` · `ValueError` (bad column
 Ingest an explicit list of files instead of scanning a directory.
 
 ```python
-from synapse_core import ingest_many
+from remex import ingest_many
 
 result = ingest_many(
     paths               = ["./a.pdf", "./reports/q1.docx"],  # str or pathlib.Path
-    db_path             = "./synapse_db",
-    collection_name     = "synapse",
+    db_path             = "./remex_db",
+    collection_name     = "remex",
     chunk_size          = 1000,
     overlap             = 200,
     min_chunk_size      = 50,
@@ -284,7 +294,7 @@ Unsupported or missing files are skipped — reasons recorded in `result.skipped
 `ingest_async()` and `query_async()` are drop-in async equivalents backed by `asyncio.to_thread()`. All parameters are identical to their sync counterparts.
 
 ```python
-from synapse_core import ingest_async, query_async
+from remex import ingest_async, query_async
 
 async def main():
     result = await ingest_async("./docs", incremental=True)
@@ -294,7 +304,7 @@ async def main():
 **FastAPI example:**
 ```python
 from fastapi import FastAPI
-from synapse_core import ingest_async, query_async
+from remex import ingest_async, query_async
 
 app = FastAPI()
 
@@ -313,14 +323,14 @@ async def search_endpoint(q: str, n: int = 5):
 ### `purge()` · `reset()` · `sources()`
 
 ```python
-from synapse_core import purge, reset, sources
+from remex import purge, reset, sources
 
-paths  = sources(db_path="./synapse_db", collection_name="synapse")
+paths  = sources(db_path="./remex_db", collection_name="remex")
 
-result = purge(db_path="./synapse_db", collection_name="synapse")
+result = purge(db_path="./remex_db", collection_name="remex")
 print(f"Deleted {result.chunks_deleted} stale chunk(s) out of {result.chunks_checked} checked")
 
-reset(db_path="./synapse_db", collection_name="synapse", confirm=True)
+reset(db_path="./remex_db", collection_name="remex", confirm=True)
 ```
 
 > [!WARNING]
@@ -328,24 +338,24 @@ reset(db_path="./synapse_db", collection_name="synapse", confirm=True)
 
 **Logging:**
 ```python
-import logging, synapse_core
+import logging, remex
 
-synapse_core.setup_logging()                        # coloured console output
-synapse_core.setup_logging(log_file="ingest.log")   # also write to a file
-synapse_core.setup_logging(level=logging.WARNING)   # suppress info messages
+remex.setup_logging()                        # coloured console output
+remex.setup_logging(log_file="ingest.log")   # also write to a file
+remex.setup_logging(level=logging.WARNING)   # suppress info messages
 ```
 
 </details>
 
 ---
 
-## synapse.toml
+## remex.toml
 
-Run `synapse init` once per project. Defaults for every command — CLI flags always override. Looked up in the **current working directory** at runtime.
+Run `remex init` once per project. Defaults for every command — CLI flags always override. Looked up in the **current working directory** at runtime.
 
 ```toml
-[synapse]
-db              = "./synapse_db"
+[remex]
+db              = "./remex_db"
 collection      = "myproject"
 embedding_model = "all-MiniLM-L6-v2"
 
@@ -360,7 +370,7 @@ embedding_model = "all-MiniLM-L6-v2"
 ## Use with any LLM
 
 ```python
-from synapse_core import ingest, query
+from remex import ingest, query
 
 ingest("./docs")  # run once — idempotent
 
@@ -378,7 +388,7 @@ def ask(question: str, client) -> str:
 Or zero-code from the CLI — set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` and use `--ai`:
 
 ```bash
-synapse query "what changed in v2?" --ai
+remex query "what changed in v2?" --ai
 ```
 
 ---
@@ -434,13 +444,13 @@ synapse query "what changed in v2?" --ai
 ### Exceptions
 
 ```
-SynapseError                    ← base class, catch-all
+RemexError                      ← base class, catch-all
 ├── SourceNotFoundError         ← also FileNotFoundError
 ├── CollectionNotFoundError     ← also ValueError
 └── TableNotFoundError          ← also ValueError
 ```
 
-Every exception inherits from both `SynapseError` and the matching Python built-in — existing `except ValueError` / `except FileNotFoundError` handlers keep working unchanged.
+Every exception inherits from both `RemexError` and the matching Python built-in — existing `except ValueError` / `except FileNotFoundError` handlers keep working unchanged.
 
 ---
 
@@ -489,7 +499,7 @@ Default models: `claude-sonnet-4-5` · `gpt-4o` · `llama3`. Override with `--mo
 # Ollama setup
 ollama serve
 ollama pull llama3
-synapse query "..." --ai --provider ollama --model llama3
+remex query "..." --ai --provider ollama --model llama3
 ```
 
 The AI answer is generated from retrieved chunks only — your full corpus is never sent to any provider.
@@ -498,23 +508,11 @@ The AI answer is generated from retrieved chunks only — your full corpus is ne
 
 ---
 
-## Related
-
-**[synapse-studio](https://github.com/adm-crow/synapse-studio)** — visual interface for synapse-core. Browse your collections, run queries, chat with your AI agent, and manage settings — all from a browser UI. Built on top of this library.
-
-```bash
-pip install synapse-studio
-synapse studio   # opens the UI in your browser
-```
-
----
-
 <div align="center">
   <sub>
     <a href="CHANGELOG.md">Changelog</a> ·
-    <a href="ROADMAP.md">Roadmap</a> ·
-    <a href="https://pypi.org/project/synapse-core/">PyPI</a> ·
-    <a href="https://github.com/adm-crow/synapse-studio">synapse-studio</a> ·
-    <a href="LICENSE">Apache 2.0</a>
+    <a href="LICENSE">Apache 2.0</a> ·
+    <a href="https://pypi.org/project/remex/">PyPI</a> ·
+    <a href="https://github.com/adm-crow/remex">GitHub</a>
   </sub>
 </div>

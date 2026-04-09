@@ -6,7 +6,7 @@ import click
 from remex.core import __version__
 from remex.core.ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
 from remex.core.config import load_config
-from remex.core.exceptions import SynapseError
+from remex.core.exceptions import RemexError
 from remex.core.pipeline import collection_stats, delete_source, ingest, list_collections, purge, query, reset, sources
 from remex.core.sqlite_ingester import ingest_sqlite
 
@@ -125,7 +125,7 @@ def ingest_cmd(
             streaming_threshold=streaming_threshold * 1024 * 1024,
             embedding_model=embedding_model,
         )
-    except (SynapseError, FileNotFoundError, ValueError) as e:
+    except (RemexError, FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
 
@@ -224,7 +224,7 @@ def ingest_sqlite_cmd(
             chunking=chunking,
             embedding_model=embedding_model,
         )
-    except (SynapseError, FileNotFoundError, ValueError) as e:
+    except (RemexError, FileNotFoundError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
 
@@ -344,7 +344,7 @@ def query_cmd(
             embedding_model=embedding_model,
             min_score=min_score,
         )
-    except (SynapseError, ValueError) as e:
+    except (RemexError, ValueError) as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
 
@@ -549,7 +549,7 @@ def stats_cmd(db_path: str, collection: str) -> None:
     """Show statistics for a ChromaDB collection."""
     try:
         stats = collection_stats(db_path=db_path, collection_name=collection)
-    except SynapseError as e:
+    except RemexError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
     click.echo(f"Collection : {stats.name}")
@@ -583,7 +583,7 @@ def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> 
         )
     try:
         deleted = delete_source(source=source, db_path=db_path, collection_name=collection)
-    except SynapseError as e:
+    except RemexError as e:
         click.echo(f"Error: {e}", err=True)
         raise SystemExit(1)
     if deleted:

@@ -1,7 +1,7 @@
 import asyncio
 import hashlib
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Union, cast
+from typing import Any, Callable, cast
 
 import chromadb
 from chromadb.errors import NotFoundError as ChromaNotFoundError
@@ -91,7 +91,7 @@ def _ingest_file_streaming(
     doc_meta: dict,
     incremental: bool,
     current_hash: str,
-    id_fn: Optional[Callable[[int], str]] = None,
+    id_fn: Callable[[int], str] | None = None,
 ) -> int:
     """Stream a large text file through the chunker, upserting in small batches.
 
@@ -156,7 +156,7 @@ def ingest(
     chunking: str = "word",
     verbose: bool = True,
     streaming_threshold: int = 50 * 1024 * 1024,
-    on_progress: Optional[Callable[[IngestProgress], None]] = None,
+    on_progress: Callable[[IngestProgress], None] | None = None,
 ) -> IngestResult:
     """
     Scan source_dir for supported files, extract text, chunk it,
@@ -324,10 +324,10 @@ def query(
     collection_name: str = "remex",
     n_results: int = 5,
     embedding_model: str = "all-MiniLM-L6-v2",
-    where: Optional[dict] = None,
-    collection_names: Optional[List[str]] = None,
-    min_score: Optional[float] = None,
-) -> List[QueryResult]:
+    where: dict | None = None,
+    collection_names: list[str] | None = None,
+    min_score: float | None = None,
+) -> list[QueryResult]:
     """
     Semantic search over one or more ChromaDB collections.
 
@@ -358,7 +358,7 @@ def query(
 
     # ── multi-collection: query each, merge, return top-n ─────────────────
     if collection_names:
-        all_results: List[QueryResult] = []
+        all_results: list[QueryResult] = []
         for name in collection_names:
             try:
                 partial = query(
@@ -400,7 +400,7 @@ def query(
     documents = results["documents"][0]  # type: ignore[index]
     metadatas = results["metadatas"][0]  # type: ignore[index]
     distances = results["distances"][0]  # type: ignore[index]
-    rows = cast(List[QueryResult], [
+    rows = cast(list[QueryResult], [
         {
             "text": doc,
             "source": meta.get("source", ""),
@@ -503,7 +503,7 @@ def reset(
 def sources(
     db_path: str = "./remex_db",
     collection_name: str = "remex",
-) -> List[str]:
+) -> list[str]:
     """Return a sorted list of unique source file paths stored in the collection."""
     client = chromadb.PersistentClient(path=db_path)
     try:
@@ -522,7 +522,7 @@ def sources(
     return sorted(unique)
 
 
-def list_collections(db_path: str = "./remex_db") -> List[str]:
+def list_collections(db_path: str = "./remex_db") -> list[str]:
     """Return a sorted list of all collection names in a ChromaDB directory.
 
     Returns an empty list if the path does not exist or contains no collections.
@@ -633,7 +633,7 @@ def delete_source(
 
 
 def ingest_many(
-    paths: List[Union[str, Path]],
+    paths: list[str | Path],
     db_path: str = "./remex_db",
     collection_name: str = "remex",
     chunk_size: int = 1000,
@@ -644,7 +644,7 @@ def ingest_many(
     verbose: bool = True,
     incremental: bool = False,
     streaming_threshold: int = 50 * 1024 * 1024,
-    on_progress: Optional[Callable[[IngestProgress], None]] = None,
+    on_progress: Callable[[IngestProgress], None] | None = None,
 ) -> IngestResult:
     """
     Ingest a specific list of files into a ChromaDB collection.
@@ -830,7 +830,7 @@ async def ingest_async(
     chunking: str = "word",
     verbose: bool = True,
     streaming_threshold: int = 50 * 1024 * 1024,
-    on_progress: Optional[Callable[[IngestProgress], None]] = None,
+    on_progress: Callable[[IngestProgress], None] | None = None,
 ) -> IngestResult:
     """Async wrapper around :func:`ingest`. Runs in a thread pool so the event
     loop is never blocked. All parameters are identical to :func:`ingest`."""
@@ -857,10 +857,10 @@ async def query_async(
     collection_name: str = "remex",
     n_results: int = 5,
     embedding_model: str = "all-MiniLM-L6-v2",
-    where: Optional[dict] = None,
-    collection_names: Optional[List[str]] = None,
-    min_score: Optional[float] = None,
-) -> List[QueryResult]:
+    where: dict | None = None,
+    collection_names: list[str] | None = None,
+    min_score: float | None = None,
+) -> list[QueryResult]:
     """Async wrapper around :func:`query`. Runs in a thread pool so the event
     loop is never blocked. All parameters are identical to :func:`query`."""
     return await asyncio.to_thread(

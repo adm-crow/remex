@@ -206,8 +206,8 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Synapse — ignore generated DB
-synapse_db/
+# remex — ignore generated DB
+remex_db/
 .python-version
 .vscode/
 
