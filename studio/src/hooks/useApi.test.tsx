@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import {
   useCollections,
@@ -23,7 +24,7 @@ vi.mock("@/api/client", () => ({
 import { api } from "@/api/client";
 
 function wrapper({ children }: { children: ReactNode }) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const [qc] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
 }
 

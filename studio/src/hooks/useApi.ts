@@ -9,7 +9,7 @@ export function useCollections(apiUrl: string, dbPath: string) {
   return useQuery({
     queryKey: ["collections", apiUrl, dbPath],
     queryFn: () => api.getCollections(apiUrl, dbPath),
-    enabled: !!dbPath,
+    enabled: !!apiUrl && !!dbPath,
   });
 }
 
@@ -21,7 +21,7 @@ export function useCollectionStats(
   return useQuery({
     queryKey: ["collectionStats", apiUrl, dbPath, collection],
     queryFn: () => api.getCollectionStats(apiUrl, dbPath, collection),
-    enabled: !!dbPath && !!collection,
+    enabled: !!apiUrl && !!dbPath && !!collection,
   });
 }
 
@@ -33,7 +33,7 @@ export function useSources(
   return useQuery({
     queryKey: ["sources", apiUrl, dbPath, collection],
     queryFn: () => api.getSources(apiUrl, dbPath, collection),
-    enabled: !!dbPath && !!collection,
+    enabled: !!apiUrl && !!dbPath && !!collection,
   });
 }
 
@@ -48,6 +48,7 @@ export function useQueryResults(
     queryKey: ["query", apiUrl, dbPath, collection, text],
     queryFn: () => api.queryCollection(apiUrl, dbPath, collection, { text }),
     enabled:
+      !!apiUrl &&
       !!text &&
       !!dbPath &&
       !!collection &&
@@ -66,6 +67,7 @@ export function useChat(
     queryKey: ["chat", apiUrl, dbPath, collection, text],
     queryFn: () => api.chat(apiUrl, dbPath, collection, { text }),
     enabled:
+      !!apiUrl &&
       !!text &&
       !!dbPath &&
       !!collection &&
