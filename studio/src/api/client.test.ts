@@ -1,10 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { api } from "./client";
 
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
-beforeEach(() => mockFetch.mockReset());
+beforeEach(() => {
+  mockFetch.mockReset();
+  vi.stubGlobal("fetch", mockFetch);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function okJson(data: unknown) {
   return Promise.resolve({
