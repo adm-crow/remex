@@ -46,12 +46,12 @@ export function useSidecar() {
         }
         if (Date.now() > deadline) {
           clearInterval(intervalRef.current!);
-          setSidecarStatus("error");
+          if (!cancelled) setSidecarStatus("error");
           return;
         }
         if (await checkHealth()) {
           clearInterval(intervalRef.current!);
-          setSidecarStatus("connected");
+          if (!cancelled) setSidecarStatus("connected");
         }
       }, POLL_INTERVAL_MS);
     }
