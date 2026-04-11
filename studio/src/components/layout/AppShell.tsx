@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ComponentType } from "react";
 import { Sidebar, type View } from "./Sidebar";
 import { QueryPane } from "@/components/query/QueryPane";
 import { IngestPane } from "@/components/ingest/IngestPane";
@@ -7,17 +8,19 @@ import { SettingsPane } from "@/components/settings/SettingsPane";
 import { useSidecar } from "@/hooks/useSidecar";
 import { useAppStore } from "@/store/app";
 
+const PANE_MAP: Record<View, ComponentType> = {
+  query: QueryPane,
+  ingest: IngestPane,
+  sources: SourcesPane,
+  settings: SettingsPane,
+};
+
 export function AppShell() {
   const [activeView, setActiveView] = useState<View>("query");
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   useSidecar();
 
-  const panes: Record<View, React.ReactNode> = {
-    query: <QueryPane />,
-    ingest: <IngestPane />,
-    sources: <SourcesPane />,
-    settings: <SettingsPane />,
-  };
+  const ActivePane = PANE_MAP[activeView];
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -32,7 +35,7 @@ export function AppShell() {
             remex[api])
           </div>
         )}
-        <div className="flex-1">{panes[activeView]}</div>
+        <div className="flex-1"><ActivePane /></div>
       </main>
     </div>
   );
