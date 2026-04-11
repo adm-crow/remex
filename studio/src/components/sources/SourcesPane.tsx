@@ -40,8 +40,13 @@ export function SourcesPane() {
   );
 
   async function handlePurge() {
-    const res = await purgeMutation.mutateAsync();
-    setPurgeResult({ deleted: res.chunks_deleted, checked: res.chunks_checked });
+    setPurgeResult(null);
+    try {
+      const res = await purgeMutation.mutateAsync();
+      setPurgeResult({ deleted: res.chunks_deleted, checked: res.chunks_checked });
+    } catch {
+      // error is surfaced via purgeMutation.error
+    }
   }
 
   if (isLoading)
@@ -128,8 +133,12 @@ export function SourcesPane() {
             <Button
               variant="destructive"
               onClick={async () => {
-                await deleteMutation.mutateAsync(confirmDelete!);
-                setConfirmDelete(null);
+                try {
+                  await deleteMutation.mutateAsync(confirmDelete!);
+                  setConfirmDelete(null);
+                } catch {
+                  // keep dialog open; error surfaced via deleteMutation.error
+                }
               }}
             >
               Delete
