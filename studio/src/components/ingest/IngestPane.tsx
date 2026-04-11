@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ const STATUS_VARIANT = {
 };
 
 export function IngestPane() {
+  const queryClient = useQueryClient();
   const { apiUrl, currentDb, currentCollection } = useAppStore();
   const [sourcePath, setSourcePath] = useState("");
   const [chunkSize, setChunkSize] = useState(1000);
@@ -79,6 +81,9 @@ export function IngestPane() {
           ]);
         } else if (event.type === "done") {
           setResult(event.result);
+          queryClient.invalidateQueries({
+            queryKey: ["sources", apiUrl, currentDb, currentCollection],
+          });
         } else if (event.type === "error") {
           setStreamError(event.detail);
         }

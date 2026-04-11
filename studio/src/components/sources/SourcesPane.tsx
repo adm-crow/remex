@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -121,6 +122,9 @@ export function SourcesPane() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Remove source</DialogTitle>
+            <DialogDescription>
+              This will remove all ingested chunks for this source from the collection.
+            </DialogDescription>
           </DialogHeader>
           <p className="text-sm">
             Remove all chunks for{" "}
