@@ -177,7 +177,7 @@ export function IngestPane() {
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-1">
           {progress.map((p, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs p-1">
+            <div key={`${p.filename}-${i}`} className="flex items-center gap-2 text-xs p-1">
               <Badge variant={STATUS_VARIANT[p.status]} className="text-xs">
                 {p.status}
               </Badge>
