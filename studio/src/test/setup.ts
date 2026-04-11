@@ -40,3 +40,8 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 vi.mock("@tauri-apps/plugin-opener", () => ({
   openUrl: vi.fn().mockResolvedValue(undefined),
 }));
+
+// Radix UI uses scrollIntoView in Select/Popover; jsdom doesn't implement it
+if (typeof Element.prototype.scrollIntoView === "undefined") {
+  Element.prototype.scrollIntoView = vi.fn();
+}
