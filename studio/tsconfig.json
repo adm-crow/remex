@@ -14,11 +14,9 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     },
-    "ignoreDeprecations": "5.0",
 
     /* Linting */
     "strict": true,
