@@ -98,8 +98,8 @@ export function QueryPane() {
 
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-3">
-          {results.map((r, i) => (
-            <Card key={i}>
+          {results.map((r) => (
+            <Card key={`${r.source}-${r.chunk}`}>
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Badge variant="outline" className="text-xs">
