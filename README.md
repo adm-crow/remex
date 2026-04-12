@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="logo.svg" alt="remex" width="80" /><br/><br/>
+  <img src="logo.svg" alt="remex" width="90" /><br/><br/>
 
   # remex
 
@@ -8,10 +8,13 @@
 
   <br/>
 
-  [![PyPI](https://img.shields.io/pypi/v/remex?style=flat-square&logo=pypi&logoColor=white&color=5C6BC0)](https://pypi.org/project/remex/)
-  [![Python](https://img.shields.io/pypi/pyversions/remex?style=flat-square&logo=python&logoColor=white&color=5C6BC0)](https://pypi.org/project/remex/)
-  [![License](https://img.shields.io/badge/license-Apache%202.0-5C6BC0?style=flat-square)](LICENSE)
-  [![CI](https://img.shields.io/github/check-runs/adm-crow/remex/main?style=flat-square&logo=github&logoColor=white&label=CI)](https://github.com/adm-crow/remex/actions)
+  [![PyPI](https://img.shields.io/pypi/v/remex?style=for-the-badge&logo=pypi&logoColor=white&color=5C6BC0)](https://pypi.org/project/remex/)
+  [![Python](https://img.shields.io/pypi/pyversions/remex?style=for-the-badge&logo=python&logoColor=white&color=3776AB)](https://pypi.org/project/remex/)
+  [![License](https://img.shields.io/badge/License-Apache%202.0-5C6BC0?style=for-the-badge)](LICENSE)
+
+  [![CI](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?branch=main&style=for-the-badge&logo=github&logoColor=white&label=CI)](https://github.com/adm-crow/remex/actions)
+  [![Downloads](https://img.shields.io/pypi/dm/remex?style=for-the-badge&logo=pypi&logoColor=white&color=5C6BC0&label=Downloads)](https://pypi.org/project/remex/)
+  [![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
 
   <br/>
 
