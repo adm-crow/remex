@@ -4,17 +4,19 @@
 
   # remex
 
-  **Local-first RAG — ingest your files, search semantically, answer with AI.**
+  **Search your documents with AI — privately, offline, on your machine.**
 
   <br/>
 
-  [![PyPI](https://img.shields.io/pypi/v/remex?style=for-the-badge&logo=pypi&logoColor=white&color=5C6BC0)](https://pypi.org/project/remex/)
-  [![Python](https://img.shields.io/pypi/pyversions/remex?style=for-the-badge&logo=python&logoColor=white&color=3776AB)](https://pypi.org/project/remex/)
   [![License](https://img.shields.io/badge/License-Apache%202.0-5C6BC0?style=for-the-badge)](LICENSE)
-
   [![CI](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?branch=main&style=for-the-badge&logo=github&logoColor=white&label=CI)](https://github.com/adm-crow/remex/actions)
-  [![Downloads](https://img.shields.io/pypi/dm/remex?style=for-the-badge&logo=pypi&logoColor=white&color=5C6BC0&label=Downloads)](https://pypi.org/project/remex/)
   [![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
+
+  <br/>
+
+  remex turns any folder of documents into a searchable knowledge base.<br/>
+  Point it at your files, ask questions in plain language, and get answers — with sources.<br/>
+  No cloud, no API key, no data leaving your machine.
 
   <br/>
 
