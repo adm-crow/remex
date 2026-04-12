@@ -1,75 +1,115 @@
+import { Search, Upload, Database, Settings } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CollectionSwitcher } from "./CollectionSwitcher";
-import { Separator } from "@/components/ui/separator";
 import { useAppStore } from "@/store/app";
 
-export type View = "query" | "ingest" | "sources" | "settings";
+export type View = "query" | "ingest" | "collections" | "settings";
 
 interface SidebarProps {
   activeView: View;
   onViewChange: (v: View) => void;
+  style?: React.CSSProperties;
 }
 
-const NAV_ITEMS: { view: View; label: string }[] = [
-  { view: "query", label: "Query" },
-  { view: "ingest", label: "Ingest" },
-  { view: "sources", label: "Sources" },
-  { view: "settings", label: "Settings" },
+const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
+  { view: "query",       label: "Query",       icon: Search   },
+  { view: "ingest",      label: "Ingest",      icon: Upload   },
+  { view: "collections", label: "Collections", icon: Database },
+  { view: "settings",    label: "Settings",    icon: Settings },
 ];
 
-export function Sidebar({ activeView, onViewChange }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
   const { currentDb, sidecarStatus } = useAppStore();
 
-  const statusColor =
-    sidecarStatus === "connected"
-      ? "bg-green-500"
-      : sidecarStatus === "starting"
-      ? "bg-amber-500"
-      : "bg-red-500";
-
-  const truncated =
-    currentDb && currentDb.length > 30
-      ? "…" + currentDb.slice(-27)
-      : (currentDb ?? "");
-
   return (
-    <aside className="w-52 shrink-0 flex flex-col border-r bg-muted/30 h-full">
-      <div className="p-3 space-y-2">
-        <p
-          className="text-xs text-muted-foreground truncate"
-          title={currentDb ?? ""}
-          aria-label="Current database"
-        >
-          {truncated}
-        </p>
+    <aside
+      className="shrink-0 flex flex-col bg-sidebar border-r border-sidebar-border h-full overflow-hidden"
+      style={style}
+    >
+      {/* ── Brand ───────────────────────────────────────────────────────── */}
+      <div className="px-4 pt-5 pb-4 flex items-center gap-3 shrink-0">
+        <div className="min-w-0">
+          <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground">
+            Remex Studio
+          </p>
+          {currentDb && (
+            <p
+              className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 font-mono"
+              title={currentDb}
+              aria-label="Current database"
+            >
+              {currentDb}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Collection switcher ─────────────────────────────────────────── */}
+      <div className="px-3 pb-3 shrink-0">
         <CollectionSwitcher />
       </div>
-      <Separator />
-      <nav className="flex flex-col p-2 gap-1 flex-1">
-        {NAV_ITEMS.map(({ view, label }) => (
+
+      {/* ── Separator ───────────────────────────────────────────────────── */}
+      <div className="h-px bg-sidebar-border mx-0 shrink-0" />
+
+      {/* ── Navigation ──────────────────────────────────────────────────── */}
+      <nav className="flex flex-col p-2 gap-0.5 flex-1 mt-1">
+        {NAV_ITEMS.map(({ view, label, icon: Icon }) => (
           <button
             key={view}
             onClick={() => onViewChange(view)}
             className={cn(
-              "text-left text-sm px-3 py-1.5 rounded hover:bg-accent transition-colors",
-              activeView === view && "bg-accent font-medium"
+              "group relative flex items-center gap-3 text-left text-sm px-3 py-2 rounded-md transition-all duration-150 w-full",
+              activeView === view
+                ? "bg-accent text-primary font-medium"
+                : "text-muted-foreground hover:bg-accent/50 hover:text-sidebar-foreground"
             )}
             aria-current={activeView === view ? "page" : undefined}
           >
-            {label}
+            {/* Left accent bar */}
+            <span
+              className={cn(
+                "absolute left-0 inset-y-1.5 w-[3px] rounded-full transition-all duration-200",
+                activeView === view ? "bg-primary opacity-100" : "opacity-0"
+              )}
+            />
+            <Icon
+              className={cn(
+                "w-4 h-4 shrink-0 transition-colors duration-150",
+                activeView === view
+                  ? "text-primary"
+                  : "text-muted-foreground group-hover:text-sidebar-foreground"
+              )}
+            />
+            <span>{label}</span>
           </button>
         ))}
       </nav>
-      <Separator />
-      <div className="p-3 flex items-center gap-2">
+
+      {/* ── Status footer ───────────────────────────────────────────────── */}
+      <div className="h-px bg-sidebar-border mx-0 shrink-0" />
+      <div className="px-4 py-3 flex items-center gap-3 shrink-0">
         <span
-          className={cn("w-2 h-2 rounded-full", statusColor)}
+          className={cn(
+            "size-2 rounded-full shrink-0",
+            sidecarStatus === "connected"
+              ? "bg-emerald-500"
+              : sidecarStatus === "starting"
+              ? "bg-amber-500 animate-pulse-dot"
+              : "bg-red-500"
+          )}
           aria-label={`Server ${sidecarStatus}`}
           title={`Server ${sidecarStatus}`}
         />
-        <span className="text-xs text-muted-foreground capitalize">
-          {sidecarStatus}
-        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-medium capitalize text-sidebar-foreground leading-none">
+            {sidecarStatus}
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-none mt-1">
+            remex serve
+          </p>
+        </div>
       </div>
     </aside>
   );

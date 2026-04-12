@@ -20,7 +20,7 @@ describe("Home", () => {
     render(<Home />);
     expect(screen.getByText("Remex Studio")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /open remex_db folder/i })
+      screen.getByRole("button", { name: /open project folder/i })
     ).toBeInTheDocument();
   });
 
@@ -51,11 +51,24 @@ describe("Home", () => {
     expect(useAppStore.getState().currentDb).toBe("/my/db");
   });
 
+  it("clicking remove button removes project from recent list", () => {
+    useAppStore.setState({
+      recentProjects: [
+        { path: "/my/db", lastOpened: "2026-04-01T00:00:00.000Z" },
+        { path: "/other/db", lastOpened: "2026-04-01T00:00:00.000Z" },
+      ],
+    } as any);
+    render(<Home />);
+    fireEvent.click(screen.getByLabelText("Remove /my/db from recent projects"));
+    expect(useAppStore.getState().recentProjects).toHaveLength(1);
+    expect(useAppStore.getState().recentProjects[0].path).toBe("/other/db");
+  });
+
   it("open button calls dialog.open and sets currentDb on selection", async () => {
     vi.mocked(dialog.open).mockResolvedValue("/selected/db");
     render(<Home />);
     fireEvent.click(
-      screen.getByRole("button", { name: /open remex_db folder/i })
+      screen.getByRole("button", { name: /open project folder/i })
     );
     await waitFor(() => {
       expect(useAppStore.getState().currentDb).toBe("/selected/db");
@@ -66,7 +79,7 @@ describe("Home", () => {
     vi.mocked(dialog.open).mockResolvedValue(null);
     render(<Home />);
     fireEvent.click(
-      screen.getByRole("button", { name: /open remex_db folder/i })
+      screen.getByRole("button", { name: /open project folder/i })
     );
     await waitFor(() => {
       expect(useAppStore.getState().currentDb).toBeNull();

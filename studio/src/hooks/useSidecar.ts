@@ -4,15 +4,33 @@ import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
 
 const POLL_INTERVAL_MS = 2000;
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 60000;
+
+function parseUrl(apiUrl: string): { host: string; port: number } {
+  try {
+    const u = new URL(apiUrl);
+    return {
+      host: u.hostname || "127.0.0.1",
+      port: u.port ? parseInt(u.port) : 8000,
+    };
+  } catch {
+    return { host: "127.0.0.1", port: 8000 };
+  }
+}
 
 export function useSidecar() {
   const apiUrl = useAppStore((s) => s.apiUrl);
   const setSidecarStatus = useAppStore((s) => s.setSidecarStatus);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // True only when this effect run successfully spawned the sidecar.
+  // Used to avoid killing an externally-started server on cleanup
+  // (important in React StrictMode which mounts → unmounts → remounts).
+  const didSpawnRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
+    didSpawnRef.current = false;
+    const { host, port } = parseUrl(apiUrl);
 
     async function checkHealth(): Promise<boolean> {
       try {
@@ -32,7 +50,8 @@ export function useSidecar() {
       }
 
       try {
-        await invoke("spawn_sidecar");
+        await invoke("spawn_sidecar", { host, port });
+        didSpawnRef.current = true;
       } catch {
         if (!cancelled) setSidecarStatus("error");
         return;
@@ -49,6 +68,13 @@ export function useSidecar() {
           if (!cancelled) setSidecarStatus("error");
           return;
         }
+        // Bail fast if the process has already died
+        const alive = await invoke<boolean>("is_sidecar_alive").catch(() => false);
+        if (!alive) {
+          clearInterval(intervalRef.current!);
+          if (!cancelled) setSidecarStatus("error");
+          return;
+        }
         if (await checkHealth()) {
           clearInterval(intervalRef.current!);
           if (!cancelled) setSidecarStatus("connected");
@@ -61,6 +87,13 @@ export function useSidecar() {
     return () => {
       cancelled = true;
       if (intervalRef.current) clearInterval(intervalRef.current);
+      // Only kill the sidecar if we spawned it — not if we found an
+      // already-running external server (avoids killing it on React
+      // StrictMode's double-mount or on unrelated re-renders).
+      if (didSpawnRef.current) {
+        didSpawnRef.current = false;
+        invoke("kill_sidecar").catch(() => {});
+      }
     };
   }, [apiUrl, setSidecarStatus]);
 }

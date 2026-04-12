@@ -44,15 +44,16 @@ def generate_answer(
     context: str,
     provider: str,
     model: Optional[str] = None,
+    api_key: Optional[str] = None,
 ) -> str:
     """Generate an answer using the specified provider and model."""
     model = model or DEFAULT_MODELS.get(provider, "")
     system = _SYSTEM_PROMPT.format(context=context)
 
     if provider == "anthropic":
-        return _answer_anthropic(question, system, model)
+        return _answer_anthropic(question, system, model, api_key=api_key)
     if provider == "openai":
-        return _answer_openai(question, system, model)
+        return _answer_openai(question, system, model, api_key=api_key)
     if provider == "ollama":
         return _answer_ollama(question, system, model)
 
@@ -64,38 +65,58 @@ def generate_answer(
 # ── providers ────────────────────────────────────────────────────────────────
 
 
-def _answer_anthropic(question: str, system: str, model: str) -> str:
+def _answer_anthropic(
+    question: str, system: str, model: str, api_key: Optional[str] = None
+) -> str:
     try:
         import anthropic  # type: ignore[import-untyped]
         from anthropic.types import TextBlock  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError("Anthropic SDK not installed. Run: pip install anthropic")
-    client = anthropic.Anthropic()
-    response = client.messages.create(
-        model=model,
-        max_tokens=1024,
-        system=system,
-        messages=[{"role": "user", "content": question}],
-    )
+    key = api_key or os.getenv("ANTHROPIC_API_KEY")
+    if not key:
+        raise ValueError(
+            "No Anthropic API key provided. Add one in Settings → AI Agent or set ANTHROPIC_API_KEY."
+        )
+    client = anthropic.Anthropic(api_key=key)
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            system=system,
+            messages=[{"role": "user", "content": question}],
+        )
+    except Exception as e:
+        raise RuntimeError(f"Anthropic API error: {e}") from e
     text_block = next((b for b in response.content if isinstance(b, TextBlock)), None)
     if text_block is None:
         raise RuntimeError("Anthropic response contained no text block.")
     return text_block.text
 
 
-def _answer_openai(question: str, system: str, model: str) -> str:
+def _answer_openai(
+    question: str, system: str, model: str, api_key: Optional[str] = None
+) -> str:
     try:
         import openai  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError("OpenAI SDK not installed. Run: pip install openai")
-    client = openai.OpenAI()
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": question},
-        ],
-    )
+    key = api_key or os.getenv("OPENAI_API_KEY")
+    if not key:
+        raise ValueError(
+            "No OpenAI API key provided. Add one in Settings → AI Agent or set OPENAI_API_KEY."
+        )
+    client = openai.OpenAI(api_key=key)
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": question},
+            ],
+        )
+    except Exception as e:
+        raise RuntimeError(f"OpenAI API error: {e}") from e
     return response.choices[0].message.content or ""
 
 

@@ -48,7 +48,7 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
     if not results:
         raise HTTPException(status_code=404, detail="No relevant chunks found in this collection.")
 
-    provider = req.provider or detect_provider()
+    provider = req.provider or await asyncio.to_thread(detect_provider)
     if not provider:
         raise HTTPException(
             status_code=422,
@@ -65,8 +65,11 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
             context=context,
             provider=provider,
             model=resolved_model,
+            api_key=req.api_key or None,
         )
     except (ImportError, RuntimeError, ValueError) as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
     return ChatResponse(

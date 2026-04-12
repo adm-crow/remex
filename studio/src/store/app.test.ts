@@ -45,6 +45,15 @@ describe("useAppStore", () => {
     expect(recentProjects[0].path).toBe("/path/a");
   });
 
+  it("removeRecentProject removes the matching entry", () => {
+    useAppStore.getState().addRecentProject("/path/a");
+    useAppStore.getState().addRecentProject("/path/b");
+    useAppStore.getState().removeRecentProject("/path/a");
+    const { recentProjects } = useAppStore.getState();
+    expect(recentProjects).toHaveLength(1);
+    expect(recentProjects[0].path).toBe("/path/b");
+  });
+
   it("setApiUrl updates apiUrl", () => {
     useAppStore.getState().setApiUrl("http://localhost:9000");
     expect(useAppStore.getState().apiUrl).toBe("http://localhost:9000");

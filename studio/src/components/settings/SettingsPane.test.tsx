@@ -27,7 +27,7 @@ describe("SettingsPane", () => {
     renderWithProviders(<SettingsPane />);
     const input = screen.getByRole("textbox", { name: /api url/i });
     fireEvent.change(input, { target: { value: "http://localhost:9000" } });
-    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    fireEvent.submit(input.closest("form")!);
     expect(useAppStore.getState().apiUrl).toBe("http://localhost:9000");
   });
 
@@ -35,7 +35,7 @@ describe("SettingsPane", () => {
     renderWithProviders(<SettingsPane />);
     const input = screen.getByRole("textbox", { name: /api url/i });
     fireEvent.change(input, { target: { value: "   " } });
-    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+    fireEvent.submit(input.closest("form")!);
     expect(useAppStore.getState().apiUrl).toBe("http://localhost:8000");
   });
 

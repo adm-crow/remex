@@ -66,7 +66,7 @@ export function CollectionSwitcher() {
         }
       }}
     >
-      <SelectTrigger className="h-7 text-xs" aria-label="Collection">
+      <SelectTrigger className="h-7 text-xs w-full" aria-label="Collection">
         <SelectValue placeholder="Select collection…" />
       </SelectTrigger>
       <SelectContent>

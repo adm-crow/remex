@@ -62,7 +62,7 @@ describe("Sidebar", () => {
     );
     expect(screen.getByText("Query")).toBeInTheDocument();
     expect(screen.getByText("Ingest")).toBeInTheDocument();
-    expect(screen.getByText("Sources")).toBeInTheDocument();
+    expect(screen.getByText("Collections")).toBeInTheDocument();
     expect(screen.getByText("Settings")).toBeInTheDocument();
   });
 

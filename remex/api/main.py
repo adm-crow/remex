@@ -1,5 +1,6 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from remex.core import __version__
 from remex.api.routes import collections, ingest, query, system
@@ -26,6 +27,16 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
+        """Catch-all: ensures every error returns JSON with CORS headers."""
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc)},
+        )
 
     app.include_router(system.router)
     app.include_router(collections.router)

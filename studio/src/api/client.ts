@@ -51,6 +51,7 @@ export interface QueryRequest {
 export interface ChatRequest extends QueryRequest {
   provider?: string;
   model?: string;
+  api_key?: string;
 }
 
 export interface IngestRequest {
@@ -99,10 +100,24 @@ export type IngestStreamEvent =
 // ---- Internal fetch helper ----
 
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = init !== undefined ? await fetch(url, init) : await fetch(url);
+  let res: Response;
+  try {
+    res = await (init !== undefined ? fetch(url, init) : fetch(url));
+  } catch (e) {
+    throw new Error(
+      `Cannot reach the server at ${url.replace(/\/[^/]+$/, "")}. ` +
+      `Make sure 'remex serve' is running. (${e instanceof Error ? e.message : String(e)})`
+    );
+  }
   if (!res.ok) {
     const detail = await res.text();
-    throw new Error(`${res.status}: ${detail}`);
+    let message: string;
+    try {
+      message = (JSON.parse(detail) as { detail?: string }).detail ?? detail;
+    } catch {
+      message = detail;
+    }
+    throw new Error(`${res.status}: ${message}`);
   }
   return res.json() as Promise<T>;
 }

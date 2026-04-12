@@ -54,6 +54,7 @@ class ChatRequest(BaseModel):
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     provider: Optional[str] = None
     model: Optional[str] = None
+    api_key: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

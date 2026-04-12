@@ -4,6 +4,20 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [0.3.0] — 2026-04-12
+
+### Added
+- **Remex Studio** — native desktop app (Tauri v2 + React 19 + TypeScript)
+  - Visual ingest with live progress, streaming SSE, and embedding model picker
+  - Query panel with semantic search, min-score filter, and AI Answer (markdown rendered)
+  - Collections panel — stats, sources list, delete source, purge, reset
+  - Settings panel — API server URL, dark mode, accent colour, AI provider/model/key
+  - Automatic sidecar management — spawns `remex serve` on startup, restarts on URL change
+- **API additions for Studio** — `api_key` field on `/chat` endpoint forwarded to AI providers; catch-all exception handler ensures CORS headers on all error responses; `detect_provider()` runs off the async event loop to avoid blocking
+- **`remex serve --host / --port`** — explicit bind address flags, used by the Studio sidecar
+
+---
+
 ## [0.2.0] — 2026-04-09
 
 ### Changed

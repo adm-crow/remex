@@ -7,9 +7,10 @@ import { useAppStore } from "@/store/app";
 vi.mock("@/hooks/useApi", () => ({
   useQueryResults: vi.fn(),
   useChat: vi.fn(),
+  useCollections: vi.fn(),
 }));
 
-import { useQueryResults, useChat } from "@/hooks/useApi";
+import { useQueryResults, useChat, useCollections } from "@/hooks/useApi";
 
 const mockResults = [
   {
@@ -32,6 +33,11 @@ beforeEach(() => {
     currentCollection: "myCol",
     apiUrl: "http://localhost:8000",
     sidecarStatus: "connected",
+  } as any);
+  vi.mocked(useCollections).mockReturnValue({
+    data: ["myCol"],
+    isLoading: false,
+    error: null,
   } as any);
   vi.mocked(useQueryResults).mockReturnValue({
     data: undefined,
@@ -87,7 +93,7 @@ describe("QueryPane", () => {
     fireEvent.submit(input.closest("form")!);
     await waitFor(() => {
       expect(screen.getByText("Remex is a RAG tool.")).toBeInTheDocument();
-      expect(screen.getByText(/anthropic \/ claude-opus-4-6/i)).toBeInTheDocument();
+      expect(screen.getByText(/anthropic.*claude-opus-4-6/i)).toBeInTheDocument();
     });
   });
 

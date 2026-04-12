@@ -6,18 +6,31 @@ export interface RecentProject {
   lastOpened: string;
 }
 
+export type Theme = "default" | "blue" | "purple" | "green" | "rose" | "amber" | "teal" | "coral";
+
 export interface AppState {
   currentDb: string | null;
   currentCollection: string | null;
   recentProjects: RecentProject[];
   apiUrl: string;
   sidecarStatus: "starting" | "connected" | "error";
+  darkMode: boolean;
+  theme: Theme;
+  aiProvider: string;
+  aiModel: string;
+  aiApiKey: string;
   // Actions
   setCurrentDb: (db: string | null) => void;
   setCurrentCollection: (col: string | null) => void;
   addRecentProject: (path: string) => void;
+  removeRecentProject: (path: string) => void;
   setApiUrl: (url: string) => void;
   setSidecarStatus: (status: AppState["sidecarStatus"]) => void;
+  setDarkMode: (dark: boolean) => void;
+  setTheme: (theme: Theme) => void;
+  setAiProvider: (provider: string) => void;
+  setAiModel: (model: string) => void;
+  setAiApiKey: (key: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -28,6 +41,11 @@ export const useAppStore = create<AppState>()(
       recentProjects: [],
       apiUrl: "http://localhost:8000",
       sidecarStatus: "starting",
+      darkMode: false,
+      theme: "default",
+      aiProvider: "",
+      aiModel: "",
+      aiApiKey: "",
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -42,15 +60,30 @@ export const useAppStore = create<AppState>()(
         });
       },
 
+      removeRecentProject: (path) => {
+        set({
+          recentProjects: get().recentProjects.filter((p) => p.path !== path),
+        });
+      },
+
       setApiUrl: (url) => set({ apiUrl: url }),
       setSidecarStatus: (status) => set({ sidecarStatus: status }),
+      setDarkMode: (dark) => set({ darkMode: dark }),
+      setTheme: (theme) => set({ theme }),
+      setAiProvider: (provider) => set({ aiProvider: provider }),
+      setAiModel: (model) => set({ aiModel: model }),
+      setAiApiKey: (key) => set({ aiApiKey: key }),
     }),
     {
       name: "remex-studio",
-      // Only persist user preferences — runtime state resets each launch
       partialize: (state) => ({
         recentProjects: state.recentProjects,
         apiUrl: state.apiUrl,
+        darkMode: state.darkMode,
+        theme: state.theme,
+        aiProvider: state.aiProvider,
+        aiModel: state.aiModel,
+        aiApiKey: state.aiApiKey,
       }),
     }
   )

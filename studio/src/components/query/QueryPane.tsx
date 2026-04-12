@@ -1,34 +1,51 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { Search, Sparkles, Info, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useQueryResults, useChat } from "@/hooks/useApi";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useQueryResults, useChat, useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
+import { cn } from "@/lib/utils";
 
 export function QueryPane() {
+  const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey } =
+    useAppStore();
+
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [useAi, setUseAi] = useState(false);
-  const { apiUrl, currentDb, currentCollection } = useAppStore();
+  const [nResults, setNResults] = useState(5);
+  const [minScore, setMinScore] = useState(0);
+  const [selectedCollection, setSelectedCollection] = useState(
+    currentCollection ?? ""
+  );
+
+  const { data: collections = [] } = useCollections(apiUrl, currentDb ?? "");
+  const activeCollection = selectedCollection || currentCollection || "";
 
   const queryResult = useQueryResults(
-    apiUrl,
-    currentDb ?? "",
-    currentCollection ?? "",
-    submitted,
-    { enabled: !!submitted && !useAi }
+    apiUrl, currentDb ?? "", activeCollection, submitted,
+    { enabled: !!submitted && !useAi, n_results: nResults,
+      min_score: minScore > 0 ? minScore : undefined }
   );
   const chatResult = useChat(
-    apiUrl,
-    currentDb ?? "",
-    currentCollection ?? "",
-    submitted,
-    { enabled: !!submitted && useAi }
+    apiUrl, currentDb ?? "", activeCollection, submitted,
+    { enabled: !!submitted && useAi, n_results: nResults,
+      min_score: minScore > 0 ? minScore : undefined,
+      provider: aiProvider || undefined, model: aiModel || undefined,
+      api_key: aiApiKey || undefined }
   );
 
   function handleSubmit(e: FormEvent) {
@@ -36,88 +53,211 @@ export function QueryPane() {
     if (text.trim()) setSubmitted(text.trim());
   }
 
-  const results = useAi
-    ? (chatResult.data?.sources ?? [])
-    : (queryResult.data ?? []);
+  const results = useAi ? (chatResult.data?.sources ?? []) : (queryResult.data ?? []);
   const isLoading = useAi ? chatResult.isLoading : queryResult.isLoading;
   const error = useAi ? chatResult.error : queryResult.error;
 
   return (
-    <div className="flex flex-col h-full p-6 gap-4">
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <Input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Ask a question…"
-          className="flex-1"
-          aria-label="Query input"
-        />
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? "Searching…" : "Search"}
-        </Button>
-      </form>
+    <div className="flex flex-col h-full">
 
-      <div className="flex items-center gap-2">
-        <Switch
-          id="ai-toggle"
-          checked={useAi}
-          onCheckedChange={setUseAi}
-          aria-label="AI answer toggle"
-        />
-        <Label htmlFor="ai-toggle">AI answer</Label>
+      {/* ── Search area ─────────────────────────────────────────────────── */}
+      <div className="px-6 pt-5 pb-4 border-b shrink-0 space-y-3">
+
+        {/* Search input — dominant, full width */}
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Ask a question or search your documents…"
+              className="pl-9 h-10"
+              aria-label="Query input"
+            />
+          </div>
+          <Button
+            type="submit"
+            disabled={isLoading || !activeCollection}
+            className="h-10 px-5 shrink-0"
+          >
+            {isLoading ? "Searching…" : "Search"}
+          </Button>
+        </form>
+
+        {/* Collection — full width, prominent */}
+        <Select value={selectedCollection} onValueChange={setSelectedCollection}>
+          <SelectTrigger className="h-9 w-full text-sm" aria-label="Collection">
+            <SelectValue placeholder={currentCollection ?? "Select a collection…"} />
+          </SelectTrigger>
+          <SelectContent>
+            {collections.map((c) => (
+              <SelectItem key={c} value={c}>{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Options strip — compact, secondary */}
+        <div className="flex items-center gap-3">
+
+          {/* Results count */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Results</span>
+            <Input
+              type="number" min={1} max={50}
+              value={nResults}
+              onChange={(e) => setNResults(Math.max(1, Number(e.target.value)))}
+              className="h-7 w-14 text-xs text-center px-1"
+              aria-label="Max results"
+            />
+          </div>
+
+          {/* Min score */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground whitespace-nowrap">Min score</span>
+            <Input
+              id="min-score"
+              type="number" min={0} max={1} step={0.05}
+              value={minScore}
+              onChange={(e) => setMinScore(Number(e.target.value))}
+              className="h-7 w-16 text-xs text-center px-1"
+            />
+          </div>
+
+          <div className="flex-1" />
+
+          {/* AI toggle */}
+          <div className="flex items-center gap-2">
+            <Switch
+              id="ai-toggle"
+              checked={useAi}
+              onCheckedChange={setUseAi}
+              aria-label="AI answer toggle"
+            />
+            <Label
+              htmlFor="ai-toggle"
+              className="text-xs flex items-center gap-1.5 cursor-pointer select-none"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              AI Answer
+            </Label>
+          </div>
+        </div>
+
+        {/* AI Agent notice — shown below the strip when toggle is on but not configured */}
+        {useAi && !aiProvider && !aiModel && (
+          <div className="flex items-center gap-1.5 text-[11px] text-amber-500 dark:text-amber-400">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            AI Answer requires a provider and model — configure them in{" "}
+            <strong className="font-medium">Settings → AI Agent</strong>.
+          </div>
+        )}
       </div>
 
+      {/* ── Error ────────────────────────────────────────────────────────── */}
       {error && (
         <div
-          className="text-destructive text-sm p-3 border border-destructive rounded"
+          className="mx-6 mt-4 shrink-0 text-destructive text-sm p-3 border border-destructive/30 rounded-md bg-destructive/5"
           role="alert"
         >
           {error.message}
         </div>
       )}
 
-      {useAi && chatResult.data && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Answer</CardTitle>
-            <Badge variant="secondary" className="w-fit text-xs">
-              {chatResult.data.provider} / {chatResult.data.model}
-            </Badge>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">
-              {chatResult.data.answer}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* ── Scrollable body ──────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="px-6 py-4 space-y-4">
 
-      {!isLoading && submitted && results.length === 0 && !error && (
-        <p className="text-muted-foreground text-sm">No results found.</p>
-      )}
+          {/* AI answer — loading */}
+          {useAi && chatResult.isLoading && (
+            <div className="rounded-lg border border-primary/25 bg-primary/8 p-4 flex items-center gap-3">
+              <Loader2 className="w-4 h-4 text-primary shrink-0 animate-spin" />
+              <span className="text-sm text-muted-foreground">Generating answer…</span>
+            </div>
+          )}
 
-      <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-3">
-          {results.map((r) => (
-            <Card key={`${r.source}-${r.chunk}`}>
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <Badge variant="outline" className="text-xs">
+          {/* AI answer — result */}
+          {useAi && chatResult.data && (
+            <div className="rounded-lg border border-primary/25 bg-primary/8 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary shrink-0" />
+                <span className="text-sm font-semibold">AI Answer</span>
+                <Badge variant="secondary" className="text-xs ml-auto font-mono">
+                  {chatResult.data.provider} · {chatResult.data.model}
+                </Badge>
+              </div>
+              <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed
+                [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2 [&>ul]:pl-4 [&>ol]:pl-4
+                [&>h1]:text-base [&>h2]:text-sm [&>h3]:text-sm
+                [&>pre]:bg-muted [&>pre]:p-2 [&>pre]:rounded [&>pre]:overflow-x-auto
+                [&>code]:bg-muted [&>code]:px-1 [&>code]:rounded [&>code]:text-xs">
+                <ReactMarkdown>{chatResult.data.answer}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+
+          {/* Results header */}
+          {!isLoading && submitted && results.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                {useAi ? "Sources" : "Results"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {results.length}
+              </span>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!isLoading && submitted && results.length === 0 && !error && (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Search className="w-8 h-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm text-muted-foreground">No results found.</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Try different search terms or a lower min-score.
+              </p>
+            </div>
+          )}
+
+          {/* Result cards */}
+          <div className="flex flex-col gap-2">
+            {results.map((r) => (
+              <div
+                key={`${r.source}-${r.chunk}`}
+                className={cn(
+                  "rounded-lg border bg-card p-4 space-y-2.5 transition-all duration-150",
+                  "hover:border-primary/30 hover:shadow-sm hover:shadow-primary/5"
+                )}
+              >
+                {/* Card meta row */}
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="font-mono text-xs font-semibold tabular-nums px-1.5 py-0.5 rounded bg-primary/12 text-primary shrink-0">
                     {r.score.toFixed(3)}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
+                  </span>
+                  {r.doc_title && (
+                    <span className="text-xs font-semibold truncate">
+                      {r.doc_title}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground font-mono truncate flex-1 min-w-0">
                     {r.source}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    chunk {r.chunk}
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    #{r.chunk}
                   </span>
                 </div>
-                <p className="text-sm">{r.text.slice(0, 200)}</p>
-              </CardContent>
-            </Card>
-          ))}
+                {/* Excerpt */}
+                <p className="text-sm leading-relaxed text-foreground">
+                  {r.text.slice(0, 300)}
+                  {r.text.length > 300 && (
+                    <span className="text-muted-foreground">…</span>
+                  )}
+                </p>
+              </div>
+            ))}
+          </div>
+
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
