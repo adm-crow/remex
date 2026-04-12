@@ -55,95 +55,103 @@ export function Home() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen px-8 gap-10">
+    <div className="flex flex-col h-screen overflow-hidden px-8">
 
-      {/* ── Brand ─────────────────────────────────────────────────────── */}
-      <div className="flex flex-col items-center gap-3 text-center">
-        <img
-          src="/remex.svg"
-          alt="remex"
-          className="w-14 h-14 drop-shadow-sm select-none"
-          draggable={false}
-        />
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Remex Studio</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Local-first RAG — ingest files, search semantically, answer with AI.
-          </p>
-        </div>
-      </div>
+      {/* ── Main content — centered in upper portion ───────────────────── */}
+      <div className="flex-1 flex flex-col items-center justify-center gap-10 min-h-0">
 
-      {/* ── Feature pills ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-3 w-full max-w-lg">
-        {FEATURES.map(({ icon: Icon, label, desc }) => (
-          <div
-            key={label}
-            className="flex flex-col items-center gap-1.5 rounded-xl border bg-card px-3 py-3 text-center"
-          >
-            <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-              <Icon className="w-3.5 h-3.5 text-primary" />
-            </div>
-            <p className="text-xs font-semibold leading-none">{label}</p>
-            <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>
+        {/* ── Brand ───────────────────────────────────────────────────── */}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <img
+            src="/remex.svg"
+            alt="remex"
+            className="w-14 h-14 drop-shadow-sm select-none"
+            draggable={false}
+          />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Remex Studio</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Search your documents with AI — privately, offline, on your machine.
+            </p>
           </div>
-        ))}
-      </div>
+        </div>
 
-      {/* ── Open button ───────────────────────────────────────────────── */}
-      <Button onClick={handleOpen} size="lg" className="px-8 gap-2">
-        <FolderOpen className="w-4 h-4" />
-        Open project folder
-      </Button>
-
-      {/* ── Recent projects ───────────────────────────────────────────── */}
-      {recentProjects.length > 0 && (
-        <div className="w-full max-w-sm space-y-2">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest px-1">
-            Recent
-          </p>
-          <div className="space-y-1">
-            {recentProjects.map((p) => (
-              <div
-                key={p.path}
-                className={cn(
-                  "group flex items-center gap-2 rounded-lg border bg-card",
-                  "hover:border-primary/30 hover:bg-accent/40 transition-all duration-150"
-                )}
-              >
-                <button
-                  className="flex-1 text-left px-3 py-2.5 min-w-0"
-                  onClick={() => handleRecent(p.path)}
-                  aria-label={`Open ${p.path}`}
-                >
-                  <p className="text-xs font-mono truncate">{p.path}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {new Date(p.lastOpened).toLocaleDateString(undefined, {
-                      year: "numeric",
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </p>
-                </button>
-                <button
-                  className={cn(
-                    "shrink-0 mr-2 p-1.5 rounded-md text-muted-foreground",
-                    "opacity-0 group-hover:opacity-100",
-                    "hover:bg-destructive/10 hover:text-destructive transition-all duration-100"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeRecentProject(p.path);
-                  }}
-                  aria-label={`Remove ${p.path} from recent projects`}
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+        {/* ── Feature pills ───────────────────────────────────────────── */}
+        <div className="grid grid-cols-4 gap-3 w-full max-w-lg">
+          {FEATURES.map(({ icon: Icon, label, desc }) => (
+            <div
+              key={label}
+              className="flex flex-col items-center gap-1.5 rounded-xl border bg-card px-3 py-3 text-center"
+            >
+              <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="w-3.5 h-3.5 text-primary" />
               </div>
-            ))}
-          </div>
+              <p className="text-xs font-semibold leading-none">{label}</p>
+              <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>
+            </div>
+          ))}
         </div>
-      )}
+
+        {/* ── Open button ─────────────────────────────────────────────── */}
+        <Button onClick={handleOpen} size="lg" className="px-8 gap-2">
+          <FolderOpen className="w-4 h-4" />
+          Open project folder
+        </Button>
+
+      </div>
+
+      {/* ── Recent projects — reserved slot at bottom, scrollable ──────── */}
+      <div className="shrink-0 h-48 flex flex-col justify-end pb-5">
+        {recentProjects.length > 0 && (
+          <div className="w-full max-w-sm mx-auto space-y-2 overflow-y-auto max-h-full">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest px-1">
+              Recent
+            </p>
+            <div className="space-y-1">
+              {recentProjects.map((p) => (
+                <div
+                  key={p.path}
+                  className={cn(
+                    "group flex items-center gap-2 rounded-lg border bg-card",
+                    "hover:border-primary/30 hover:bg-accent/40 transition-all duration-150"
+                  )}
+                >
+                  <button
+                    className="flex-1 text-left px-3 py-2.5 min-w-0"
+                    onClick={() => handleRecent(p.path)}
+                    aria-label={`Open ${p.path}`}
+                  >
+                    <p className="text-xs font-mono truncate">{p.path}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {new Date(p.lastOpened).toLocaleDateString(undefined, {
+                        year: "numeric",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </button>
+                  <button
+                    className={cn(
+                      "shrink-0 mr-2 p-1.5 rounded-md text-muted-foreground",
+                      "opacity-0 group-hover:opacity-100",
+                      "hover:bg-destructive/10 hover:text-destructive transition-all duration-100"
+                    )}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeRecentProject(p.path);
+                    }}
+                    aria-label={`Remove ${p.path} from recent projects`}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
     </div>
   );
 }
+
