@@ -14,45 +14,21 @@
 
   <br/>
 
-  remex turns any folder of documents into a searchable knowledge base.<br/>
-  Point it at your files, ask questions in plain language, and get answers — with sources.<br/>
-  No cloud, no API key, no data leaving your machine.
-
-  <br/>
-
   <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio" width="720" />
 
 </div>
 
-<br/>
+---
+
+remex is a local-first knowledge base for your documents. Point it at any folder — PDFs, notes, code, spreadsheets — and it becomes instantly searchable using natural language. Ask questions and get answers backed by the exact sources in your files, with no data ever leaving your machine.
+
+It comes as a **native desktop app** for everyday use and a **CLI** for automation and scripting. Both run entirely offline, require no cloud account, and work with any AI provider you already have — Anthropic, OpenAI, or a local Ollama instance.
 
 ---
 
 ## Remex Studio
 
-A native desktop app to ingest, search, and query your documents with AI — entirely on your machine, no cloud required.
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <img src="docs/screenshots/remex_ingest.png" alt="Ingest" width="340" /><br/>
-        <sub>Ingest — pick a folder, watch live progress</sub>
-      </td>
-      <td align="center">
-        <img src="docs/screenshots/remex_collection.png" alt="Collections" width="340" /><br/>
-        <sub>Collections — stats, sources, manage</sub>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <img src="docs/screenshots/remex_settings.png" alt="Settings" width="340" /><br/>
-        <sub>Settings — API server, AI provider, theme</sub>
-      </td>
-      <td></td>
-    </tr>
-  </table>
-</div>
+A native desktop app to ingest, search, and query your documents with AI.
 
 ### Install
 
