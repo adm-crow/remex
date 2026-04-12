@@ -27,7 +27,34 @@ Point remex at a folder — or a SQLite database — and semantically search you
 
 Remex Studio is a native desktop app for ingesting, searching, and querying your documents with AI — all running locally.
 
-**Panels:**
+<div align="center">
+  <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio — home" width="700" />
+</div>
+
+<br/>
+
+<div align="center">
+  <table>
+    <tr>
+      <td><img src="docs/screenshots/remex_ingest.png" alt="Ingest panel" width="340" /></td>
+      <td><img src="docs/screenshots/remex_collection.png" alt="Collections panel" width="340" /></td>
+    </tr>
+    <tr>
+      <td align="center"><sub>Ingest — live progress, embedding model picker</sub></td>
+      <td align="center"><sub>Collections — stats, sources, manage</sub></td>
+    </tr>
+    <tr>
+      <td><img src="docs/screenshots/remex_settings.png" alt="Settings panel" width="340" /></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td align="center"><sub>Settings — API server, AI provider, theme</sub></td>
+      <td></td>
+    </tr>
+  </table>
+</div>
+
+<br/>
 
 | Panel | What it does |
 |:------|:-------------|
@@ -36,7 +63,7 @@ Remex Studio is a native desktop app for ingesting, searching, and querying your
 | **Collections** | Browse collections, view stats, manage sources (delete, purge, reset). |
 | **Settings** | API server URL, AI provider / model / key, dark mode, accent colour. |
 
-**How it works:** Studio automatically spawns `remex serve` in the background when it starts. You can also point it at a manually-started server via **Settings → API Server**.
+Studio automatically spawns `remex serve` in the background when it starts. You can also point it at a manually-started server via **Settings → API Server**.
 
 ### Install
 
@@ -46,7 +73,7 @@ Remex Studio is a native desktop app for ingesting, searching, and querying your
 pip install "remex[api]"
 ```
 
-Then download and run the Remex Studio app for your platform.
+Then download and run the Remex Studio installer for your platform.
 
 > **Building from source:** see [`studio/README.md`](studio/README.md).
 

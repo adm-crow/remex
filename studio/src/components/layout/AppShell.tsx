@@ -5,7 +5,6 @@ import { QueryPane } from "@/components/query/QueryPane";
 import { IngestPane } from "@/components/ingest/IngestPane";
 import { SourcesPane } from "@/components/sources/SourcesPane";
 import { SettingsPane } from "@/components/settings/SettingsPane";
-import { useSidecar } from "@/hooks/useSidecar";
 import { useAppStore } from "@/store/app";
 
 const PANE_MAP: Record<View, ComponentType> = {
@@ -24,7 +23,6 @@ export function AppShell() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const isDragging = useRef(false);
-  useSidecar();
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

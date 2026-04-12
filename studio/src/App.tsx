@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppStore } from "@/store/app";
 import { Home } from "@/pages/Home";
 import { AppShell } from "@/components/layout/AppShell";
+import { useSidecar } from "@/hooks/useSidecar";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,6 +18,7 @@ export function App() {
   const currentDb = useAppStore((s) => s.currentDb);
   const darkMode = useAppStore((s) => s.darkMode);
   const theme = useAppStore((s) => s.theme);
+  useSidecar();
 
   useEffect(() => {
     const html = document.documentElement;
