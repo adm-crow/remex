@@ -215,5 +215,8 @@ chroma.sqlite3
 # Claude Code
 .claude/
 
+# Superpowers brainstorming sessions
+.superpowers/
+
 # Git worktrees
 .worktrees/
