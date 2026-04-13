@@ -1,3 +1,4 @@
+import sqlite3
 from fastapi import APIRouter, HTTPException, Query
 from remex.core import collection_stats, delete_source, list_collections, purge, reset, sources
 from remex.core.exceptions import CollectionNotFoundError, RemexError
@@ -6,6 +7,7 @@ from remex.api.schemas import (
     DeletedChunksResponse,
     DeletedResponse,
     PurgeResultResponse,
+    SQLiteTablesResponse,
 )
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -14,6 +16,22 @@ router = APIRouter(prefix="/collections", tags=["collections"])
 @router.get("", response_model=list[str])
 def get_collections(db_path: str = Query(default="./remex_db")) -> list[str]:
     return list_collections(db_path=db_path)
+
+
+@router.get("/sqlite/tables", response_model=SQLiteTablesResponse)
+def list_sqlite_tables(
+    path: str = Query(..., description="Absolute path to the SQLite file"),
+) -> SQLiteTablesResponse:
+    try:
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        cursor = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        )
+        tables = [row[0] for row in cursor.fetchall()]
+        conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Cannot read SQLite file: {e}")
+    return SQLiteTablesResponse(tables=tables)
 
 
 @router.get("/{collection}/stats", response_model=CollectionStatsResponse)

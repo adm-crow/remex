@@ -126,3 +126,7 @@ class DeletedResponse(BaseModel):
 
 class DeletedChunksResponse(BaseModel):
     deleted_chunks: int
+
+
+class SQLiteTablesResponse(BaseModel):
+    tables: list[str]
