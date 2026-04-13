@@ -4,7 +4,7 @@ import {
   useQueryClient,
   useQueries,
 } from "@tanstack/react-query";
-import { api } from "@/api/client";
+import { api, type QueryResultItem } from "@/api/client";
 
 export function useCollections(apiUrl: string, dbPath: string) {
   return useQuery({
@@ -88,7 +88,7 @@ export function useMultiQueryResults(
   collections: string[],
   text: string,
   options?: QueryOptions
-) {
+): { data: QueryResultItem[]; isLoading: boolean; error: Error | null } {
   const results = useQueries({
     queries: collections.map((col) => ({
       queryKey: [
@@ -111,7 +111,7 @@ export function useMultiQueryResults(
       .flatMap((r) => r.data ?? [])
       .sort((a, b) => b.score - a.score),
     isLoading: results.some((r) => r.isLoading),
-    error: results.find((r) => r.error)?.error ?? null,
+    error: results.find((r) => r.error)?.error ?? null, // first error wins; others are dropped
   };
 }
 
