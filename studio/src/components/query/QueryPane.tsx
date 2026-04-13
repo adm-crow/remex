@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { useQueryResults, useChat, useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
-import { cn } from "@/lib/utils";
+import { ResultCard } from "./ResultCard";
 
 export function QueryPane() {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey } =
@@ -221,38 +221,7 @@ export function QueryPane() {
           {/* Result cards */}
           <div className="flex flex-col gap-2">
             {results.map((r) => (
-              <div
-                key={`${r.source}-${r.chunk}`}
-                className={cn(
-                  "rounded-lg border bg-card p-4 space-y-2.5 transition-all duration-150",
-                  "hover:border-primary/30 hover:shadow-sm hover:shadow-primary/5"
-                )}
-              >
-                {/* Card meta row */}
-                <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <span className="font-mono text-xs font-semibold tabular-nums px-1.5 py-0.5 rounded bg-primary/12 text-primary shrink-0">
-                    {r.score.toFixed(3)}
-                  </span>
-                  {r.doc_title && (
-                    <span className="text-xs font-semibold truncate">
-                      {r.doc_title}
-                    </span>
-                  )}
-                  <span className="text-xs text-muted-foreground font-mono truncate flex-1 min-w-0">
-                    {r.source}
-                  </span>
-                  <span className="text-xs text-muted-foreground shrink-0">
-                    #{r.chunk}
-                  </span>
-                </div>
-                {/* Excerpt */}
-                <p className="text-sm leading-relaxed text-foreground">
-                  {r.text.slice(0, 300)}
-                  {r.text.length > 300 && (
-                    <span className="text-muted-foreground">…</span>
-                  )}
-                </p>
-              </div>
+              <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
             ))}
           </div>
 
