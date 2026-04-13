@@ -50,38 +50,6 @@ export interface ChatOptions extends QueryOptions {
   api_key?: string;
 }
 
-export function useQueryResults(
-  apiUrl: string,
-  dbPath: string,
-  collection: string,
-  text: string,
-  options?: QueryOptions
-) {
-  return useQuery({
-    queryKey: [
-      "query",
-      apiUrl,
-      dbPath,
-      collection,
-      text,
-      options?.n_results,
-      options?.min_score,
-    ],
-    queryFn: () =>
-      api.queryCollection(apiUrl, dbPath, collection, {
-        text,
-        n_results: options?.n_results,
-        min_score: options?.min_score,
-      }),
-    enabled:
-      !!apiUrl &&
-      !!text &&
-      !!dbPath &&
-      !!collection &&
-      (options?.enabled ?? true),
-  });
-}
-
 export function useMultiQueryResults(
   apiUrl: string,
   dbPath: string,
