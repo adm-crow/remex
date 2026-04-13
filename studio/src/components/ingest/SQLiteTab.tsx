@@ -3,6 +3,7 @@ import { Play, AlertCircle } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -219,12 +220,13 @@ export function SQLiteTab() {
             <Label htmlFor="sqlite-template" className="text-xs">
               Row template (optional)
             </Label>
-            <Input
+            <Textarea
               id="sqlite-template"
               value={rowTemplate}
               onChange={(e) => setRowTemplate(e.target.value)}
               placeholder="{title}: {body}"
-              className="h-7 text-xs"
+              rows={3}
+              className="text-xs resize-none"
             />
           </div>
           <div className="space-y-1">
