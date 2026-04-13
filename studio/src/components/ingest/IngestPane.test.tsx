@@ -4,7 +4,13 @@ import { renderWithProviders } from "@/test/utils";
 import { IngestPane } from "./IngestPane";
 import { useAppStore } from "@/store/app";
 
-vi.mock("@/api/client", () => ({ api: { ingestFilesStream: vi.fn() } }));
+vi.mock("@/api/client", () => ({
+  api: {
+    ingestFilesStream: vi.fn(),
+    listSqliteTables: vi.fn(),
+    ingestSqlite: vi.fn(),
+  },
+}));
 
 beforeEach(() => {
   localStorage.clear();

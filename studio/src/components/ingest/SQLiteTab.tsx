@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Play, AlertCircle } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
 import type { IngestResultResponse } from "@/api/client";
@@ -38,18 +39,27 @@ export function SQLiteTab() {
   const [result,          setResult]          = useState<IngestResultResponse | null>(null);
   const [runError,        setRunError]        = useState<string | null>(null);
 
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const queryClient = useQueryClient();
+
   async function loadTables(path: string) {
+    loadAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    loadAbortRef.current = ctrl;
+
     setIsLoadingTables(true);
     setTableError(null);
     setTables([]);
     setSelectedTable("");
     try {
       const resp = await api.listSqliteTables(apiUrl, path);
+      if (ctrl.signal.aborted) return;
       setTables(resp.tables);
     } catch (e) {
+      if (ctrl.signal.aborted) return;
       setTableError(e instanceof Error ? e.message : String(e));
     } finally {
-      setIsLoadingTables(false);
+      if (!ctrl.signal.aborted) setIsLoadingTables(false);
     }
   }
 
@@ -92,6 +102,9 @@ export function SQLiteTab() {
         row_template: rowTemplate || undefined,
       });
       setResult(res);
+      queryClient.invalidateQueries({
+        queryKey: ["sources", apiUrl, currentDb, collectionName],
+      });
     } catch (e) {
       setRunError(e instanceof Error ? e.message : String(e));
     } finally {
