@@ -26,7 +26,7 @@ describe("Home", () => {
 
   it("does not render recent projects section when list is empty", () => {
     render(<Home />);
-    expect(screen.queryByText(/recent projects/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^recent$/i)).not.toBeInTheDocument();
   });
 
   it("renders recent projects when store has entries", () => {
@@ -36,7 +36,7 @@ describe("Home", () => {
       ],
     } as any);
     render(<Home />);
-    expect(screen.getByText(/recent projects/i)).toBeInTheDocument();
+    expect(screen.getByText(/^recent$/i)).toBeInTheDocument();
     expect(screen.getByLabelText("Open /my/db")).toBeInTheDocument();
   });
 
