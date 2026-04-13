@@ -11,7 +11,12 @@ vi.mock("@/api/client", () => ({
   },
 }));
 
+vi.mock("@tauri-apps/plugin-notification", () => ({
+  sendNotification: vi.fn(),
+}));
+
 import { api } from "@/api/client";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 
 async function* makeStream(events: object[]) {
   for (const e of events) yield e;
@@ -25,6 +30,7 @@ beforeEach(() => {
     apiUrl: "http://localhost:8000",
     sidecarStatus: "connected",
   } as any);
+  vi.mocked(sendNotification).mockClear();
 });
 
 describe("FilesTab", () => {
@@ -113,5 +119,61 @@ describe("FilesTab", () => {
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent("Directory not found");
     });
+  });
+
+  it("sends OS notification when ingest completes with ingested files", async () => {
+    vi.mocked(api.ingestFilesStream).mockReturnValue(
+      makeStream([
+        {
+          type: "done",
+          result: {
+            sources_found: 2,
+            sources_ingested: 2,
+            sources_skipped: 0,
+            chunks_stored: 8,
+            skipped_reasons: [],
+          },
+        },
+      ]) as any
+    );
+    renderWithProviders(<FilesTab />);
+    fireEvent.change(
+      screen.getByRole("textbox", { name: /source directory/i }),
+      { target: { value: "/my/docs" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
+    await waitFor(() => {
+      expect(sendNotification).toHaveBeenCalledWith({
+        title: "Remex — Ingest complete",
+        body: "2 files ingested · 8 chunks stored",
+      });
+    });
+  });
+
+  it("does not notify when sources_ingested is 0", async () => {
+    vi.mocked(api.ingestFilesStream).mockReturnValue(
+      makeStream([
+        {
+          type: "done",
+          result: {
+            sources_found: 3,
+            sources_ingested: 0,
+            sources_skipped: 3,
+            chunks_stored: 0,
+            skipped_reasons: ["unchanged", "unchanged", "unchanged"],
+          },
+        },
+      ]) as any
+    );
+    renderWithProviders(<FilesTab />);
+    fireEvent.change(
+      screen.getByRole("textbox", { name: /source directory/i }),
+      { target: { value: "/my/docs" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/chunks stored: 0/i)).toBeInTheDocument();
+    });
+    expect(sendNotification).not.toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { Play, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
+import { sendNotification } from "@tauri-apps/plugin-notification";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,6 +103,12 @@ export function FilesTab() {
           queryClient.invalidateQueries({
             queryKey: ["sources", apiUrl, currentDb, effectiveCollection],
           });
+          if (event.result.sources_ingested > 0) {
+            sendNotification({
+              title: "Remex — Ingest complete",
+              body: `${event.result.sources_ingested} files ingested · ${event.result.chunks_stored} chunks stored`,
+            });
+          }
         } else if (event.type === "error") {
           setStreamError(event.detail);
         }
