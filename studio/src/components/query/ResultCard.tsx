@@ -39,7 +39,7 @@ export function ResultCard({ result }: Props) {
             });
           }}
           aria-label="Open source file"
-          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-foreground"
+          className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0 text-muted-foreground hover:text-foreground"
         >
           <FolderOpen className="w-3.5 h-3.5" />
         </button>
