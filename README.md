@@ -14,7 +14,19 @@
 
   <br/>
 
-  <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio" width="720" />
+  <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio — Home" width="720" />
+
+  <br/><br/>
+
+  <img src="docs/screenshots/remex_ingest.png" alt="Remex Studio — Ingest" width="720" />
+
+  <br/><br/>
+
+  <img src="docs/screenshots/remex_collection.png" alt="Remex Studio — Collections" width="720" />
+
+  <br/><br/>
+
+  <img src="docs/screenshots/remex_settings.png" alt="Remex Studio — Settings" width="720" />
 
 </div>
 
