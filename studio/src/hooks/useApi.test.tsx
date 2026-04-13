@@ -9,6 +9,7 @@ import {
   useSources,
   useDeleteSource,
   usePurgeCollection,
+  useMultiQueryResults,
 } from "./useApi";
 
 vi.mock("@/api/client", () => ({
@@ -18,6 +19,7 @@ vi.mock("@/api/client", () => ({
     getSources: vi.fn(),
     deleteSource: vi.fn(),
     purgeCollection: vi.fn(),
+    queryCollection: vi.fn(),
   },
 }));
 
@@ -110,5 +112,27 @@ describe("usePurgeCollection", () => {
     );
     const res = await result.current.mutateAsync();
     expect(res.chunks_deleted).toBe(2);
+  });
+});
+
+describe("useMultiQueryResults", () => {
+  it("merges results from multiple collections sorted by score", async () => {
+    vi.mocked(api.queryCollection)
+      .mockResolvedValueOnce([
+        { text: "a", source: "col-a", score: 0.9, source_type: "file", distance: 0.1, chunk: 0, doc_title: "", doc_author: "", doc_created: "" },
+      ])
+      .mockResolvedValueOnce([
+        { text: "b", source: "col-b", score: 0.7, source_type: "file", distance: 0.3, chunk: 0, doc_title: "", doc_author: "", doc_created: "" },
+      ]);
+
+    const { result } = renderHook(
+      () => useMultiQueryResults("http://localhost:8000", "./db", ["col-a", "col-b"], "test", { enabled: true }),
+      { wrapper }
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.data).toHaveLength(2);
+    expect(result.current.data![0].score).toBe(0.9);
+    expect(result.current.data![1].score).toBe(0.7);
   });
 });

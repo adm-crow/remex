@@ -2,6 +2,7 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
+  useQueries,
 } from "@tanstack/react-query";
 import { api } from "@/api/client";
 
@@ -79,6 +80,39 @@ export function useQueryResults(
       !!collection &&
       (options?.enabled ?? true),
   });
+}
+
+export function useMultiQueryResults(
+  apiUrl: string,
+  dbPath: string,
+  collections: string[],
+  text: string,
+  options?: QueryOptions
+) {
+  const results = useQueries({
+    queries: collections.map((col) => ({
+      queryKey: [
+        "query", apiUrl, dbPath, col, text,
+        options?.n_results, options?.min_score,
+      ],
+      queryFn: () =>
+        api.queryCollection(apiUrl, dbPath, col, {
+          text,
+          n_results: options?.n_results,
+          min_score: options?.min_score,
+        }),
+      enabled:
+        !!apiUrl && !!text && !!dbPath && !!col && (options?.enabled ?? true),
+    })),
+  });
+
+  return {
+    data: results
+      .flatMap((r) => r.data ?? [])
+      .sort((a, b) => b.score - a.score),
+    isLoading: results.some((r) => r.isLoading),
+    error: results.find((r) => r.error)?.error ?? null,
+  };
 }
 
 export function useChat(
