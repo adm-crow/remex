@@ -154,4 +154,14 @@ describe("QueryPane", () => {
       expect(screen.getByText("Sample chunk text")).toBeInTheDocument();
     });
   });
+
+  it("clicking a history chip promotes it to front of history", () => {
+    useAppStore.setState({
+      queryHistory: ["older query", "previous search"],
+    } as any);
+    renderWithProviders(<QueryPane />);
+    const chip = screen.getByRole("button", { name: "older query" });
+    fireEvent.click(chip);
+    expect(useAppStore.getState().queryHistory[0]).toBe("older query");
+  });
 });
