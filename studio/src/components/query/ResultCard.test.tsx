@@ -3,7 +3,9 @@ import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/utils";
 import { ResultCard } from "./ResultCard";
 
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn() }));
+vi.mock("@tauri-apps/plugin-shell", () => ({
+  open: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { open } from "@tauri-apps/plugin-shell";
 

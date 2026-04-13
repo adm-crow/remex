@@ -32,7 +32,12 @@ export function ResultCard({ result }: Props) {
           #{result.chunk}
         </span>
         <button
-          onClick={() => open(result.source)}
+          type="button"
+          onClick={() => {
+            open(result.source).catch((err) => {
+              console.error("[ResultCard] Failed to open file:", err);
+            });
+          }}
           aria-label="Open source file"
           className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-foreground"
         >
