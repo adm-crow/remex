@@ -95,7 +95,7 @@ export function QueryPane() {
               <button
                 key={q}
                 type="button"
-                onClick={() => { setText(q); setSubmitted(q); }}
+                onClick={() => { setText(q); setSubmitted(q); addQueryHistory(q); }}
                 className="text-xs px-2 py-0.5 rounded-full border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
               >
                 {q}

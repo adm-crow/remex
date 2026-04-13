@@ -33,6 +33,7 @@ beforeEach(() => {
     currentCollection: "myCol",
     apiUrl: "http://localhost:8000",
     sidecarStatus: "connected",
+    queryHistory: [],
   } as any);
   vi.mocked(useCollections).mockReturnValue({
     data: ["myCol"],
