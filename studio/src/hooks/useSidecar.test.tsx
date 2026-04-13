@@ -56,11 +56,18 @@ describe("useSidecar", () => {
     renderHook(() => useSidecar());
 
     await waitFor(() => {
-      expect(tauriCore.invoke).toHaveBeenCalledWith("spawn_sidecar");
+      expect(tauriCore.invoke).toHaveBeenCalledWith("spawn_sidecar", {
+        host: "localhost",
+        port: 8000,
+      });
     });
   });
 
   it("sets status to connected after spawn + poll succeeds", async () => {
+    vi.mocked(tauriCore.invoke)
+      .mockResolvedValueOnce(undefined)  // spawn_sidecar succeeds
+      .mockResolvedValue(true);          // is_sidecar_alive → process alive
+
     vi.mocked(api.getHealth)
       .mockRejectedValueOnce(new Error("not ready"))
       .mockRejectedValueOnce(new Error("still not ready"))
