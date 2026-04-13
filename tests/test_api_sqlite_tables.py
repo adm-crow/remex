@@ -34,3 +34,12 @@ def test_list_tables_bad_path(client):
     response = client.get("/collections/sqlite/tables?path=/nonexistent/missing.db")
     assert response.status_code == 400
     assert "Cannot read SQLite file" in response.json()["detail"]
+
+
+def test_list_tables_corrupt_file(client, tmp_path):
+    db = tmp_path / "corrupt.db"
+    db.write_text("this is not a sqlite database")
+
+    response = client.get(f"/collections/sqlite/tables?path={db}")
+    assert response.status_code == 400
+    assert "Cannot read SQLite file" in response.json()["detail"]

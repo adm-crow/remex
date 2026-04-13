@@ -22,15 +22,18 @@ def get_collections(db_path: str = Query(default="./remex_db")) -> list[str]:
 def list_sqlite_tables(
     path: str = Query(..., description="Absolute path to the SQLite file"),
 ) -> SQLiteTablesResponse:
+    conn = None
     try:
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
         cursor = conn.execute(
             "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
         )
         tables = [row[0] for row in cursor.fetchall()]
-        conn.close()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Cannot read SQLite file: {e}")
+    finally:
+        if conn:
+            conn.close()
     return SQLiteTablesResponse(tables=tables)
 
 
