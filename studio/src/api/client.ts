@@ -73,6 +73,23 @@ export interface IngestResultResponse {
   skipped_reasons: string[];
 }
 
+export interface SQLiteTablesResponse {
+  tables: string[];
+}
+
+export interface IngestSQLiteRequest {
+  sqlite_path: string;
+  table: string;
+  embedding_model?: string;
+  chunk_size?: number;
+  overlap?: number;
+  min_chunk_size?: number;
+  chunking?: "word" | "sentence";
+  columns?: string[];
+  id_column?: string;
+  row_template?: string;
+}
+
 export interface IngestProgressEvent {
   type: "progress";
   filename: string;
@@ -204,6 +221,26 @@ export const api = {
   ) =>
     apiFetch<IngestResultResponse>(
       `${base}/collections/${encodeURIComponent(collection)}/ingest`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...req, db_path: dbPath }),
+      }
+    ),
+
+  listSqliteTables: (base: string, sqlitePath: string) =>
+    apiFetch<SQLiteTablesResponse>(
+      `${base}/collections/sqlite/tables?path=${encodeURIComponent(sqlitePath)}`
+    ),
+
+  ingestSqlite: (
+    base: string,
+    dbPath: string,
+    collection: string,
+    req: IngestSQLiteRequest
+  ) =>
+    apiFetch<IngestResultResponse>(
+      `${base}/collections/${encodeURIComponent(collection)}/ingest/sqlite`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
