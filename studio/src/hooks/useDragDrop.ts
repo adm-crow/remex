@@ -14,6 +14,7 @@ export function useDragDrop(onDrop: (path: string) => void): { isDragging: boole
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
+    let cleaned = false;
 
     getCurrentWindow()
       .onDragDropEvent((event) => {
@@ -30,10 +31,12 @@ export function useDragDrop(onDrop: (path: string) => void): { isDragging: boole
         }
       })
       .then((fn) => {
-        unlisten = fn;
+        if (cleaned) fn(); // immediately call unlisten if already cleaned up
+        else unlisten = fn;
       });
 
     return () => {
+      cleaned = true;
       unlisten?.();
     };
   }, []); // empty — onDropRef keeps callback fresh without re-subscribing
