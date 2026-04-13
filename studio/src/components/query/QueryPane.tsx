@@ -169,7 +169,12 @@ export function QueryPane() {
             <Switch
               id="ai-toggle"
               checked={useAi}
-              onCheckedChange={setUseAi}
+              onCheckedChange={(val) => {
+                setUseAi(val);
+                if (val && selectedCollections.length > 1) {
+                  setSelectedCollections([selectedCollections[0]]);
+                }
+              }}
               aria-label="AI answer toggle"
             />
             <Label
