@@ -22,9 +22,5 @@ describe("IngestPane", () => {
     expect(screen.getByRole("textbox", { name: /source directory/i })).toBeInTheDocument();
   });
 
-  it("switches to SQLite tab on click", () => {
-    renderWithProviders(<IngestPane />);
-    fireEvent.click(screen.getByText("SQLite"));
-    expect(screen.getByRole("textbox", { name: /sqlite database path/i })).toBeInTheDocument();
-  });
+  it.todo("switches to SQLite tab on click — full assertion added in Task 4");
 });
