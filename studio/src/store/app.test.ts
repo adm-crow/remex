@@ -7,6 +7,7 @@ beforeEach(() => {
     currentDb: null,
     currentCollection: null,
     recentProjects: [],
+    queryHistory: [],
     apiUrl: "http://localhost:8000",
     sidecarStatus: "starting",
   });
@@ -62,5 +63,26 @@ describe("useAppStore", () => {
   it("setSidecarStatus updates sidecarStatus", () => {
     useAppStore.getState().setSidecarStatus("connected");
     expect(useAppStore.getState().sidecarStatus).toBe("connected");
+  });
+
+  it("addQueryHistory adds an entry", () => {
+    useAppStore.getState().addQueryHistory("what is remex");
+    expect(useAppStore.getState().queryHistory[0]).toBe("what is remex");
+  });
+
+  it("addQueryHistory deduplicates — re-adding moves to front", () => {
+    useAppStore.getState().addQueryHistory("first query");
+    useAppStore.getState().addQueryHistory("second query");
+    useAppStore.getState().addQueryHistory("first query");
+    const { queryHistory } = useAppStore.getState();
+    expect(queryHistory).toHaveLength(2);
+    expect(queryHistory[0]).toBe("first query");
+  });
+
+  it("addQueryHistory caps at 20 entries", () => {
+    for (let i = 0; i < 25; i++) {
+      useAppStore.getState().addQueryHistory(`query ${i}`);
+    }
+    expect(useAppStore.getState().queryHistory).toHaveLength(20);
   });
 });

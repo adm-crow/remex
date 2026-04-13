@@ -12,6 +12,7 @@ export interface AppState {
   currentDb: string | null;
   currentCollection: string | null;
   recentProjects: RecentProject[];
+  queryHistory: string[];
   apiUrl: string;
   sidecarStatus: "starting" | "connected" | "error";
   darkMode: boolean;
@@ -24,6 +25,7 @@ export interface AppState {
   setCurrentCollection: (col: string | null) => void;
   addRecentProject: (path: string) => void;
   removeRecentProject: (path: string) => void;
+  addQueryHistory: (text: string) => void;
   setApiUrl: (url: string) => void;
   setSidecarStatus: (status: AppState["sidecarStatus"]) => void;
   setDarkMode: (dark: boolean) => void;
@@ -39,6 +41,7 @@ export const useAppStore = create<AppState>()(
       currentDb: null,
       currentCollection: null,
       recentProjects: [],
+      queryHistory: [],
       apiUrl: "http://localhost:8000",
       sidecarStatus: "starting",
       darkMode: false,
@@ -66,6 +69,11 @@ export const useAppStore = create<AppState>()(
         });
       },
 
+      addQueryHistory: (text) => {
+        const filtered = get().queryHistory.filter((q) => q !== text);
+        set({ queryHistory: [text, ...filtered].slice(0, 20) });
+      },
+
       setApiUrl: (url) => set({ apiUrl: url }),
       setSidecarStatus: (status) => set({ sidecarStatus: status }),
       setDarkMode: (dark) => set({ darkMode: dark }),
@@ -78,6 +86,7 @@ export const useAppStore = create<AppState>()(
       name: "remex-studio",
       partialize: (state) => ({
         recentProjects: state.recentProjects,
+        queryHistory: state.queryHistory,
         apiUrl: state.apiUrl,
         darkMode: state.darkMode,
         theme: state.theme,
