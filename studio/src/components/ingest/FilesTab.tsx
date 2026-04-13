@@ -5,6 +5,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDragDrop } from "@/hooks/useDragDrop";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -47,6 +49,7 @@ export function FilesTab() {
   const [result,           setResult]           = useState<IngestResultResponse | null>(null);
   const [streamError,      setStreamError]      = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const { isDragging } = useDragDrop((path) => setSourcePath(path));
 
   const effectiveCollection = appendModel
     ? `${collectionName}-${embeddingModel}`.replace(/[^a-zA-Z0-9_-]/g, "-")
@@ -115,7 +118,12 @@ export function FilesTab() {
   return (
     <div className="flex flex-col h-full p-6 gap-4">
       {/* Directory picker */}
-      <div className="space-y-1">
+      <div
+        className={cn(
+          "space-y-1 rounded-lg p-1 -m-1 transition-colors",
+          isDragging && "bg-primary/5 ring-2 ring-dashed ring-primary/50"
+        )}
+      >
         <Label className="text-xs text-muted-foreground">Source directory</Label>
         <div className="flex gap-2">
           <Input
