@@ -2,20 +2,13 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Search, Sparkles, Info, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { useQueryResults, useChat, useCollections } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
 
@@ -29,15 +22,16 @@ export function QueryPane() {
   const [useAi, setUseAi] = useState(false);
   const [nResults, setNResults] = useState(5);
   const [minScore, setMinScore] = useState(0);
-  const [selectedCollection, setSelectedCollection] = useState(
-    currentCollection ?? ""
+  const [selectedCollections, setSelectedCollections] = useState<string[]>(
+    currentCollection ? [currentCollection] : []
   );
 
   const { data: collections = [] } = useCollections(apiUrl, currentDb ?? "");
-  const activeCollection = selectedCollection || currentCollection || "";
+  // For AI mode (single-collection): use first selected or fall back to currentCollection
+  const activeCollection = selectedCollections[0] ?? currentCollection ?? "";
 
-  const queryResult = useQueryResults(
-    apiUrl, currentDb ?? "", activeCollection, submitted,
+  const multiResult = useMultiQueryResults(
+    apiUrl, currentDb ?? "", selectedCollections, submitted,
     { enabled: !!submitted && !useAi, n_results: nResults,
       min_score: minScore > 0 ? minScore : undefined }
   );
@@ -57,9 +51,24 @@ export function QueryPane() {
     }
   }
 
-  const results = useAi ? (chatResult.data?.sources ?? []) : (queryResult.data ?? []);
-  const isLoading = useAi ? chatResult.isLoading : queryResult.isLoading;
-  const error = useAi ? chatResult.error : queryResult.error;
+  function handleCollectionToggle(col: string) {
+    if (useAi) {
+      setSelectedCollections([col]);
+    } else {
+      setSelectedCollections((prev) => {
+        if (prev.includes(col)) {
+          if (prev.length === 1) return prev; // never deselect last
+          return prev.filter((c) => c !== col);
+        }
+        return [...prev, col];
+      });
+    }
+  }
+
+  const results = useAi ? (chatResult.data?.sources ?? []) : (multiResult.data ?? []);
+  const isLoading = useAi ? chatResult.isLoading : multiResult.isLoading;
+  const error = useAi ? chatResult.error : multiResult.error;
+  const canRun = !isLoading && selectedCollections.length > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -81,7 +90,7 @@ export function QueryPane() {
           </div>
           <Button
             type="submit"
-            disabled={isLoading || !activeCollection}
+            disabled={!canRun}
             className="h-10 px-5 shrink-0"
           >
             {isLoading ? "Searching…" : "Search"}
@@ -104,17 +113,27 @@ export function QueryPane() {
           </div>
         )}
 
-        {/* Collection — full width, prominent */}
-        <Select value={selectedCollection} onValueChange={setSelectedCollection}>
-          <SelectTrigger className="h-9 w-full text-sm" aria-label="Collection">
-            <SelectValue placeholder={currentCollection ?? "Select a collection…"} />
-          </SelectTrigger>
-          <SelectContent>
-            {collections.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Collection pills */}
+        <div className="flex flex-wrap gap-1.5">
+          {collections.map((col) => {
+            const isSelected = selectedCollections.includes(col);
+            return (
+              <button
+                key={col}
+                type="button"
+                onClick={() => handleCollectionToggle(col)}
+                className={cn(
+                  "text-xs px-2.5 py-1 rounded-full border transition-colors",
+                  isSelected
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {col}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Options strip — compact, secondary */}
         <div className="flex items-center gap-3">

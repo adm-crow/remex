@@ -5,12 +5,12 @@ import { QueryPane } from "./QueryPane";
 import { useAppStore } from "@/store/app";
 
 vi.mock("@/hooks/useApi", () => ({
-  useQueryResults: vi.fn(),
+  useMultiQueryResults: vi.fn(),
   useChat: vi.fn(),
   useCollections: vi.fn(),
 }));
 
-import { useQueryResults, useChat, useCollections } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
 
 const mockResults = [
   {
@@ -40,7 +40,7 @@ beforeEach(() => {
     isLoading: false,
     error: null,
   } as any);
-  vi.mocked(useQueryResults).mockReturnValue({
+  vi.mocked(useMultiQueryResults).mockReturnValue({
     data: undefined,
     isLoading: false,
     error: null,
@@ -60,7 +60,7 @@ describe("QueryPane", () => {
   });
 
   it("renders result cards after submitting a query", async () => {
-    vi.mocked(useQueryResults).mockReturnValue({
+    vi.mocked(useMultiQueryResults).mockReturnValue({
       data: mockResults,
       isLoading: false,
       error: null,
@@ -86,9 +86,7 @@ describe("QueryPane", () => {
       error: null,
     } as any);
     renderWithProviders(<QueryPane />);
-    // Enable AI toggle
     fireEvent.click(screen.getByRole("switch", { name: /ai answer/i }));
-    // Submit a query
     const input = screen.getByRole("textbox", { name: /query input/i });
     fireEvent.change(input, { target: { value: "what is remex" } });
     fireEvent.submit(input.closest("form")!);
@@ -99,7 +97,7 @@ describe("QueryPane", () => {
   });
 
   it("shows 'No results found' when results are empty after query", async () => {
-    vi.mocked(useQueryResults).mockReturnValue({
+    vi.mocked(useMultiQueryResults).mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
@@ -114,7 +112,7 @@ describe("QueryPane", () => {
   });
 
   it("shows error banner when query fails", async () => {
-    vi.mocked(useQueryResults).mockReturnValue({
+    vi.mocked(useMultiQueryResults).mockReturnValue({
       data: undefined,
       isLoading: false,
       error: new Error("Collection not found"),
@@ -142,7 +140,7 @@ describe("QueryPane", () => {
 
   it("clicking a history chip re-submits the query and shows results", async () => {
     useAppStore.setState({ queryHistory: ["previous search"] } as any);
-    vi.mocked(useQueryResults).mockReturnValue({
+    vi.mocked(useMultiQueryResults).mockReturnValue({
       data: mockResults,
       isLoading: false,
       error: null,
@@ -163,5 +161,51 @@ describe("QueryPane", () => {
     const chip = screen.getByRole("button", { name: "older query" });
     fireEvent.click(chip);
     expect(useAppStore.getState().queryHistory[0]).toBe("older query");
+  });
+
+  it("renders collection pills for each available collection", () => {
+    vi.mocked(useCollections).mockReturnValue({
+      data: ["col-a", "col-b"],
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    expect(screen.getByRole("button", { name: "col-a" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "col-b" })).toBeInTheDocument();
+  });
+
+  it("toggling a second pill adds it to the active selection", () => {
+    vi.mocked(useCollections).mockReturnValue({
+      data: ["col-a", "col-b"],
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    fireEvent.click(screen.getByRole("button", { name: "col-b" }));
+    expect(screen.getByRole("button", { name: "col-b" })).toHaveClass("bg-primary");
+  });
+
+  it("shows results from multiple collections merged by score", async () => {
+    vi.mocked(useCollections).mockReturnValue({
+      data: ["col-a", "col-b"],
+      isLoading: false,
+      error: null,
+    } as any);
+    vi.mocked(useMultiQueryResults).mockReturnValue({
+      data: [
+        { text: "High score result", source: "col-a", score: 0.9, source_type: "file", distance: 0.1, chunk: 0, doc_title: "", doc_author: "", doc_created: "" },
+        { text: "Lower score result", source: "col-b", score: 0.7, source_type: "file", distance: 0.3, chunk: 0, doc_title: "", doc_author: "", doc_created: "" },
+      ],
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    const input = screen.getByRole("textbox", { name: /query input/i });
+    fireEvent.change(input, { target: { value: "test" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => {
+      expect(screen.getByText("High score result")).toBeInTheDocument();
+      expect(screen.getByText("Lower score result")).toBeInTheDocument();
+    });
   });
 });
