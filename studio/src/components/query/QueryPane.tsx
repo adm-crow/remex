@@ -20,7 +20,8 @@ import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
 
 export function QueryPane() {
-  const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey } =
+  const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
+          queryHistory, addQueryHistory } =
     useAppStore();
 
   const [text, setText] = useState("");
@@ -50,7 +51,10 @@ export function QueryPane() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (text.trim()) setSubmitted(text.trim());
+    if (text.trim()) {
+      setSubmitted(text.trim());
+      addQueryHistory(text.trim());
+    }
   }
 
   const results = useAi ? (chatResult.data?.sources ?? []) : (queryResult.data ?? []);
@@ -83,6 +87,22 @@ export function QueryPane() {
             {isLoading ? "Searching…" : "Search"}
           </Button>
         </form>
+
+        {/* Query history chips */}
+        {queryHistory.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {queryHistory.map((q) => (
+              <button
+                key={q}
+                type="button"
+                onClick={() => { setText(q); setSubmitted(q); }}
+                className="text-xs px-2 py-0.5 rounded-full border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Collection — full width, prominent */}
         <Select value={selectedCollection} onValueChange={setSelectedCollection}>

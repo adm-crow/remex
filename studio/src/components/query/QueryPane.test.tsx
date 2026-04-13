@@ -126,4 +126,31 @@ describe("QueryPane", () => {
       expect(screen.getByRole("alert")).toBeInTheDocument();
     });
   });
+
+  it("adds a history chip after submitting a query", async () => {
+    renderWithProviders(<QueryPane />);
+    const input = screen.getByRole("textbox", { name: /query input/i });
+    fireEvent.change(input, { target: { value: "what is remex" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "what is remex" })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("clicking a history chip re-submits the query and shows results", async () => {
+    useAppStore.setState({ queryHistory: ["previous search"] } as any);
+    vi.mocked(useQueryResults).mockReturnValue({
+      data: mockResults,
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    const chip = screen.getByRole("button", { name: "previous search" });
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(screen.getByText("Sample chunk text")).toBeInTheDocument();
+    });
+  });
 });
