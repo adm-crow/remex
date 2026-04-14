@@ -26,6 +26,8 @@ export interface AppState {
   addRecentProject: (path: string) => void;
   removeRecentProject: (path: string) => void;
   addQueryHistory: (text: string) => void;
+  removeQueryHistory: (text: string) => void;
+  clearQueryHistory: () => void;
   setApiUrl: (url: string) => void;
   setSidecarStatus: (status: AppState["sidecarStatus"]) => void;
   setDarkMode: (dark: boolean) => void;
@@ -72,6 +74,14 @@ export const useAppStore = create<AppState>()(
       addQueryHistory: (text) => {
         const filtered = get().queryHistory.filter((q) => q !== text);
         set({ queryHistory: [text, ...filtered].slice(0, 20) });
+      },
+
+      removeQueryHistory: (text) => {
+        set({ queryHistory: get().queryHistory.filter((q) => q !== text) });
+      },
+
+      clearQueryHistory: () => {
+        set({ queryHistory: [] });
       },
 
       setApiUrl: (url) => set({ apiUrl: url }),

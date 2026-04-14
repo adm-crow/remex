@@ -85,4 +85,20 @@ describe("useAppStore", () => {
     }
     expect(useAppStore.getState().queryHistory).toHaveLength(20);
   });
+
+  it("removeQueryHistory removes the matching entry", () => {
+    useAppStore.getState().addQueryHistory("first");
+    useAppStore.getState().addQueryHistory("second");
+    useAppStore.getState().removeQueryHistory("first");
+    const { queryHistory } = useAppStore.getState();
+    expect(queryHistory).toHaveLength(1);
+    expect(queryHistory[0]).toBe("second");
+  });
+
+  it("clearQueryHistory empties the history", () => {
+    useAppStore.getState().addQueryHistory("first");
+    useAppStore.getState().addQueryHistory("second");
+    useAppStore.getState().clearQueryHistory();
+    expect(useAppStore.getState().queryHistory).toHaveLength(0);
+  });
 });
