@@ -270,4 +270,24 @@ describe("QueryPane", () => {
     renderWithProviders(<QueryPane />);
     expect(screen.getByText("No collections yet")).toBeInTheDocument();
   });
+
+  it("Escape on the input clears text and dismisses results", async () => {
+    vi.mocked(useMultiQueryResults).mockReturnValue({
+      data: mockResults,
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    const input = screen.getByRole("textbox", { name: /query input/i });
+    fireEvent.change(input, { target: { value: "what is remex" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() =>
+      expect(screen.getByText("Sample chunk text")).toBeInTheDocument()
+    );
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input).toHaveValue("");
+    expect(
+      screen.getByText("Ask anything about your documents")
+    ).toBeInTheDocument();
+  });
 });

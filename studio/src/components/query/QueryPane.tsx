@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
 import { Search, Sparkles, Info, Loader2, X, FolderOpen, PackageOpen, SearchX } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -12,7 +12,11 @@ import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
 
-export function QueryPane() {
+interface QueryPaneProps {
+  onFocusReady?: (fn: () => void) => void;
+}
+
+export function QueryPane({ onFocusReady }: QueryPaneProps = {}) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
           queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory } =
     useAppStore();
@@ -25,6 +29,12 @@ export function QueryPane() {
   const [selectedCollections, setSelectedCollections] = useState<string[]>(
     currentCollection ? [currentCollection] : []
   );
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    onFocusReady?.(() => inputRef.current?.focus());
+  }, [onFocusReady]);
 
   const { data: collections = [] } = useCollections(apiUrl, currentDb ?? "");
   // For AI mode (single-collection): use first selected or fall back to currentCollection
@@ -81,8 +91,10 @@ export function QueryPane() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <Input
+              ref={inputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") { setText(""); setSubmitted(""); } }}
               placeholder="Ask a question or search your documents…"
               className="pl-9 pr-9 h-10"
               aria-label="Query input"

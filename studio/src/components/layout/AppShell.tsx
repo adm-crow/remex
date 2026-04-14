@@ -6,6 +6,7 @@ import { IngestPane } from "@/components/ingest/IngestPane";
 import { SourcesPane } from "@/components/sources/SourcesPane";
 import { SettingsPane } from "@/components/settings/SettingsPane";
 import { useAppStore } from "@/store/app";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const PANE_MAP: Record<View, ComponentType> = {
   query:       QueryPane,
@@ -23,6 +24,16 @@ export function AppShell() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const isDragging = useRef(false);
+  const focusSearchRef = useRef<(() => void) | null>(null);
+
+  const handleFocusReady = useCallback((fn: () => void) => {
+    focusSearchRef.current = fn;
+  }, []);
+
+  useKeyboardShortcuts({
+    onViewChange: setActiveView,
+    focusSearch: () => focusSearchRef.current?.(),
+  });
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -72,7 +83,11 @@ export function AppShell() {
           </div>
         )}
         <div key={activeView} className="flex-1 min-h-0 flex flex-col animate-pane-in">
-          <ActivePane />
+          {activeView === "query" ? (
+            <QueryPane onFocusReady={handleFocusReady} />
+          ) : (
+            <ActivePane />
+          )}
         </div>
       </main>
     </div>
