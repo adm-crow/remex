@@ -182,4 +182,30 @@ describe("FilesTab", () => {
     });
     expect(sendNotification).not.toHaveBeenCalled();
   });
+
+  it("shows 'Last ingest' timestamp after a completed run", async () => {
+    vi.mocked(api.ingestFilesStream).mockReturnValue(
+      makeStream([
+        {
+          type: "done",
+          result: {
+            sources_found: 3,
+            sources_ingested: 3,
+            sources_skipped: 0,
+            chunks_stored: 12,
+            skipped_reasons: [],
+          },
+        },
+      ]) as any
+    );
+    renderWithProviders(<FilesTab />);
+    fireEvent.change(
+      screen.getByRole("textbox", { name: /source directory/i }),
+      { target: { value: "/my/docs" } }
+    );
+    fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/last ingest/i)).toBeInTheDocument();
+    });
+  });
 });
