@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle } from "lucide-react";
+import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle, FileText, Database } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -120,9 +120,10 @@ interface CollectionCardProps {
   apiUrl: string;
   dbPath: string;
   isCurrent: boolean;
+  collectionType: "files" | "sqlite" | undefined;
 }
 
-function CollectionCard({ name, apiUrl, dbPath, isCurrent }: CollectionCardProps) {
+function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: CollectionCardProps) {
   const [expanded,      setExpanded]      = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [purgeResult, setPurgeResult] = useState<{
@@ -170,6 +171,8 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent }: CollectionCardProps
           ) : (
             <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
           )}
+          {collectionType === "files"  && <FileText className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />}
+          {collectionType === "sqlite" && <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />}
           <span className="font-medium text-sm truncate">{name}</span>
           {isCurrent && (
             <Badge
@@ -288,7 +291,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent }: CollectionCardProps
 // ── Main pane ─────────────────────────────────────────────────────────────
 
 export function SourcesPane() {
-  const { apiUrl, currentDb, currentCollection } = useAppStore();
+  const { apiUrl, currentDb, currentCollection, collectionTypes } = useAppStore();
 
   const { data: collections = [], isLoading, error } = useCollections(
     apiUrl,
@@ -349,6 +352,7 @@ export function SourcesPane() {
                 apiUrl={apiUrl}
                 dbPath={currentDb}
                 isCurrent={name === currentCollection}
+                collectionType={collectionTypes[`${currentDb}::${name}`]}
               />
             ))}
           </div>

@@ -45,6 +45,8 @@ export interface AppState {
   ingestDoneUnread: boolean;
   // Ingest result (persisted)
   lastIngestResult: LastIngestResult | null;
+  // Collection metadata (persisted)
+  collectionTypes: Record<string, "files" | "sqlite">;
   // Actions
   setCurrentDb: (db: string | null) => void;
   setCurrentCollection: (col: string | null) => void;
@@ -68,6 +70,7 @@ export interface AppState {
   setIngestStreamError: (err: string | null) => void;
   setLastIngestResult: (r: LastIngestResult | null) => void;
   setIngestDoneUnread: (v: boolean) => void;
+  setCollectionType: (dbPath: string, collection: string, type: "files" | "sqlite") => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -91,6 +94,7 @@ export const useAppStore = create<AppState>()(
       ingestStreamError: null,
       ingestDoneUnread: false,
       lastIngestResult: null,
+      collectionTypes: {},
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -149,6 +153,13 @@ export const useAppStore = create<AppState>()(
       setIngestStreamError: (err) => set({ ingestStreamError: err }),
       setLastIngestResult:  (r)   => set({ lastIngestResult: r }),
       setIngestDoneUnread:  (v)   => set({ ingestDoneUnread: v }),
+      setCollectionType: (dbPath, collection, type) =>
+        set((s) => ({
+          collectionTypes: {
+            ...s.collectionTypes,
+            [`${dbPath}::${collection}`]: type,
+          },
+        })),
     }),
     {
       name: "remex-studio",
@@ -162,6 +173,7 @@ export const useAppStore = create<AppState>()(
         aiModel:          state.aiModel,
         aiApiKey:         state.aiApiKey,
         lastIngestResult: state.lastIngestResult,
+        collectionTypes:  state.collectionTypes,
       }),
     }
   )

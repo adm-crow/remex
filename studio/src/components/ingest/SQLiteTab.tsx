@@ -25,7 +25,7 @@ import { useAppStore } from "@/store/app";
 import type { IngestResultResponse } from "@/api/client";
 
 export function SQLiteTab() {
-  const { apiUrl, currentDb, currentCollection } = useAppStore();
+  const { apiUrl, currentDb, currentCollection, setCollectionType } = useAppStore();
 
   const [sqlitePath,      setSqlitePath]      = useState("");
   const [tables,          setTables]          = useState<string[]>([]);
@@ -89,6 +89,7 @@ export function SQLiteTab() {
 
   async function handleRun() {
     if (!sqlitePath || !selectedTable || !collectionName || !currentDb) return;
+    setCollectionType(currentDb, collectionName, "sqlite");
     setIsRunning(true);
     setResult(null);
     setRunError(null);
