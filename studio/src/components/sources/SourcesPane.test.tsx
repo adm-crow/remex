@@ -139,6 +139,26 @@ describe("SourcesPane", () => {
     });
   });
 
+  it("clicking collection delete button opens confirmation dialog", async () => {
+    renderWithProviders(<SourcesPane />);
+    fireEvent.click(screen.getByRole("button", { name: /delete collection myCol/i }));
+    await waitFor(() => {
+      expect(screen.getByRole("dialog")).toBeInTheDocument();
+      expect(screen.getByText(/delete collection/i)).toBeInTheDocument();
+    });
+  });
+
+  it("confirming collection delete calls mutateAsync and clears currentCollection", async () => {
+    renderWithProviders(<SourcesPane />);
+    fireEvent.click(screen.getByRole("button", { name: /delete collection myCol/i }));
+    await waitFor(() => screen.getByRole("dialog"));
+    fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
+    await waitFor(() => {
+      expect(mockDeleteCollectionMutate).toHaveBeenCalledWith("myCol");
+      expect(useAppStore.getState().currentCollection).toBeNull();
+    });
+  });
+
   it("purge button calls mutateAsync and shows result", async () => {
     renderWithProviders(<SourcesPane />);
     fireEvent.click(screen.getByTitle(/purge stale chunks/i));

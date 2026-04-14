@@ -100,12 +100,12 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
     async def _stream() -> AsyncIterator[str]:
         try:
             while True:
+                if await request.is_disconnected():
+                    task.cancel()
+                    break
                 event = await queue.get()
                 yield f"data: {json.dumps(event)}\n\n"
                 if event["type"] in ("done", "error"):
-                    break
-                if await request.is_disconnected():
-                    task.cancel()
                     break
         finally:
             if not task.done():

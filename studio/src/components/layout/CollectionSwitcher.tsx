@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 
+// Sentinel that can never be a valid ChromaDB collection name (starts with \x00).
+const NEW_SENTINEL = "\x00new";
+
 export function CollectionSwitcher() {
   const { apiUrl, currentDb, currentCollection, setCurrentCollection } =
     useAppStore();
@@ -59,7 +62,7 @@ export function CollectionSwitcher() {
     <Select
       value={currentCollection ?? ""}
       onValueChange={(v) => {
-        if (v === "__new__") {
+        if (v === NEW_SENTINEL) {
           setIsNew(true);
         } else {
           setCurrentCollection(v);
@@ -75,7 +78,7 @@ export function CollectionSwitcher() {
             {c}
           </SelectItem>
         ))}
-        <SelectItem value="__new__" className="text-xs text-muted-foreground">
+        <SelectItem value={NEW_SENTINEL} className="text-xs text-muted-foreground">
           Type a new name…
         </SelectItem>
       </SelectContent>

@@ -16,6 +16,8 @@ beforeEach(() => {
     ingestFilesTotal: 0,
     ingestStreamError: null,
     lastIngestResult: null,
+    ingestDoneUnread: false,
+    collectionTypes: {},
   } as any);
 });
 
@@ -101,6 +103,34 @@ describe("useAppStore", () => {
     expect(queryHistory[0]).toBe("second");
   });
 
+  it("setIngestDoneUnread updates ingestDoneUnread", () => {
+    expect(useAppStore.getState().ingestDoneUnread).toBe(false);
+    useAppStore.getState().setIngestDoneUnread(true);
+    expect(useAppStore.getState().ingestDoneUnread).toBe(true);
+    useAppStore.getState().setIngestDoneUnread(false);
+    expect(useAppStore.getState().ingestDoneUnread).toBe(false);
+  });
+
+  it("setCollectionType stores the type for a db+collection key", () => {
+    useAppStore.getState().setCollectionType("./db", "docs", "files");
+    expect(useAppStore.getState().collectionTypes["./db::docs"]).toBe("files");
+  });
+
+  it("setCollectionType can overwrite an existing entry", () => {
+    useAppStore.getState().setCollectionType("./db", "docs", "files");
+    useAppStore.getState().setCollectionType("./db", "docs", "sqlite");
+    expect(useAppStore.getState().collectionTypes["./db::docs"]).toBe("sqlite");
+  });
+
+  it("removeCollectionType removes the matching key", () => {
+    useAppStore.getState().setCollectionType("./db", "docs", "files");
+    useAppStore.getState().setCollectionType("./db", "other", "sqlite");
+    useAppStore.getState().removeCollectionType("./db", "docs");
+    const { collectionTypes } = useAppStore.getState();
+    expect(collectionTypes["./db::docs"]).toBeUndefined();
+    expect(collectionTypes["./db::other"]).toBe("sqlite");
+  });
+
   it("clearQueryHistory empties the history", () => {
     useAppStore.getState().addQueryHistory("first");
     useAppStore.getState().addQueryHistory("second");
@@ -138,6 +168,7 @@ describe("useAppStore", () => {
     useAppStore.getState().setLastIngestResult({
       collection:      "docs",
       sourcePath:      "/my/docs",
+      startedAt:       "2026-04-14T09:59:45.000Z",
       completedAt:     "2026-04-14T10:00:00.000Z",
       sourcesFound:    3,
       sourcesIngested: 3,

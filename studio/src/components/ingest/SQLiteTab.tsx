@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Play, AlertCircle } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
 import type { IngestResultResponse } from "@/api/client";
+import { formatDuration } from "@/lib/formatDuration";
 
 export function SQLiteTab() {
   const { apiUrl, currentDb, currentCollection, setCollectionType } = useAppStore();
@@ -40,9 +41,22 @@ export function SQLiteTab() {
   const [isRunning,       setIsRunning]       = useState(false);
   const [result,          setResult]          = useState<IngestResultResponse | null>(null);
   const [runError,        setRunError]        = useState<string | null>(null);
+  const [duration,        setDuration]        = useState<string | null>(null);
+  const [elapsed,         setElapsed]         = useState<string | null>(null);
 
-  const loadAbortRef = useRef<AbortController | null>(null);
-  const queryClient = useQueryClient();
+  const loadAbortRef  = useRef<AbortController | null>(null);
+  const startTimeRef  = useRef<number | null>(null);
+  const queryClient   = useQueryClient();
+
+  // Tick elapsed counter while SQLite ingest is running.
+  useEffect(() => {
+    if (!isRunning) { setElapsed(null); return; }
+    const id = setInterval(() => {
+      if (!startTimeRef.current) return;
+      setElapsed(formatDuration(Date.now() - startTimeRef.current));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isRunning]);
 
   async function loadTables(path: string) {
     loadAbortRef.current?.abort();
@@ -93,6 +107,9 @@ export function SQLiteTab() {
     setIsRunning(true);
     setResult(null);
     setRunError(null);
+    setDuration(null);
+    startTimeRef.current = Date.now();
+    const t0 = startTimeRef.current;
     try {
       const res = await api.ingestSqlite(apiUrl, currentDb, collectionName, {
         sqlite_path: sqlitePath,
@@ -104,9 +121,13 @@ export function SQLiteTab() {
         id_column: idColumn || "id",
         row_template: rowTemplate || undefined,
       });
+      setDuration(formatDuration(Date.now() - t0));
       setResult(res);
       queryClient.invalidateQueries({
         queryKey: ["sources", apiUrl, currentDb, collectionName],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["collections", apiUrl, currentDb],
       });
     } catch (e) {
       setRunError(e instanceof Error ? e.message : String(e));
@@ -126,7 +147,7 @@ export function SQLiteTab() {
         <div className="flex gap-2">
           <Input
             value={sqlitePath}
-            onChange={(e) => handlePathChange(e.target.value)}
+            onChange={(e) => { void handlePathChange(e.target.value); }}
             placeholder="/path/to/database.db"
             className="flex-1"
             aria-label="SQLite database path"
@@ -248,6 +269,12 @@ export function SQLiteTab() {
         {isRunning ? "Ingesting…" : "Start ingest"}
       </Button>
 
+      {isRunning && elapsed && (
+        <p className="text-xs text-muted-foreground text-right tabular-nums">
+          Elapsed: {elapsed}
+        </p>
+      )}
+
       {runError && (
         <div
           className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
@@ -265,6 +292,11 @@ export function SQLiteTab() {
             {result.sources_skipped}
           </p>
           <p>Chunks stored: {result.chunks_stored}</p>
+          {duration && (
+            <p className="text-muted-foreground">
+              Duration: <span className="font-medium text-foreground">{duration}</span>
+            </p>
+          )}
         </Card>
       )}
     </div>

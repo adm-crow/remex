@@ -65,9 +65,16 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
                 collection_name, stored_model, embedding_model,
             )
         return collection
-    return client.get_collection(
-        name=collection_name, embedding_function=ef  # type: ignore[arg-type]
+    col = client.get_collection(name=collection_name)
+    # Always use the model the collection was created with, not the caller's default.
+    stored_model = (
+        col.metadata.get("embedding_model")
+        if isinstance(col.metadata, dict) else None
+    ) or embedding_model
+    col._embedding_function = (  # type: ignore[attr-defined]
+        embedding_functions.SentenceTransformerEmbeddingFunction(model_name=stored_model)
     )
+    return col
 
 
 def _make_id_abs(file_path: Path, chunk_index: int) -> str:

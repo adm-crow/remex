@@ -7,14 +7,16 @@ use tauri::{AppHandle, Manager, RunEvent, State};
 pub struct SidecarState(pub Mutex<Option<Child>>);
 
 #[tauri::command]
-fn spawn_sidecar(
+async fn spawn_sidecar(
     state: State<'_, SidecarState>,
     host: String,
     port: u16,
 ) -> Result<(), String> {
-    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    if guard.is_some() {
-        return Ok(()); // already running
+    {
+        let guard = state.0.lock().map_err(|e| e.to_string())?;
+        if guard.is_some() {
+            return Ok(()); // already running
+        }
     }
     let mut child = Command::new("remex")
         .args(["serve", "--host", &host, "--port", &port.to_string()])
@@ -23,7 +25,7 @@ fn spawn_sidecar(
 
     // Brief pause — if remex crashes immediately (missing deps, bad install),
     // catch it here rather than silently polling for 60 s.
-    std::thread::sleep(Duration::from_millis(800));
+    tokio::time::sleep(Duration::from_millis(800)).await;
     if let Ok(Some(status)) = child.try_wait() {
         return Err(format!(
             "'remex serve' exited immediately ({}). \
@@ -32,6 +34,7 @@ fn spawn_sidecar(
         ));
     }
 
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     *guard = Some(child);
     Ok(())
 }

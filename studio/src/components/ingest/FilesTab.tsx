@@ -19,6 +19,7 @@ import { EmbeddingModelField } from "./EmbeddingModelField";
 import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
 import type { ProgressItem } from "@/store/app";
+import { formatDuration } from "@/lib/formatDuration";
 
 const STATUS_VARIANT = {
   ingested: "default" as const,
@@ -55,8 +56,28 @@ export function FilesTab() {
   const [overlap,        setOverlap]        = useState(200);
   const [embeddingModel, setEmbeddingModel] = useState("all-MiniLM-L6-v2");
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const [eta,            setEta]            = useState<string | null>(null);
+  const abortRef    = useRef<AbortController | null>(null);
+  const startTimeRef = useRef<number | null>(null);
   const { isDragging } = useDragDrop((path) => setSourcePath(path));
+
+  // Tick every second while ingesting to keep ETA display current.
+  useEffect(() => {
+    if (!ingestRunning || ingestFilesDone === 0 || ingestFilesTotal === 0) {
+      if (!ingestRunning) setEta(null);
+      return;
+    }
+    function update() {
+      if (!startTimeRef.current) return;
+      const elapsed = Date.now() - startTimeRef.current;
+      const msPerFile = elapsed / ingestFilesDone;
+      const remainingMs = msPerFile * (ingestFilesTotal - ingestFilesDone);
+      setEta(remainingMs < 2000 ? "< 2s" : formatDuration(remainingMs));
+    }
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [ingestRunning, ingestFilesDone, ingestFilesTotal]);
 
   const effectiveCollection = appendModel
     ? `${collectionName}-${embeddingModel}`.replace(/[^a-zA-Z0-9_-]/g, "-")
@@ -78,6 +99,8 @@ export function FilesTab() {
     resetIngestSession();
     setIngestRunning(true);
     abortRef.current = new AbortController();
+    startTimeRef.current = Date.now();
+    const startedAt = new Date().toISOString();
 
     try {
       for await (const event of api.ingestFilesStream(
@@ -104,6 +127,7 @@ export function FilesTab() {
           setLastIngestResult({
             collection:      effectiveCollection,
             sourcePath,
+            startedAt,
             completedAt:     new Date().toISOString(),
             sourcesFound:    event.result.sources_found,
             sourcesIngested: event.result.sources_ingested,
@@ -112,6 +136,9 @@ export function FilesTab() {
           });
           queryClient.invalidateQueries({
             queryKey: ["sources", apiUrl, currentDb, effectiveCollection],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ["collections", apiUrl, currentDb],
           });
           if (event.result.sources_ingested > 0) {
             setShowDoneAlert(true);
@@ -256,6 +283,11 @@ export function FilesTab() {
               }}
             />
           </div>
+          {ingestRunning && eta && (
+            <p className="text-xs text-muted-foreground text-right tabular-nums">
+              ~{eta} remaining
+            </p>
+          )}
         </div>
       )}
 
@@ -310,6 +342,15 @@ export function FilesTab() {
               <p className="text-xs opacity-80">
                 {lastIngestResult.sourcesIngested} ingested · {lastIngestResult.sourcesSkipped} skipped ·{" "}
                 {lastIngestResult.chunksStored} chunks stored
+              </p>
+              <p className="text-xs opacity-80">
+                Duration:{" "}
+                <span className="font-medium">
+                  {formatDuration(
+                    new Date(lastIngestResult.completedAt).getTime() -
+                    new Date(lastIngestResult.startedAt).getTime()
+                  )}
+                </span>
               </p>
               <p className="text-xs opacity-60 font-mono">
                 {new Date(lastIngestResult.completedAt).toLocaleString()}

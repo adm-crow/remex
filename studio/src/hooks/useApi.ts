@@ -138,6 +138,9 @@ export function useDeleteSource(
       queryClient.invalidateQueries({
         queryKey: ["sources", apiUrl, dbPath, collection],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["collectionStats", apiUrl, dbPath, collection],
+      });
     },
   });
 }
@@ -169,6 +172,9 @@ export function usePurgeCollection(
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["sources", apiUrl, dbPath, collection],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["collectionStats", apiUrl, dbPath, collection],
       });
     },
   });

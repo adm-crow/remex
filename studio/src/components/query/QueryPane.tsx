@@ -272,7 +272,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       </div>
 
       {/* ── Error ────────────────────────────────────────────────────────── */}
-      {error && (
+      {!!submitted && error && (
         <div
           className="mx-6 mt-4 shrink-0 text-destructive text-sm p-3 border border-destructive/30 rounded-md bg-destructive/5"
           role="alert"
@@ -394,8 +394,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <div className="flex flex-col gap-2 mt-2">
-                    {results.map((r) => (
-                      <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
+                    {results.map((r, i) => (
+                      <ResultCard key={`${r.source}-${r.chunk}-${i}`} result={r} />
                     ))}
                   </div>
                 </CollapsibleContent>
@@ -409,8 +409,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                   <span className="text-xs text-muted-foreground">{results.length}</span>
                 </div>
                 <div className="flex flex-col gap-2">
-                  {results.map((r) => (
-                    <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
+                  {results.map((r, i) => (
+                    <ResultCard key={`${r.source}-${r.chunk}-${i}`} result={r} />
                   ))}
                 </div>
               </>

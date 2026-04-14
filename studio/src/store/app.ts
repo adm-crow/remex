@@ -17,6 +17,7 @@ export interface ProgressItem {
 export interface LastIngestResult {
   collection: string;
   sourcePath: string;
+  startedAt: string;   // ISO string
   completedAt: string; // ISO string
   sourcesFound: number;
   sourcesIngested: number;
