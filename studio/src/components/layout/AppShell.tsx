@@ -23,6 +23,7 @@ export function AppShell() {
   const [activeView, setActiveView] = useState<View>("query");
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
+  const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
   const isDragging = useRef(false);
   const focusSearchRef = useRef<(() => void) | null>(null);
 
@@ -82,6 +83,12 @@ export function AppShell() {
             <span className="size-1.5 rounded-full bg-destructive shrink-0" />
             Could not start remex serve — is remex installed?{" "}
             <code className="font-mono text-xs opacity-80">pip install remex[api]</code>
+            <button
+              onClick={triggerSidecarReconnect}
+              className="ml-auto shrink-0 underline underline-offset-2 hover:no-underline"
+            >
+              Retry
+            </button>
           </div>
         )}
         <div key={activeView} className="flex-1 min-h-0 flex flex-col animate-pane-in">

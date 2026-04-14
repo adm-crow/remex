@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 60000;
+const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
 function parseUrl(apiUrl: string): { host: string; port: number } {
   try {
@@ -20,6 +20,7 @@ function parseUrl(apiUrl: string): { host: string; port: number } {
 
 export function useSidecar() {
   const apiUrl = useAppStore((s) => s.apiUrl);
+  const reconnectSeq = useAppStore((s) => s.sidecarReconnectSeq);
   const setSidecarStatus = useAppStore((s) => s.setSidecarStatus);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // True only when this effect run successfully spawned the sidecar.
@@ -33,11 +34,15 @@ export function useSidecar() {
     const { host, port } = parseUrl(apiUrl);
 
     async function checkHealth(): Promise<boolean> {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), HEALTH_CHECK_TIMEOUT_MS);
       try {
-        await api.getHealth(apiUrl);
-        return true;
+        const res = await fetch(`${apiUrl}/health`, { signal: ctrl.signal });
+        return res.ok;
       } catch {
         return false;
+      } finally {
+        clearTimeout(timer);
       }
     }
 
@@ -95,5 +100,5 @@ export function useSidecar() {
         invoke("kill_sidecar").catch(() => {});
       }
     };
-  }, [apiUrl, setSidecarStatus]);
+  }, [apiUrl, reconnectSeq, setSidecarStatus]);
 }

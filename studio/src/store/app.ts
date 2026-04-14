@@ -36,6 +36,9 @@ export interface AppState {
   aiProvider: string;
   aiModel: string;
   aiApiKey: string;
+  // Sidecar reconnect (not persisted)
+  sidecarReconnectSeq: number;
+  triggerSidecarReconnect: () => void;
   // Ingest session state (not persisted)
   ingestRunning: boolean;
   ingestProgress: ProgressItem[];
@@ -82,6 +85,7 @@ export const useAppStore = create<AppState>()(
       queryHistory: [],
       apiUrl: "http://localhost:8000",
       sidecarStatus: "starting",
+      sidecarReconnectSeq: 0,
       darkMode: false,
       theme: "default",
       aiProvider: "",
@@ -129,7 +133,8 @@ export const useAppStore = create<AppState>()(
       },
 
       setApiUrl:         (url)      => set({ apiUrl: url }),
-      setSidecarStatus:  (status)   => set({ sidecarStatus: status }),
+      setSidecarStatus:        (status) => set({ sidecarStatus: status }),
+      triggerSidecarReconnect: ()       => set((s) => ({ sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
       setDarkMode:       (dark)     => set({ darkMode: dark }),
       setTheme:          (theme)    => set({ theme }),
       setAiProvider:     (provider) => set({ aiProvider: provider }),
