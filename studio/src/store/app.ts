@@ -6,7 +6,7 @@ export interface RecentProject {
   lastOpened: string;
 }
 
-export type Theme = "default" | "blue" | "purple" | "green" | "rose" | "amber" | "teal" | "coral";
+export type Theme = "default" | "blue" | "purple" | "green" | "rose" | "amber" | "teal" | "coral" | "slate" | "lime" | "violet" | "cyan";
 
 export interface ProgressItem {
   filename: string;

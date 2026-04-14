@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Play, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -37,6 +37,16 @@ export function FilesTab() {
     setIngestFilesDone, setIngestFilesTotal,
     setIngestRunning, setIngestStreamError, setLastIngestResult,
   } = useAppStore();
+
+  // Reset session state when navigating away after a completed ingest
+  useEffect(() => {
+    return () => {
+      if (!useAppStore.getState().ingestRunning) {
+        resetIngestSession();
+        setLastIngestResult(null);
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [sourcePath,     setSourcePath]     = useState("");
   const [collectionName, setCollectionName] = useState(currentCollection ?? "");
@@ -242,7 +252,7 @@ export function FilesTab() {
                 <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
               </button>
             ))}
-            <div className="flex flex-col gap-1 pt-0.5">
+            <div className="flex flex-row flex-wrap gap-x-3 gap-y-1 pt-0.5">
               {[
                 { label: "SBERT pretrained models",         href: "https://www.sbert.net/docs/pretrained_models.html" },
                 { label: "HuggingFace sentence-similarity", href: "https://huggingface.co/models?pipeline_tag=sentence-similarity&sort=downloads" },
@@ -272,7 +282,9 @@ export function FilesTab() {
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>{ingestRunning ? "Ingesting…" : "Done"}</span>
             <span className="tabular-nums">
-              {ingestFilesDone} / {ingestFilesTotal > 0 ? ingestFilesTotal : "?"}
+              {ingestFilesTotal === 0
+                ? "Loading model…"
+                : `${ingestFilesDone} / ${ingestFilesTotal}`}
             </span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -329,7 +341,7 @@ export function FilesTab() {
 
       {lastIngestResult && (
         <Card>
-          <CardContent className="pt-4 text-sm space-y-1">
+          <CardContent className="py-4 text-sm space-y-1">
             {!ingestRunning && (
               <p className="text-xs text-muted-foreground mb-1">
                 Last ingest · {new Date(lastIngestResult.completedAt).toLocaleString()}

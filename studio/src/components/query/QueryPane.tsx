@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X, FolderOpen, PackageOpen, SearchX } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
@@ -26,6 +27,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const [useAi, setUseAi] = useState(false);
   const [nResults, setNResults] = useState(5);
   const [minScore, setMinScore] = useState(0);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
   const [selectedCollections, setSelectedCollections] = useState<string[]>(
     currentCollection ? [currentCollection] : []
   );
@@ -165,6 +167,11 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           </div>
         )}
 
+        {/* Separator between history and collections */}
+        {queryHistory.length > 0 && collections.length > 0 && (
+          <div className="h-px bg-border/60" />
+        )}
+
         {/* Collection pills */}
         <div className="flex flex-wrap gap-1.5">
           {collections.map((col) => {
@@ -290,7 +297,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           {/* Empty state: pre-query idle (no collections) */}
           {!!currentDb && !submitted && collections.length === 0 && (
             <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-              <PackageOpen className="w-8 h-8 text-muted-foreground/40 mb-3" />
+              <Inbox className="w-8 h-8 text-muted-foreground/40 mb-3" />
               <p className="text-sm font-medium text-muted-foreground">No collections yet</p>
               <p className="text-xs text-muted-foreground/60 mt-1">
                 Go to the Ingest tab to add some documents first.
@@ -345,18 +352,6 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
             </div>
           )}
 
-          {/* Results header */}
-          {!isLoading && submitted && results.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                {useAi ? "Sources" : "Results"}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {results.length}
-              </span>
-            </div>
-          )}
-
           {/* Empty state: no results */}
           {!isLoading && !!submitted && results.length === 0 && !error && (
             <div className="flex flex-col items-center justify-center py-16 text-center px-6">
@@ -368,13 +363,43 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
             </div>
           )}
 
-          {/* Result cards */}
-          {!!submitted && (
-            <div className="flex flex-col gap-2">
-              {results.map((r) => (
-                <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
-              ))}
-            </div>
+          {/* Results / Sources — AI mode gets a collapsible, vector mode is always open */}
+          {!isLoading && submitted && results.length > 0 && (
+            useAi ? (
+              <Collapsible open={sourcesOpen} onOpenChange={setSourcesOpen}>
+                <CollapsibleTrigger className="flex items-center gap-2 w-full text-left group">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Sources
+                  </span>
+                  <span className="text-xs text-muted-foreground">{results.length}</span>
+                  <ChevronDown className={cn(
+                    "w-3.5 h-3.5 text-muted-foreground ml-auto transition-transform duration-150",
+                    sourcesOpen && "rotate-180"
+                  )} />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {results.map((r) => (
+                      <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Results
+                  </span>
+                  <span className="text-xs text-muted-foreground">{results.length}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {results.map((r) => (
+                    <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
+                  ))}
+                </div>
+              </>
+            )
           )}
 
         </div>

@@ -20,7 +20,7 @@ const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
 ];
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
-  const { currentDb, sidecarStatus } = useAppStore();
+  const { currentDb, sidecarStatus, apiUrl } = useAppStore();
 
   return (
     <aside
@@ -106,8 +106,8 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
           <p className="text-xs font-medium capitalize text-sidebar-foreground leading-none">
             {sidecarStatus}
           </p>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1">
-            remex serve
+          <p className="text-[11px] text-muted-foreground leading-none mt-1 font-mono truncate" title={apiUrl}>
+            {apiUrl}
           </p>
         </div>
       </div>

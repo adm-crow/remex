@@ -23,12 +23,16 @@ import { cn } from "@/lib/utils";
 const THEME_OPTIONS: { value: Theme; label: string; color: string }[] = [
   { value: "default", label: "Indigo",  color: "bg-indigo-500"  },
   { value: "blue",    label: "Blue",    color: "bg-sky-500"     },
+  { value: "violet",  label: "Violet",  color: "bg-violet-500"  },
   { value: "purple",  label: "Fuchsia", color: "bg-fuchsia-500" },
   { value: "green",   label: "Green",   color: "bg-emerald-500" },
-  { value: "rose",    label: "Rose",    color: "bg-rose-500"    },
-  { value: "amber",   label: "Amber",   color: "bg-amber-400"   },
+  { value: "lime",    label: "Lime",    color: "bg-lime-500"    },
   { value: "teal",    label: "Teal",    color: "bg-teal-500"    },
+  { value: "cyan",    label: "Cyan",    color: "bg-cyan-500"    },
+  { value: "rose",    label: "Rose",    color: "bg-rose-500"    },
   { value: "coral",   label: "Coral",   color: "bg-orange-400"  },
+  { value: "amber",   label: "Amber",   color: "bg-amber-400"   },
+  { value: "slate",   label: "Slate",   color: "bg-slate-500"   },
 ];
 
 const AUTO_PROVIDER = "__auto__";

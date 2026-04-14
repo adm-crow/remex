@@ -249,7 +249,7 @@ export function SQLiteTab() {
         aria-label="Run ingest"
       >
         <Play className="w-4 h-4 mr-2" />
-        {isRunning ? "Ingesting…" : "Run ingest"}
+        {isRunning ? "Ingesting…" : "Start ingest"}
       </Button>
 
       {runError && (
@@ -264,7 +264,7 @@ export function SQLiteTab() {
 
       {result && (
         <Card>
-          <CardContent className="pt-4 text-sm space-y-1">
+          <CardContent className="py-4 text-sm space-y-1">
             <p>
               Found: {result.sources_found} · Ingested: {result.sources_ingested} · Skipped:{" "}
               {result.sources_skipped}
