@@ -130,3 +130,8 @@ class DeletedChunksResponse(BaseModel):
 
 class SQLiteTablesResponse(BaseModel):
     tables: list[str]
+
+
+class SourceItem(BaseModel):
+    source: str
+    chunk_count: int

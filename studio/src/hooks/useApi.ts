@@ -4,7 +4,9 @@ import {
   useQueryClient,
   useQueries,
 } from "@tanstack/react-query";
-import { api, type QueryResultItem } from "@/api/client";
+import { api, type QueryResultItem, type SourceItem } from "@/api/client";
+
+export type { SourceItem };
 
 export function useCollections(apiUrl: string, dbPath: string) {
   return useQuery({

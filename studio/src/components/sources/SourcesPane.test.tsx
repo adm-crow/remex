@@ -51,7 +51,10 @@ beforeEach(() => {
   } as any);
 
   vi.mocked(useSources).mockReturnValue({
-    data: ["/docs/a.md", "/docs/b.md"],
+    data: [
+      { source: "/docs/a.md", chunk_count: 4 },
+      { source: "/docs/b.md", chunk_count: 7 },
+    ],
     isLoading: false,
     error: null,
   } as any);

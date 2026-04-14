@@ -73,7 +73,10 @@ describe("useCollectionStats", () => {
 
 describe("useSources", () => {
   it("returns sources list", async () => {
-    vi.mocked(api.getSources).mockResolvedValue(["/path/a.md", "/path/b.md"]);
+    vi.mocked(api.getSources).mockResolvedValue([
+      { source: "/path/a.md", chunk_count: 4 },
+      { source: "/path/b.md", chunk_count: 7 },
+    ]);
     const { result } = renderHook(
       () => useSources("http://localhost:8000", "./remex_db", "col1"),
       { wrapper }

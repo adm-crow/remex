@@ -522,6 +522,26 @@ def sources(
     return sorted(unique)
 
 
+def source_chunk_counts(
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
+) -> dict[str, int]:
+    """Return a mapping of source path → chunk count for the collection."""
+    client = chromadb.PersistentClient(path=db_path)
+    try:
+        collection = client.get_collection(name=collection_name)
+    except (ValueError, ChromaNotFoundError):
+        return {}
+
+    results = collection.get(include=["metadatas"])
+    counts: dict[str, int] = {}
+    for meta in results["metadatas"]:  # type: ignore[union-attr]
+        src = meta.get("source", "")
+        if src:
+            counts[src] = counts.get(src, 0) + 1
+    return counts
+
+
 def list_collections(db_path: str = "./remex_db") -> list[str]:
     """Return a sorted list of all collection names in a ChromaDB directory.
 

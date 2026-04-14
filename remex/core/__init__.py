@@ -17,6 +17,7 @@ from .pipeline import (
     query,
     query_async,
     reset,
+    source_chunk_counts,
     sources,
 )
 from .sqlite_ingester import ingest_sqlite
@@ -36,6 +37,7 @@ __all__ = [
     "query_async",
     "reset",
     "setup_logging",
+    "source_chunk_counts",
     "sources",
     # config
     "load_config",

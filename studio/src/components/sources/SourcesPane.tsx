@@ -18,6 +18,7 @@ import {
   useDeleteSource,
   usePurgeCollection,
   useDeleteCollection,
+  type SourceItem,
 } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ interface SourcesListProps {
 }
 
 function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<SourceItem | null>(null);
   const { data: sources = [], isLoading } = useSources(apiUrl, dbPath, collection);
   const deleteMutation = useDeleteSource(apiUrl, dbPath, collection);
 
@@ -48,22 +49,26 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
     <>
       <div className="flex flex-col gap-px py-1">
         {sources
-          .filter((s) => s !== confirmDelete)
-          .map((source) => (
+          .filter((s) => s.source !== confirmDelete?.source)
+          .map((item) => (
             <div
-              key={source}
+              key={item.source}
               className="group flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-muted/50 transition-colors"
             >
               <span
                 className="text-xs font-mono truncate flex-1 text-muted-foreground"
-                title={source}
+                title={item.source}
               >
-                {source}
+                {item.source}
+              </span>
+              <span className="text-xs text-muted-foreground/50 shrink-0 mx-2 select-none">·</span>
+              <span className="text-xs tabular-nums text-muted-foreground/70 shrink-0 mr-1">
+                {item.chunk_count.toLocaleString()}
               </span>
               <button
                 className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1 rounded transition-all duration-100"
-                onClick={() => setConfirmDelete(source)}
-                aria-label={`Delete ${source}`}
+                onClick={() => setConfirmDelete(item)}
+                aria-label={`Delete ${item.source}`}
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -85,7 +90,7 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
           <p className="text-sm">
             Remove{" "}
             <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-              {confirmDelete}
+              {confirmDelete?.source}
             </span>
             ?
           </p>
@@ -97,7 +102,7 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
               variant="destructive"
               onClick={async () => {
                 try {
-                  await deleteMutation.mutateAsync(confirmDelete!);
+                  await deleteMutation.mutateAsync(confirmDelete!.source);
                   setConfirmDelete(null);
                 } catch {
                   // error visible via deleteMutation.error

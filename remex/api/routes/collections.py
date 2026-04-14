@@ -1,6 +1,6 @@
 import sqlite3
 from fastapi import APIRouter, HTTPException, Query
-from remex.core import collection_stats, delete_source, list_collections, purge, reset, sources
+from remex.core import collection_stats, delete_source, list_collections, purge, reset, source_chunk_counts
 from remex.core.exceptions import CollectionNotFoundError, RemexError
 from remex.api.schemas import (
     CollectionStatsResponse,
@@ -8,6 +8,7 @@ from remex.api.schemas import (
     DeletedResponse,
     PurgeResultResponse,
     SQLiteTablesResponse,
+    SourceItem,
 )
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -53,11 +54,15 @@ def get_stats(
     )
 
 
-@router.get("/{collection}/sources", response_model=list[str])
+@router.get("/{collection}/sources", response_model=list[SourceItem])
 def get_sources(
     collection: str, db_path: str = Query(default="./remex_db")
-) -> list[str]:
-    return sources(db_path=db_path, collection_name=collection)
+) -> list[SourceItem]:
+    counts = source_chunk_counts(db_path=db_path, collection_name=collection)
+    return [
+        SourceItem(source=src, chunk_count=count)
+        for src, count in sorted(counts.items())
+    ]
 
 
 @router.delete("/{collection}/sources/{source:path}", response_model=DeletedChunksResponse)

@@ -77,6 +77,11 @@ export interface SQLiteTablesResponse {
   tables: string[];
 }
 
+export interface SourceItem {
+  source: string;
+  chunk_count: number;
+}
+
 export interface IngestSQLiteRequest {
   sqlite_path: string;
   table: string;
@@ -156,7 +161,7 @@ export const api = {
     ),
 
   getSources: (base: string, dbPath: string, collection: string) =>
-    apiFetch<string[]>(
+    apiFetch<SourceItem[]>(
       `${base}/collections/${encodeURIComponent(collection)}/sources?db_path=${encodeURIComponent(dbPath)}`
     ),
 
