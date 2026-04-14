@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FolderOpen } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
@@ -8,6 +9,8 @@ interface Props {
 }
 
 export function ResultCard({ result }: Props) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <div
       className={cn(
@@ -46,11 +49,20 @@ export function ResultCard({ result }: Props) {
       </div>
       {/* Excerpt */}
       <p className="text-sm leading-relaxed text-foreground">
-        {result.text.slice(0, 300)}
-        {result.text.length > 300 && (
+        {expanded ? result.text : result.text.slice(0, 300)}
+        {!expanded && result.text.length > 300 && (
           <span className="text-muted-foreground">…</span>
         )}
       </p>
+      {result.text.length > 300 && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors self-end"
+        >
+          {expanded ? "‹ Show less" : "Show more ›"}
+        </button>
+      )}
     </div>
   );
 }

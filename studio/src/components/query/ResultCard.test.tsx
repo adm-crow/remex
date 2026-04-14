@@ -21,6 +21,8 @@ const mockResult = {
   doc_created: "",
 };
 
+const longText = "A".repeat(400);
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -44,5 +46,35 @@ describe("ResultCard", () => {
     renderWithProviders(<ResultCard result={mockResult} />);
     fireEvent.click(screen.getByRole("button", { name: /open source file/i }));
     expect(vi.mocked(open)).toHaveBeenCalledWith("/docs/a.md");
+  });
+
+  it("does not show toggle when text is 300 chars or fewer", () => {
+    renderWithProviders(<ResultCard result={mockResult} />);
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /show less/i })).not.toBeInTheDocument();
+  });
+
+  it("shows truncated text and 'Show more' button when text exceeds 300 chars", () => {
+    renderWithProviders(<ResultCard result={{ ...mockResult, text: longText }} />);
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /show less/i })).not.toBeInTheDocument();
+    // Only first 300 chars rendered — the full 400-char string should not be present
+    expect(screen.queryByText(longText)).not.toBeInTheDocument();
+  });
+
+  it("clicking 'Show more' reveals full text and shows 'Show less' button", () => {
+    renderWithProviders(<ResultCard result={{ ...mockResult, text: longText }} />);
+    fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+    expect(screen.getByText(longText)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /show less/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /show more/i })).not.toBeInTheDocument();
+  });
+
+  it("clicking 'Show less' collapses back to truncated text", () => {
+    renderWithProviders(<ResultCard result={{ ...mockResult, text: longText }} />);
+    fireEvent.click(screen.getByRole("button", { name: /show more/i }));
+    fireEvent.click(screen.getByRole("button", { name: /show less/i }));
+    expect(screen.queryByText(longText)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /show more/i })).toBeInTheDocument();
   });
 });
