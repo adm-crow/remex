@@ -171,6 +171,11 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           </div>
         )}
 
+        {/* Separator between history and collections */}
+        {queryHistory.length > 0 && collections.length > 0 && (
+          <div className="h-px bg-border/60" />
+        )}
+
         {/* Collection pills */}
         {collections.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
