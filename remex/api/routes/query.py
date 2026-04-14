@@ -67,8 +67,6 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
             model=resolved_model,
             api_key=req.api_key or None,
         )
-    except (ImportError, RuntimeError, ValueError) as e:
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

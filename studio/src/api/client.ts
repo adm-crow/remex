@@ -275,12 +275,19 @@ export const api = {
       }
     );
     if (!res.ok || !res.body) {
-      throw new Error(`${res.status}: ingest stream failed`);
+      const body = await res.text().catch(() => "");
+      let message: string;
+      try {
+        message = (JSON.parse(body) as { detail?: string }).detail ?? body;
+      } catch {
+        message = body || "ingest stream failed";
+      }
+      throw new Error(`${res.status}: ${message}`);
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    while (true) {
+    outer: while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -288,7 +295,9 @@ export const api = {
       buffer = parts.pop() ?? "";
       for (const part of parts) {
         if (part.startsWith("data: ")) {
-          yield JSON.parse(part.slice(6)) as IngestStreamEvent;
+          const event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+          yield event;
+          if (event.type === "done" || event.type === "error") break outer;
         }
       }
     }

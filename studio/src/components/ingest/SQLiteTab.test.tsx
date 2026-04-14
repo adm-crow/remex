@@ -56,15 +56,8 @@ describe("SQLiteTab", () => {
     });
   });
 
-  it("shows result card after successful ingest", async () => {
+  it("run button stays disabled until a table is selected", async () => {
     vi.mocked(api.listSqliteTables).mockResolvedValue({ tables: ["logs"] });
-    vi.mocked(api.ingestSqlite).mockResolvedValue({
-      sources_found: 1,
-      sources_ingested: 1,
-      sources_skipped: 0,
-      chunks_stored: 50,
-      skipped_reasons: [],
-    });
     renderWithProviders(<SQLiteTab />);
     fireEvent.change(
       screen.getByRole("textbox", { name: /sqlite database path/i }),
@@ -73,13 +66,7 @@ describe("SQLiteTab", () => {
     await waitFor(() => {
       expect(api.listSqliteTables).toHaveBeenCalled();
     });
-    // Simulate table selection — type directly into the collection input to enable run
-    fireEvent.change(
-      screen.getByRole("textbox", { name: /sqlite collection/i }),
-      { target: { value: "myCol" } }
-    );
-    // We can't easily interact with Radix Select in tests — test via direct state.
-    // The run button requires a selected table; verify it's disabled without one.
+    // Tables are loaded but none selected yet — run button must stay disabled.
     expect(screen.getByRole("button", { name: /run ingest/i })).toBeDisabled();
   });
 });

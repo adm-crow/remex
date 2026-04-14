@@ -140,7 +140,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
     checked: number;
   } | null>(null);
 
-  const { currentCollection, setCurrentCollection } = useAppStore();
+  const { currentCollection, setCurrentCollection, removeCollectionType } = useAppStore();
   const { data: stats, isLoading: statsLoading } = useCollectionStats(
     apiUrl,
     dbPath,
@@ -233,7 +233,9 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
             <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{name}</span>?
           </p>
           {deleteMutation.error && (
-            <p className="text-xs text-destructive">{(deleteMutation.error as Error).message}</p>
+            <p className="text-xs text-destructive">
+              {deleteMutation.error instanceof Error ? deleteMutation.error.message : String(deleteMutation.error)}
+            </p>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDelete(false)}>
@@ -246,6 +248,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
                 try {
                   await deleteMutation.mutateAsync(name);
                   if (currentCollection === name) setCurrentCollection(null);
+                  removeCollectionType(dbPath, name);
                   setConfirmDelete(false);
                 } catch {
                   // error surfaced via deleteMutation.error above
@@ -283,7 +286,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
       )}
       {purgeMutation.error && (
         <div className="px-4 pb-2 text-xs text-destructive border-t pt-2">
-          {(purgeMutation.error as Error).message}
+          {purgeMutation.error instanceof Error ? purgeMutation.error.message : String(purgeMutation.error)}
         </div>
       )}
 

@@ -74,6 +74,7 @@ export interface AppState {
   setLastIngestResult: (r: LastIngestResult | null) => void;
   setIngestDoneUnread: (v: boolean) => void;
   setCollectionType: (dbPath: string, collection: string, type: "files" | "sqlite") => void;
+  removeCollectionType: (dbPath: string, collection: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -165,6 +166,12 @@ export const useAppStore = create<AppState>()(
             [`${dbPath}::${collection}`]: type,
           },
         })),
+      removeCollectionType: (dbPath, collection) =>
+        set((s) => {
+          const next = { ...s.collectionTypes };
+          delete next[`${dbPath}::${collection}`];
+          return { collectionTypes: next };
+        }),
     }),
     {
       name: "remex-studio",

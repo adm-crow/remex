@@ -32,6 +32,11 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     currentCollection ? [currentCollection] : []
   );
 
+  // Keep selection in sync when the user switches collections from the sidebar.
+  useEffect(() => {
+    setSelectedCollections(currentCollection ? [currentCollection] : []);
+  }, [currentCollection]);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

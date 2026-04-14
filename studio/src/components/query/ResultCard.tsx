@@ -34,18 +34,20 @@ export function ResultCard({ result }: Props) {
         <span className="text-xs text-muted-foreground shrink-0">
           #{result.chunk}
         </span>
-        <button
-          type="button"
-          onClick={() => {
-            open(result.source).catch((err) => {
-              console.error("[ResultCard] Failed to open file:", err);
-            });
-          }}
-          aria-label="Open source file"
-          className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <FolderOpen className="w-3.5 h-3.5" />
-        </button>
+        {result.source_type !== "sqlite" && (
+          <button
+            type="button"
+            onClick={() => {
+              open(result.source).catch((err) => {
+                console.error("[ResultCard] Failed to open file:", err);
+              });
+            }}
+            aria-label="Open source file"
+            className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <FolderOpen className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
       {/* Excerpt */}
       <p className="text-sm leading-relaxed text-foreground">

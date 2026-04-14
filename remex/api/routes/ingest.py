@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import AsyncIterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from remex.core import ingest, ingest_sqlite
@@ -42,7 +42,7 @@ async def ingest_files(collection: str, req: IngestRequest) -> IngestResultRespo
 
 
 @router.post("/{collection}/ingest/stream")
-async def ingest_files_stream(collection: str, req: IngestRequest) -> StreamingResponse:
+async def ingest_files_stream(collection: str, req: IngestRequest, request: Request) -> StreamingResponse:
     """SSE endpoint — streams per-file progress events, then a final result event.
 
     Event types:
@@ -95,14 +95,21 @@ async def ingest_files_stream(collection: str, req: IngestRequest) -> StreamingR
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
 
-    asyncio.create_task(_run())
+    task = asyncio.create_task(_run())
 
     async def _stream() -> AsyncIterator[str]:
-        while True:
-            event = await queue.get()
-            yield f"data: {json.dumps(event)}\n\n"
-            if event["type"] in ("done", "error"):
-                break
+        try:
+            while True:
+                event = await queue.get()
+                yield f"data: {json.dumps(event)}\n\n"
+                if event["type"] in ("done", "error"):
+                    break
+                if await request.is_disconnected():
+                    task.cancel()
+                    break
+        finally:
+            if not task.done():
+                task.cancel()
 
     return StreamingResponse(_stream(), media_type="text/event-stream")
 
