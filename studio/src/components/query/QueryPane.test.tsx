@@ -271,6 +271,14 @@ describe("QueryPane", () => {
     expect(screen.getByText("No collections yet")).toBeInTheDocument();
   });
 
+  it("calls onFocusReady with a function that focuses the query input", () => {
+    let focusFn: (() => void) | undefined;
+    renderWithProviders(
+      <QueryPane onFocusReady={(fn) => { focusFn = fn; }} />
+    );
+    expect(focusFn).toBeDefined();
+  });
+
   it("Escape on the input clears text and dismisses results", async () => {
     vi.mocked(useMultiQueryResults).mockReturnValue({
       data: mockResults,

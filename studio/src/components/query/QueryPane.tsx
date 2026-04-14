@@ -16,7 +16,7 @@ interface QueryPaneProps {
   onFocusReady?: (fn: () => void) => void;
 }
 
-export function QueryPane({ onFocusReady }: QueryPaneProps = {}) {
+export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
           queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory } =
     useAppStore();
@@ -33,7 +33,10 @@ export function QueryPane({ onFocusReady }: QueryPaneProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    onFocusReady?.(() => inputRef.current?.focus());
+    if (!onFocusReady) return;
+    onFocusReady(() => inputRef.current?.focus());
+    // No cleanup needed: AppShell's handleFocusReady is stable (useCallback []),
+    // so this effect runs exactly once on mount.
   }, [onFocusReady]);
 
   const { data: collections = [] } = useCollections(apiUrl, currentDb ?? "");
@@ -94,7 +97,13 @@ export function QueryPane({ onFocusReady }: QueryPaneProps = {}) {
               ref={inputRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Escape") { setText(""); setSubmitted(""); } }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setText("");
+                  setSubmitted("");
+                  inputRef.current?.blur();
+                }
+              }}
               placeholder="Ask a question or search your documents…"
               className="pl-9 pr-9 h-10"
               aria-label="Query input"

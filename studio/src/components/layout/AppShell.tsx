@@ -30,10 +30,12 @@ export function AppShell() {
     focusSearchRef.current = fn;
   }, []);
 
-  useKeyboardShortcuts({
-    onViewChange: setActiveView,
-    focusSearch: () => focusSearchRef.current?.(),
-  });
+  const focusSearch = useCallback(
+    () => focusSearchRef.current?.(),
+    [] // focusSearchRef is a stable ref; no deps needed
+  );
+
+  useKeyboardShortcuts({ onViewChange: setActiveView, focusSearch });
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
