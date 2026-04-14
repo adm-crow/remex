@@ -7,13 +7,14 @@ import { useAppStore } from "@/store/app";
 
 vi.mock("@/hooks/useApi", () => ({
   useCollections: vi.fn(),
+  useDeleteCollection: vi.fn(),
 }));
 
 vi.mock("@/hooks/useSidecar", () => ({
   useSidecar: vi.fn(),
 }));
 
-import { useCollections } from "@/hooks/useApi";
+import { useCollections, useDeleteCollection } from "@/hooks/useApi";
 
 beforeEach(() => {
   localStorage.clear();
@@ -24,6 +25,10 @@ beforeEach(() => {
     apiUrl: "http://localhost:8000",
     sidecarStatus: "connected",
   });
+  vi.mocked(useDeleteCollection).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as any);
 });
 
 describe("CollectionSwitcher", () => {
