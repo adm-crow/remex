@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -133,10 +133,14 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         {/* Query history chips */}
         {queryHistory.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
+            <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
+              <Clock className="w-3 h-3" />
+              Recent
+            </span>
             {queryHistory.map((q) => (
               <span
                 key={q}
-                className="group flex items-center gap-0.5 text-xs pl-2 pr-1 py-0.5 rounded-full border bg-muted/50 hover:bg-muted transition-colors"
+                className="group flex items-center gap-0.5 text-xs pl-2 pr-1 py-0.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted transition-colors"
               >
                 <button
                   type="button"
@@ -159,7 +163,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               <button
                 type="button"
                 onClick={clearQueryHistory}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-0.5"
               >
                 Clear all
               </button>
@@ -167,32 +171,33 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           </div>
         )}
 
-        {/* Separator between history and collections */}
-        {queryHistory.length > 0 && collections.length > 0 && (
-          <div className="h-px bg-border/60" />
-        )}
-
         {/* Collection pills */}
-        <div className="flex flex-wrap gap-1.5">
-          {collections.map((col) => {
-            const isSelected = selectedCollections.includes(col);
-            return (
-              <button
-                key={col}
-                type="button"
-                onClick={() => handleCollectionToggle(col)}
-                className={cn(
-                  "text-xs px-2.5 py-1 rounded-full border transition-colors",
-                  isSelected
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/50 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
-                )}
-              >
-                {col}
-              </button>
-            );
-          })}
-        </div>
+        {collections.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
+              <Layers className="w-3 h-3" />
+              Collections
+            </span>
+            {collections.map((col) => {
+              const isSelected = selectedCollections.includes(col);
+              return (
+                <button
+                  key={col}
+                  type="button"
+                  onClick={() => handleCollectionToggle(col)}
+                  className={cn(
+                    "text-xs px-2.5 py-1 rounded-md border transition-colors font-medium",
+                    isSelected
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  {col}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Options strip — compact, secondary */}
         <div className="flex items-center gap-3">
