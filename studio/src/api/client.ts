@@ -160,10 +160,15 @@ export const api = {
       `${base}/collections/${encodeURIComponent(collection)}/stats?db_path=${encodeURIComponent(dbPath)}`
     ),
 
-  getSources: (base: string, dbPath: string, collection: string) =>
-    apiFetch<SourceItem[]>(
+  getSources: async (base: string, dbPath: string, collection: string) => {
+    const raw = await apiFetch<SourceItem[] | string[]>(
       `${base}/collections/${encodeURIComponent(collection)}/sources?db_path=${encodeURIComponent(dbPath)}`
-    ),
+    );
+    // Normalise: handle servers that still return plain string[].
+    return (raw as Array<SourceItem | string>).map((item): SourceItem =>
+      typeof item === "string" ? { source: item, chunk_count: 0 } : item
+    );
+  },
 
   deleteSource: (
     base: string,

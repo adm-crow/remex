@@ -49,7 +49,7 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
     <>
       <div className="flex flex-col gap-px py-1">
         {sources
-          .filter((s) => s.source !== confirmDelete?.source)
+          .filter((s) => !confirmDelete || s.source !== confirmDelete.source)
           .map((item) => (
             <div
               key={item.source}
@@ -61,10 +61,14 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
               >
                 {item.source}
               </span>
-              <span className="text-xs text-muted-foreground/50 shrink-0 mx-2 select-none">·</span>
-              <span className="text-xs tabular-nums text-muted-foreground/70 shrink-0 mr-1">
-                {item.chunk_count.toLocaleString()}
-              </span>
+              {item.chunk_count > 0 && (
+                <>
+                  <span className="text-xs text-muted-foreground/50 shrink-0 mx-2 select-none">·</span>
+                  <span className="text-xs tabular-nums text-muted-foreground/70 shrink-0 mr-1">
+                    {item.chunk_count.toLocaleString()}
+                  </span>
+                </>
+              )}
               <button
                 className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive p-1 rounded transition-all duration-100"
                 onClick={() => setConfirmDelete(item)}
