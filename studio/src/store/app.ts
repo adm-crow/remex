@@ -8,6 +8,22 @@ export interface RecentProject {
 
 export type Theme = "default" | "blue" | "purple" | "green" | "rose" | "amber" | "teal" | "coral";
 
+export interface ProgressItem {
+  filename: string;
+  status: "ingested" | "skipped" | "error";
+  chunks_stored: number;
+}
+
+export interface LastIngestResult {
+  collection: string;
+  sourcePath: string;
+  completedAt: string; // ISO string
+  sourcesFound: number;
+  sourcesIngested: number;
+  sourcesSkipped: number;
+  chunksStored: number;
+}
+
 export interface AppState {
   currentDb: string | null;
   currentCollection: string | null;
@@ -20,6 +36,14 @@ export interface AppState {
   aiProvider: string;
   aiModel: string;
   aiApiKey: string;
+  // Ingest session state (not persisted)
+  ingestRunning: boolean;
+  ingestProgress: ProgressItem[];
+  ingestFilesDone: number;
+  ingestFilesTotal: number;
+  ingestStreamError: string | null;
+  // Ingest result (persisted)
+  lastIngestResult: LastIngestResult | null;
   // Actions
   setCurrentDb: (db: string | null) => void;
   setCurrentCollection: (col: string | null) => void;
@@ -35,6 +59,13 @@ export interface AppState {
   setAiProvider: (provider: string) => void;
   setAiModel: (model: string) => void;
   setAiApiKey: (key: string) => void;
+  resetIngestSession: () => void;
+  appendIngestProgress: (item: ProgressItem) => void;
+  setIngestFilesDone: (n: number) => void;
+  setIngestFilesTotal: (n: number) => void;
+  setIngestRunning: (v: boolean) => void;
+  setIngestStreamError: (err: string | null) => void;
+  setLastIngestResult: (r: LastIngestResult | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -51,6 +82,12 @@ export const useAppStore = create<AppState>()(
       aiProvider: "",
       aiModel: "",
       aiApiKey: "",
+      ingestRunning: false,
+      ingestProgress: [],
+      ingestFilesDone: 0,
+      ingestFilesTotal: 0,
+      ingestStreamError: null,
+      lastIngestResult: null,
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -84,25 +121,43 @@ export const useAppStore = create<AppState>()(
         set({ queryHistory: [] });
       },
 
-      setApiUrl: (url) => set({ apiUrl: url }),
-      setSidecarStatus: (status) => set({ sidecarStatus: status }),
-      setDarkMode: (dark) => set({ darkMode: dark }),
-      setTheme: (theme) => set({ theme }),
-      setAiProvider: (provider) => set({ aiProvider: provider }),
-      setAiModel: (model) => set({ aiModel: model }),
-      setAiApiKey: (key) => set({ aiApiKey: key }),
+      setApiUrl:         (url)      => set({ apiUrl: url }),
+      setSidecarStatus:  (status)   => set({ sidecarStatus: status }),
+      setDarkMode:       (dark)     => set({ darkMode: dark }),
+      setTheme:          (theme)    => set({ theme }),
+      setAiProvider:     (provider) => set({ aiProvider: provider }),
+      setAiModel:        (model)    => set({ aiModel: model }),
+      setAiApiKey:       (key)      => set({ aiApiKey: key }),
+
+      resetIngestSession: () => set({
+        ingestRunning:     false,
+        ingestProgress:    [],
+        ingestFilesDone:   0,
+        ingestFilesTotal:  0,
+        ingestStreamError: null,
+      }),
+
+      appendIngestProgress: (item) =>
+        set({ ingestProgress: [...get().ingestProgress, item] }),
+
+      setIngestFilesDone:   (n)   => set({ ingestFilesDone: n }),
+      setIngestFilesTotal:  (n)   => set({ ingestFilesTotal: n }),
+      setIngestRunning:     (v)   => set({ ingestRunning: v }),
+      setIngestStreamError: (err) => set({ ingestStreamError: err }),
+      setLastIngestResult:  (r)   => set({ lastIngestResult: r }),
     }),
     {
       name: "remex-studio",
       partialize: (state) => ({
-        recentProjects: state.recentProjects,
-        queryHistory: state.queryHistory,
-        apiUrl: state.apiUrl,
-        darkMode: state.darkMode,
-        theme: state.theme,
-        aiProvider: state.aiProvider,
-        aiModel: state.aiModel,
-        aiApiKey: state.aiApiKey,
+        recentProjects:   state.recentProjects,
+        queryHistory:     state.queryHistory,
+        apiUrl:           state.apiUrl,
+        darkMode:         state.darkMode,
+        theme:            state.theme,
+        aiProvider:       state.aiProvider,
+        aiModel:          state.aiModel,
+        aiApiKey:         state.aiApiKey,
+        lastIngestResult: state.lastIngestResult,
       }),
     }
   )
