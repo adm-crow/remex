@@ -20,7 +20,7 @@ const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
 ];
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
-  const { currentDb, sidecarStatus, apiUrl } = useAppStore();
+  const { currentDb, sidecarStatus, ingestDoneUnread, setIngestDoneUnread } = useAppStore();
 
   return (
     <aside
@@ -58,7 +58,10 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
         {NAV_ITEMS.map(({ view, label, icon: Icon }) => (
           <button
             key={view}
-            onClick={() => onViewChange(view)}
+            onClick={() => {
+              if (view === "ingest") setIngestDoneUnread(false);
+              onViewChange(view);
+            }}
             className={cn(
               "group relative flex items-center gap-3 text-left text-sm px-3 py-2 rounded-md transition-all duration-150 w-full",
               activeView === view
@@ -83,6 +86,13 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
               )}
             />
             <span>{label}</span>
+            {/* Ingest-done indicator */}
+            {view === "ingest" && ingestDoneUnread && activeView !== "ingest" && (
+              <span className="relative ml-auto flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+            )}
           </button>
         ))}
       </nav>

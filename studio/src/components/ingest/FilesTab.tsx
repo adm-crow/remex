@@ -35,6 +35,7 @@ export function FilesTab() {
     resetIngestSession, appendIngestProgress,
     setIngestFilesDone, setIngestFilesTotal,
     setIngestRunning, setIngestStreamError, setLastIngestResult,
+    setIngestDoneUnread,
   } = useAppStore();
 
   // Reset session state when navigating away after a completed ingest
@@ -72,6 +73,7 @@ export function FilesTab() {
   async function handleStart() {
     if (!sourcePath || !currentDb || !effectiveCollection) return;
     setShowDoneAlert(false);
+    setIngestDoneUnread(false);
     resetIngestSession();
     setIngestRunning(true);
     abortRef.current = new AbortController();
@@ -112,6 +114,7 @@ export function FilesTab() {
           });
           if (event.result.sources_ingested > 0) {
             setShowDoneAlert(true);
+            setIngestDoneUnread(true);
           }
         } else if (event.type === "error") {
           setIngestStreamError(event.detail);

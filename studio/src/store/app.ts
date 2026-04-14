@@ -42,6 +42,7 @@ export interface AppState {
   ingestFilesDone: number;
   ingestFilesTotal: number;
   ingestStreamError: string | null;
+  ingestDoneUnread: boolean;
   // Ingest result (persisted)
   lastIngestResult: LastIngestResult | null;
   // Actions
@@ -66,6 +67,7 @@ export interface AppState {
   setIngestRunning: (v: boolean) => void;
   setIngestStreamError: (err: string | null) => void;
   setLastIngestResult: (r: LastIngestResult | null) => void;
+  setIngestDoneUnread: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -87,6 +89,7 @@ export const useAppStore = create<AppState>()(
       ingestFilesDone: 0,
       ingestFilesTotal: 0,
       ingestStreamError: null,
+      ingestDoneUnread: false,
       lastIngestResult: null,
 
       setCurrentDb: (db) => set({ currentDb: db }),
@@ -145,6 +148,7 @@ export const useAppStore = create<AppState>()(
       setIngestRunning:     (v)   => set({ ingestRunning: v }),
       setIngestStreamError: (err) => set({ ingestStreamError: err }),
       setLastIngestResult:  (r)   => set({ lastIngestResult: r }),
+      setIngestDoneUnread:  (v)   => set({ ingestDoneUnread: v }),
     }),
     {
       name: "remex-studio",
