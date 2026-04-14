@@ -208,4 +208,45 @@ describe("QueryPane", () => {
       expect(screen.getByText("Lower score result")).toBeInTheDocument();
     });
   });
+
+  it("shows clear button when input has text and hides it when empty", () => {
+    renderWithProviders(<QueryPane />);
+    expect(screen.queryByRole("button", { name: /clear search/i })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox", { name: /query input/i }), {
+      target: { value: "hello" },
+    });
+    expect(screen.getByRole("button", { name: /clear search/i })).toBeInTheDocument();
+  });
+
+  it("clear button resets input and results", async () => {
+    vi.mocked(useMultiQueryResults).mockReturnValue({
+      data: mockResults,
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    const input = screen.getByRole("textbox", { name: /query input/i });
+    fireEvent.change(input, { target: { value: "what is remex" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => expect(screen.getByText("Sample chunk text")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: /clear search/i }));
+    expect(input).toHaveValue("");
+    expect(screen.queryByText("Sample chunk text")).not.toBeInTheDocument();
+  });
+
+  it("removing a history chip via ✕ removes only that chip", () => {
+    useAppStore.setState({ queryHistory: ["first", "second"] } as any);
+    renderWithProviders(<QueryPane />);
+    fireEvent.click(screen.getByRole("button", { name: /remove first/i }));
+    expect(screen.queryByRole("button", { name: "first" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "second" })).toBeInTheDocument();
+  });
+
+  it("Clear all removes all history chips", () => {
+    useAppStore.setState({ queryHistory: ["first", "second"] } as any);
+    renderWithProviders(<QueryPane />);
+    fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
+    expect(screen.queryByRole("button", { name: "first" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "second" })).not.toBeInTheDocument();
+  });
 });

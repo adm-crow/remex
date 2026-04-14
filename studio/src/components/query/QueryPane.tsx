@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2 } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { ResultCard } from "./ResultCard";
 
 export function QueryPane() {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
-          queryHistory, addQueryHistory } =
+          queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory } =
     useAppStore();
 
   const [text, setText] = useState("");
@@ -84,9 +84,19 @@ export function QueryPane() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Ask a question or search your documents…"
-              className="pl-9 h-10"
+              className="pl-9 pr-9 h-10"
               aria-label="Query input"
             />
+            {text && (
+              <button
+                type="button"
+                onClick={() => { setText(""); setSubmitted(""); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
           <Button
             type="submit"
@@ -99,17 +109,38 @@ export function QueryPane() {
 
         {/* Query history chips */}
         {queryHistory.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 items-center">
             {queryHistory.map((q) => (
-              <button
+              <span
                 key={q}
-                type="button"
-                onClick={() => { setText(q); setSubmitted(q); addQueryHistory(q); }}
-                className="text-xs px-2 py-0.5 rounded-full border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                className="group flex items-center gap-0.5 text-xs pl-2 pr-1 py-0.5 rounded-full border bg-muted/50 hover:bg-muted transition-colors"
               >
-                {q}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => { setText(q); setSubmitted(q); addQueryHistory(q); }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  {q}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeQueryHistory(q)}
+                  aria-label={`Remove ${q}`}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
             ))}
+            {queryHistory.length > 1 && (
+              <button
+                type="button"
+                onClick={clearQueryHistory}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear all
+              </button>
+            )}
           </div>
         )}
 
@@ -239,6 +270,25 @@ export function QueryPane() {
             </div>
           )}
 
+          {/* Vector search loading skeleton */}
+          {!useAi && isLoading && !!submitted && (
+            <div className="flex flex-col gap-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-lg border bg-card p-4 space-y-2.5 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-10 rounded bg-muted" />
+                    <div className="h-4 w-32 rounded bg-muted" />
+                    <div className="h-4 w-48 rounded bg-muted flex-1" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="h-3 w-full rounded bg-muted" />
+                    <div className="h-3 w-4/5 rounded bg-muted" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Results header */}
           {!isLoading && submitted && results.length > 0 && (
             <div className="flex items-center gap-2">
@@ -263,11 +313,13 @@ export function QueryPane() {
           )}
 
           {/* Result cards */}
-          <div className="flex flex-col gap-2">
-            {results.map((r) => (
-              <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
-            ))}
-          </div>
+          {!!submitted && (
+            <div className="flex flex-col gap-2">
+              {results.map((r) => (
+                <ResultCard key={`${r.source}-${r.chunk}`} result={r} />
+              ))}
+            </div>
+          )}
 
         </div>
       </div>
