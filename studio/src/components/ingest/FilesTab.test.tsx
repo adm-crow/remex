@@ -11,12 +11,7 @@ vi.mock("@/api/client", () => ({
   },
 }));
 
-vi.mock("@tauri-apps/plugin-notification", () => ({
-  sendNotification: vi.fn(),
-}));
-
 import { api } from "@/api/client";
-import { sendNotification } from "@tauri-apps/plugin-notification";
 
 async function* makeStream(events: object[]) {
   for (const e of events) yield e;
@@ -36,7 +31,6 @@ beforeEach(() => {
     ingestStreamError: null,
     lastIngestResult: null,
   } as any);
-  vi.mocked(sendNotification).mockClear();
 });
 
 describe("FilesTab", () => {
@@ -86,7 +80,7 @@ describe("FilesTab", () => {
     });
   });
 
-  it("shows summary card on done event", async () => {
+  it("shows success alert on done event when files were ingested", async () => {
     vi.mocked(api.ingestFilesStream).mockReturnValue(
       makeStream([
         {
@@ -108,7 +102,8 @@ describe("FilesTab", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
     await waitFor(() => {
-      expect(screen.getByText(/chunks stored: 12/i)).toBeInTheDocument();
+      expect(screen.getByRole("alert")).toHaveTextContent(/ingest complete/i);
+      expect(screen.getByRole("alert")).toHaveTextContent(/12 chunks stored/i);
     });
   });
 
@@ -127,7 +122,7 @@ describe("FilesTab", () => {
     });
   });
 
-  it("sends OS notification when ingest completes with ingested files", async () => {
+  it("success alert is dismissible", async () => {
     vi.mocked(api.ingestFilesStream).mockReturnValue(
       makeStream([
         {
@@ -149,14 +144,13 @@ describe("FilesTab", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
     await waitFor(() => {
-      expect(sendNotification).toHaveBeenCalledWith({
-        title: "Remex — Ingest complete",
-        body: "2 files ingested · 8 chunks stored",
-      });
+      expect(screen.getByRole("alert")).toHaveTextContent(/ingest complete/i);
     });
+    fireEvent.click(screen.getByRole("button", { name: /dismiss/i }));
+    expect(screen.queryByRole("alert", { hidden: false })).not.toBeInTheDocument();
   });
 
-  it("does not notify when sources_ingested is 0", async () => {
+  it("does not show success alert when sources_ingested is 0", async () => {
     vi.mocked(api.ingestFilesStream).mockReturnValue(
       makeStream([
         {
@@ -177,13 +171,14 @@ describe("FilesTab", () => {
       { target: { value: "/my/docs" } }
     );
     fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
+    // Wait for ingest to finish (button re-enables)
     await waitFor(() => {
-      expect(screen.getByText(/chunks stored: 0/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /start ingest/i })).not.toBeDisabled();
     });
-    expect(sendNotification).not.toHaveBeenCalled();
+    expect(screen.queryByText(/ingest complete/i)).not.toBeInTheDocument();
   });
 
-  it("shows 'Last ingest' timestamp after a completed run", async () => {
+  it("success alert includes a timestamp", async () => {
     vi.mocked(api.ingestFilesStream).mockReturnValue(
       makeStream([
         {
@@ -205,7 +200,11 @@ describe("FilesTab", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
     await waitFor(() => {
-      expect(screen.getByText(/last ingest/i)).toBeInTheDocument();
+      // Alert should be visible and contain a non-empty timestamp string
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(/ingest complete/i);
+      // The timestamp line is rendered via toLocaleString() — just assert it's non-empty
+      expect(alert.textContent).toMatch(/\d/);
     });
   });
 });

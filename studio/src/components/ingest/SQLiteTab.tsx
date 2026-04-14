@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { EmbeddingModelField } from "./EmbeddingModelField";
 import {
   Select,
   SelectContent,
@@ -229,17 +230,11 @@ export function SQLiteTab() {
               className="text-xs resize-none"
             />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="sqlite-embedding-model" className="text-xs">
-              Embedding model
-            </Label>
-            <Input
-              id="sqlite-embedding-model"
-              value={embeddingModel}
-              onChange={(e) => setEmbeddingModel(e.target.value)}
-              className="h-7 text-xs"
-            />
-          </div>
+          <EmbeddingModelField
+            inputId="sqlite-embedding-model"
+            value={embeddingModel}
+            onChange={setEmbeddingModel}
+          />
         </CollapsibleContent>
       </Collapsible>
 
@@ -263,14 +258,12 @@ export function SQLiteTab() {
       )}
 
       {result && (
-        <Card>
-          <CardContent className="py-4 text-sm space-y-1">
-            <p>
-              Found: {result.sources_found} · Ingested: {result.sources_ingested} · Skipped:{" "}
-              {result.sources_skipped}
-            </p>
-            <p>Chunks stored: {result.chunks_stored}</p>
-          </CardContent>
+        <Card className="px-4 text-sm space-y-1">
+          <p>
+            Found: {result.sources_found} · Ingested: {result.sources_ingested} · Skipped:{" "}
+            {result.sources_skipped}
+          </p>
+          <p>Chunks stored: {result.chunks_stored}</p>
         </Card>
       )}
     </div>

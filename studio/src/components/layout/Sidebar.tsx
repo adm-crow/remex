@@ -106,8 +106,8 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
           <p className="text-xs font-medium capitalize text-sidebar-foreground leading-none">
             {sidecarStatus}
           </p>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1 font-mono truncate" title={apiUrl}>
-            {apiUrl}
+          <p className="text-[11px] text-muted-foreground leading-none mt-1">
+            Remex serve
           </p>
         </div>
       </div>
