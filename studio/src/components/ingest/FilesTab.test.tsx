@@ -29,6 +29,12 @@ beforeEach(() => {
     currentCollection: "myCol",
     apiUrl: "http://localhost:8000",
     sidecarStatus: "connected",
+    ingestRunning: false,
+    ingestProgress: [],
+    ingestFilesDone: 0,
+    ingestFilesTotal: 0,
+    ingestStreamError: null,
+    lastIngestResult: null,
   } as any);
   vi.mocked(sendNotification).mockClear();
 });

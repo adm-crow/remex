@@ -19,13 +19,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
-import type { IngestResultResponse } from "@/api/client";
-
-interface ProgressItem {
-  filename: string;
-  status: "ingested" | "skipped" | "error";
-  chunks_stored: number;
-}
+import type { ProgressItem } from "@/store/app";
 
 const STATUS_VARIANT = {
   ingested: "default" as const,
@@ -35,20 +29,21 @@ const STATUS_VARIANT = {
 
 export function FilesTab() {
   const queryClient = useQueryClient();
-  const { apiUrl, currentDb, currentCollection } = useAppStore();
+  const {
+    apiUrl, currentDb, currentCollection,
+    ingestRunning, ingestProgress, ingestFilesDone, ingestFilesTotal,
+    ingestStreamError, lastIngestResult,
+    resetIngestSession, appendIngestProgress,
+    setIngestFilesDone, setIngestFilesTotal,
+    setIngestRunning, setIngestStreamError, setLastIngestResult,
+  } = useAppStore();
 
-  const [sourcePath,       setSourcePath]       = useState("");
-  const [collectionName,   setCollectionName]   = useState(currentCollection ?? "");
-  const [appendModel,      setAppendModel]      = useState(false);
-  const [chunkSize,        setChunkSize]        = useState(1000);
-  const [overlap,          setOverlap]          = useState(200);
-  const [embeddingModel,   setEmbeddingModel]   = useState("all-MiniLM-L6-v2");
-  const [isRunning,        setIsRunning]        = useState(false);
-  const [progress,         setProgress]         = useState<ProgressItem[]>([]);
-  const [filesDone,        setFilesDone]        = useState(0);
-  const [filesTotal,       setFilesTotal]       = useState(0);
-  const [result,           setResult]           = useState<IngestResultResponse | null>(null);
-  const [streamError,      setStreamError]      = useState<string | null>(null);
+  const [sourcePath,     setSourcePath]     = useState("");
+  const [collectionName, setCollectionName] = useState(currentCollection ?? "");
+  const [appendModel,    setAppendModel]    = useState(false);
+  const [chunkSize,      setChunkSize]      = useState(1000);
+  const [overlap,        setOverlap]        = useState(200);
+  const [embeddingModel, setEmbeddingModel] = useState("all-MiniLM-L6-v2");
   const abortRef = useRef<AbortController | null>(null);
   const { isDragging } = useDragDrop((path) => setSourcePath(path));
 
@@ -66,12 +61,8 @@ export function FilesTab() {
 
   async function handleStart() {
     if (!sourcePath || !currentDb || !effectiveCollection) return;
-    setIsRunning(true);
-    setProgress([]);
-    setFilesDone(0);
-    setFilesTotal(0);
-    setResult(null);
-    setStreamError(null);
+    resetIngestSession();
+    setIngestRunning(true);
     abortRef.current = new AbortController();
 
     try {
@@ -88,37 +79,42 @@ export function FilesTab() {
         abortRef.current.signal
       )) {
         if (event.type === "progress") {
-          setFilesDone(event.files_done);
-          setFilesTotal(event.files_total);
-          setProgress((prev) => [
-            ...prev,
-            {
-              filename:      event.filename,
-              status:        event.status,
-              chunks_stored: event.chunks_stored,
-            },
-          ]);
+          setIngestFilesDone(event.files_done);
+          setIngestFilesTotal(event.files_total);
+          appendIngestProgress({
+            filename:      event.filename,
+            status:        event.status,
+            chunks_stored: event.chunks_stored,
+          });
         } else if (event.type === "done") {
-          setResult(event.result);
+          setLastIngestResult({
+            collection:      effectiveCollection,
+            sourcePath,
+            completedAt:     new Date().toISOString(),
+            sourcesFound:    event.result.sources_found,
+            sourcesIngested: event.result.sources_ingested,
+            sourcesSkipped:  event.result.sources_skipped,
+            chunksStored:    event.result.chunks_stored,
+          });
           queryClient.invalidateQueries({
             queryKey: ["sources", apiUrl, currentDb, effectiveCollection],
           });
           if (event.result.sources_ingested > 0) {
             sendNotification({
               title: "Remex — Ingest complete",
-              body: `${event.result.sources_ingested} files ingested · ${event.result.chunks_stored} chunks stored`,
+              body:  `${event.result.sources_ingested} files ingested · ${event.result.chunks_stored} chunks stored`,
             });
           }
         } else if (event.type === "error") {
-          setStreamError(event.detail);
+          setIngestStreamError(event.detail);
         }
       }
     } catch (e) {
       if (!(e instanceof DOMException && e.name === "AbortError")) {
-        setStreamError(String(e));
+        setIngestStreamError(String(e));
       }
     } finally {
-      setIsRunning(false);
+      setIngestRunning(false);
     }
   }
 
@@ -264,47 +260,47 @@ export function FilesTab() {
 
       <Button
         onClick={handleStart}
-        disabled={isRunning || !sourcePath || !effectiveCollection}
+        disabled={ingestRunning || !sourcePath || !effectiveCollection}
         aria-label="Start ingest"
       >
         <Play className="w-4 h-4 mr-2" />
-        {isRunning ? "Ingesting…" : "Start ingest"}
+        {ingestRunning ? "Ingesting…" : "Start ingest"}
       </Button>
 
-      {(isRunning || (filesTotal > 0 && !streamError)) && (
+      {(ingestRunning || (ingestFilesTotal > 0 && !ingestStreamError)) && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{isRunning ? "Ingesting…" : "Done"}</span>
+            <span>{ingestRunning ? "Ingesting…" : "Done"}</span>
             <span className="tabular-nums">
-              {filesDone} / {filesTotal > 0 ? filesTotal : "?"}
+              {ingestFilesDone} / {ingestFilesTotal > 0 ? ingestFilesTotal : "?"}
             </span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
             <div
               className="h-full rounded-full bg-primary transition-all duration-300"
               style={{
-                width: filesTotal > 0
-                  ? `${Math.round((filesDone / filesTotal) * 100)}%`
-                  : isRunning ? "5%" : "0%",
+                width: ingestFilesTotal > 0
+                  ? `${Math.round((ingestFilesDone / ingestFilesTotal) * 100)}%`
+                  : ingestRunning ? "5%" : "0%",
               }}
             />
           </div>
         </div>
       )}
 
-      {streamError && (
+      {ingestStreamError && (
         <div
           className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
           role="alert"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{streamError}</span>
+          <span>{ingestStreamError}</span>
         </div>
       )}
 
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-1">
-          {progress.map((p, i) => (
+          {ingestProgress.map((p, i) => (
             <div
               key={`${p.filename}-${i}`}
               className="flex items-center gap-2 text-xs p-1"
@@ -318,12 +314,12 @@ export function FilesTab() {
               </span>
             </div>
           ))}
-          {isRunning && (
+          {ingestRunning && (
             <div className="flex items-center gap-2 text-xs p-1 text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-primary" />
               <span className="truncate flex-1">
-                {filesTotal > 0
-                  ? `Processing file ${filesDone + 1} of ${filesTotal}…`
+                {ingestFilesTotal > 0
+                  ? `Processing file ${ingestFilesDone + 1} of ${ingestFilesTotal}…`
                   : "Starting ingestion…"}
               </span>
             </div>
@@ -331,14 +327,19 @@ export function FilesTab() {
         </div>
       </ScrollArea>
 
-      {result && (
+      {lastIngestResult && (
         <Card>
           <CardContent className="pt-4 text-sm space-y-1">
+            {!ingestRunning && (
+              <p className="text-xs text-muted-foreground mb-1">
+                Last ingest · {new Date(lastIngestResult.completedAt).toLocaleString()}
+              </p>
+            )}
             <p>
-              Found: {result.sources_found} · Ingested:{" "}
-              {result.sources_ingested} · Skipped: {result.sources_skipped}
+              Found: {lastIngestResult.sourcesFound} · Ingested:{" "}
+              {lastIngestResult.sourcesIngested} · Skipped: {lastIngestResult.sourcesSkipped}
             </p>
-            <p>Chunks stored: {result.chunks_stored}</p>
+            <p>Chunks stored: {lastIngestResult.chunksStored}</p>
           </CardContent>
         </Card>
       )}
