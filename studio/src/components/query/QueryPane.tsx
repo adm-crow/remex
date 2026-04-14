@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X, FolderOpen, PackageOpen, SearchX } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -242,6 +242,41 @@ export function QueryPane() {
       <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="px-6 py-4 space-y-4">
 
+          {/* Empty state: no project open */}
+          {!currentDb && (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <FolderOpen className="w-8 h-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">No project open</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Open a project from the sidebar to start searching.
+              </p>
+            </div>
+          )}
+
+          {/* Empty state: pre-query idle (has collections) */}
+          {!!currentDb && !submitted && collections.length > 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <Search className="w-8 h-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">
+                Ask anything about your documents
+              </p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Type a question above and press Search.
+              </p>
+            </div>
+          )}
+
+          {/* Empty state: pre-query idle (no collections) */}
+          {!!currentDb && !submitted && collections.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <PackageOpen className="w-8 h-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">No collections yet</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">
+                Go to the Ingest tab to add some documents first.
+              </p>
+            </div>
+          )}
+
           {/* AI answer — loading */}
           {useAi && chatResult.isLoading && (
             <div className="rounded-lg border border-primary/25 bg-primary/8 p-4 flex items-center gap-3">
@@ -301,13 +336,13 @@ export function QueryPane() {
             </div>
           )}
 
-          {/* Empty state */}
-          {!isLoading && submitted && results.length === 0 && !error && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Search className="w-8 h-8 text-muted-foreground/40 mb-3" />
-              <p className="text-sm text-muted-foreground">No results found.</p>
+          {/* Empty state: no results */}
+          {!isLoading && !!submitted && results.length === 0 && !error && (
+            <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+              <SearchX className="w-8 h-8 text-muted-foreground/40 mb-3" />
+              <p className="text-sm font-medium text-muted-foreground">No results</p>
               <p className="text-xs text-muted-foreground/60 mt-1">
-                Try different search terms or a lower min-score.
+                Try broader terms, a lower min-score, or check that the collection has been ingested.
               </p>
             </div>
           )}

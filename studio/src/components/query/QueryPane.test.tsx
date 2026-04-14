@@ -96,7 +96,7 @@ describe("QueryPane", () => {
     });
   });
 
-  it("shows 'No results found' when results are empty after query", async () => {
+  it("shows 'No results' when results are empty after query", async () => {
     vi.mocked(useMultiQueryResults).mockReturnValue({
       data: [],
       isLoading: false,
@@ -107,7 +107,7 @@ describe("QueryPane", () => {
     fireEvent.change(input, { target: { value: "nothing" } });
     fireEvent.submit(input.closest("form")!);
     await waitFor(() => {
-      expect(screen.getByText(/no results found/i)).toBeInTheDocument();
+      expect(screen.getByText("No results")).toBeInTheDocument();
     });
   });
 
@@ -248,5 +248,26 @@ describe("QueryPane", () => {
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
     expect(screen.queryByRole("button", { name: "first" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "second" })).not.toBeInTheDocument();
+  });
+
+  it("shows 'No project open' when currentDb is null", () => {
+    useAppStore.setState({ currentDb: null } as any);
+    renderWithProviders(<QueryPane />);
+    expect(screen.getByText("No project open")).toBeInTheDocument();
+  });
+
+  it("shows idle state before any query when collections exist", () => {
+    renderWithProviders(<QueryPane />);
+    expect(screen.getByText("Ask anything about your documents")).toBeInTheDocument();
+  });
+
+  it("shows 'No collections yet' when collections list is empty", () => {
+    vi.mocked(useCollections).mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    expect(screen.getByText("No collections yet")).toBeInTheDocument();
   });
 });
