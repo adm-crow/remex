@@ -54,6 +54,8 @@ export function useSidecar() {
         return;
       }
 
+      if (cancelled) return;
+
       try {
         await invoke("spawn_sidecar", { host, port });
         didSpawnRef.current = true;
@@ -62,29 +64,35 @@ export function useSidecar() {
         return;
       }
 
+      if (cancelled) return;
+
       const deadline = Date.now() + TIMEOUT_MS;
-      intervalRef.current = setInterval(async () => {
+      // Use a local variable so each effect's callbacks only clear their own
+      // timer — not the one created by a subsequent StrictMode re-mount.
+      let timerId: ReturnType<typeof setInterval>;
+      timerId = setInterval(async () => {
         if (cancelled) {
-          clearInterval(intervalRef.current!);
+          clearInterval(timerId);
           return;
         }
         if (Date.now() > deadline) {
-          clearInterval(intervalRef.current!);
+          clearInterval(timerId);
           if (!cancelled) setSidecarStatus("error");
           return;
         }
         // Bail fast if the process has already died
         const alive = await invoke<boolean>("is_sidecar_alive").catch(() => false);
         if (!alive) {
-          clearInterval(intervalRef.current!);
+          clearInterval(timerId);
           if (!cancelled) setSidecarStatus("error");
           return;
         }
         if (await checkHealth()) {
-          clearInterval(intervalRef.current!);
+          clearInterval(timerId);
           if (!cancelled) setSidecarStatus("connected");
         }
       }, POLL_INTERVAL_MS);
+      intervalRef.current = timerId;
     }
 
     start();
