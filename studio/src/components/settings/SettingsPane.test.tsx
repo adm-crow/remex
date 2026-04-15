@@ -19,35 +19,39 @@ beforeEach(() => {
 });
 
 describe("SettingsPane", () => {
-  it("renders the current API URL in the input", () => {
+  it("renders the current API URL in the input", async () => {
     renderWithProviders(<SettingsPane />);
     const input = screen.getByRole("textbox", {
       name: /api url/i,
     }) as HTMLInputElement;
     expect(input.value).toBe("http://localhost:8000");
+    await waitFor(() => {}); // drain async queue (getVersion useEffect)
   });
 
-  it("saving updated API URL updates the store", () => {
+  it("saving updated API URL updates the store", async () => {
     renderWithProviders(<SettingsPane />);
     const input = screen.getByRole("textbox", { name: /api url/i });
     fireEvent.change(input, { target: { value: "http://localhost:9000" } });
     fireEvent.submit(input.closest("form")!);
     expect(useAppStore.getState().apiUrl).toBe("http://localhost:9000");
+    await waitFor(() => {}); // drain async queue (getVersion useEffect)
   });
 
-  it("saving empty URL falls back to default", () => {
+  it("saving empty URL falls back to default", async () => {
     renderWithProviders(<SettingsPane />);
     const input = screen.getByRole("textbox", { name: /api url/i });
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.submit(input.closest("form")!);
     expect(useAppStore.getState().apiUrl).toBe("http://localhost:8000");
+    await waitFor(() => {}); // drain async queue (getVersion useEffect)
   });
 
-  it("change project button clears currentDb and currentCollection", () => {
+  it("change project button clears currentDb and currentCollection", async () => {
     renderWithProviders(<SettingsPane />);
     fireEvent.click(screen.getByRole("button", { name: /change project/i }));
     expect(useAppStore.getState().currentDb).toBeNull();
     expect(useAppStore.getState().currentCollection).toBeNull();
+    await waitFor(() => {}); // drain async queue (getVersion useEffect)
   });
 
   it("displays app version loaded from Tauri", async () => {
