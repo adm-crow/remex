@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useMultiQueryResults, useChat, useCollections, useCollectionStats } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
 
@@ -70,6 +70,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const [selectedCollections, setSelectedCollections] = useState<string[]>(
     currentCollection ? [currentCollection] : []
   );
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Keep selection in sync when the user switches collections from the sidebar.
   useEffect(() => {
@@ -89,10 +91,22 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   // For AI mode (single-collection): use first selected or fall back to currentCollection
   const activeCollection = selectedCollections[0] ?? currentCollection ?? "";
 
+  const { data: sourcesData = [] } = useSources(
+    apiUrl, currentDb ?? "", selectedCollections[0] ?? currentCollection ?? ""
+  );
+
+  const whereFilter: Record<string, unknown> | undefined =
+    selectedSources.length === 1
+      ? { source: { "$eq": selectedSources[0] } }
+      : selectedSources.length > 1
+      ? { source: { "$in": selectedSources } }
+      : undefined;
+
   const multiResult = useMultiQueryResults(
     apiUrl, currentDb ?? "", selectedCollections, submitted,
     { enabled: !!submitted && !useAi, n_results: nResults,
-      min_score: minScore > 0 ? minScore : undefined }
+      min_score: minScore > 0 ? minScore : undefined,
+      where: whereFilter }
   );
   const chatResult = useChat(
     apiUrl, currentDb ?? "", activeCollection, submitted,
@@ -291,6 +305,62 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
             </Label>
           </div>
         </div>
+
+        {/* Filter by source — collapsible chip strip */}
+        {sourcesData.length > 0 && (
+          <Collapsible open={filterOpen} onOpenChange={setFilterOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground gap-1.5 text-xs">
+                <Filter className="w-3 h-3" />
+                Filter by source
+                {selectedSources.length > 0 && (
+                  <span className="rounded-full bg-primary text-primary-foreground text-[10px] px-1.5">
+                    {selectedSources.length}
+                  </span>
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="flex flex-wrap gap-1.5 pt-1.5">
+                {sourcesData.map((s) => {
+                  const label = s.source.split(/[/\\]/).pop() ?? s.source;
+                  const isSelected = selectedSources.includes(s.source);
+                  return (
+                    <button
+                      key={s.source}
+                      type="button"
+                      title={s.source}
+                      onClick={() =>
+                        setSelectedSources((prev) =>
+                          prev.includes(s.source)
+                            ? prev.filter((x) => x !== s.source)
+                            : [...prev, s.source]
+                        )
+                      }
+                      className={cn(
+                        "text-xs px-2 py-0.5 rounded border transition-colors font-mono truncate max-w-[200px]",
+                        isSelected
+                          ? "bg-primary/10 border-primary text-primary"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                {selectedSources.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSources([])}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         {/* AI Agent notice — shown below the strip when toggle is on but not configured */}
         {useAi && !aiProvider && !aiModel && (

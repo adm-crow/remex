@@ -9,8 +9,10 @@ vi.mock("@/hooks/useApi", () => ({
   useChat: vi.fn(),
   useCollections: vi.fn(),
   useCollectionStats: vi.fn(),
+  useSources: vi.fn(),
 }));
 
+import * as useApi from "@/hooks/useApi";
 import { useMultiQueryResults, useChat, useCollections, useCollectionStats } from "@/hooks/useApi";
 
 const mockResults = [
@@ -53,6 +55,11 @@ beforeEach(() => {
   } as any);
   vi.mocked(useChat).mockReturnValue({
     data: undefined,
+    isLoading: false,
+    error: null,
+  } as any);
+  vi.mocked(useApi.useSources).mockReturnValue({
+    data: [],
     isLoading: false,
     error: null,
   } as any);
@@ -292,6 +299,47 @@ describe("QueryPane", () => {
     } as any);
     renderWithProviders(<QueryPane />);
     expect(screen.getByText("No collections yet")).toBeInTheDocument();
+  });
+
+  it("passes where filter to useMultiQueryResults when source filter is active", async () => {
+    vi.mocked(useApi.useSources).mockReturnValue({
+      data: [
+        { source: "/docs/readme.md", chunk_count: 5 },
+      ],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    useAppStore.setState({
+      currentDb: "./db",
+      currentCollection: "myCol",
+      apiUrl: "http://localhost:8000",
+    } as any);
+
+    renderWithProviders(<QueryPane />);
+
+    // Open the filter section
+    fireEvent.click(screen.getByRole("button", { name: /filter by source/i }));
+
+    // Click the source chip
+    const chip = await screen.findByRole("button", { name: /readme\.md/i });
+    fireEvent.click(chip);
+
+    // Submit a query
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "my query" } });
+    fireEvent.click(screen.getByRole("button", { name: /^search$/i }));
+
+    await waitFor(() => {
+      expect(vi.mocked(useMultiQueryResults)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.any(Array),
+        "my query",
+        expect.objectContaining({
+          where: { source: { "$eq": "/docs/readme.md" } },
+        })
+      );
+    });
   });
 
   it("calls onFocusReady with a function that focuses the query input", () => {

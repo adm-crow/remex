@@ -44,6 +44,7 @@ export interface QueryOptions {
   enabled?: boolean;
   n_results?: number;
   min_score?: number;
+  where?: Record<string, unknown>;
 }
 
 export interface ChatOptions extends QueryOptions {
@@ -63,13 +64,14 @@ export function useMultiQueryResults(
     queries: collections.map((col) => ({
       queryKey: [
         "query", apiUrl, dbPath, col, text,
-        options?.n_results, options?.min_score,
+        options?.n_results, options?.min_score, options?.where,
       ],
       queryFn: () =>
         api.queryCollection(apiUrl, dbPath, col, {
           text,
           n_results: options?.n_results,
           min_score: options?.min_score,
+          where: options?.where,
         }),
       enabled:
         !!apiUrl && !!text && !!dbPath && !!col && (options?.enabled ?? true),
