@@ -87,8 +87,10 @@ def ingest_sqlite(
         if not cursor.fetchone():
             raise TableNotFoundError(f"Table '{table}' not found in {db_path}")
 
-        # Validate and resolve columns against actual schema
-        cursor.execute(f"PRAGMA table_info(\"{table}\")")
+        # Validate and resolve columns against actual schema.
+        # Double-quote escaping handles table/column names that contain `"`.
+        safe_table = table.replace('"', '""')
+        cursor.execute(f'PRAGMA table_info("{safe_table}")')
         available = [row["name"] for row in cursor.fetchall()]
 
         if columns:
@@ -99,14 +101,17 @@ def ingest_sqlite(
         else:
             selected = available
 
-        # Fall back to SQLite rowid if id_column is absent
+        # Fall back to SQLite rowid if id_column is absent.
+        # Alias as _remex_rowid so the name is stable even when the table has
+        # an INTEGER PRIMARY KEY column (which SQLite silently aliases to rowid,
+        # causing the cursor description to use the column's declared name instead).
         use_rowid = id_column not in available
-        col_list = ", ".join(f'"{c}"' for c in selected)
+        col_list = ", ".join(f'"{c.replace(chr(34), chr(34)*2)}"' for c in selected)
 
         if use_rowid:
-            cursor.execute(f'SELECT rowid, {col_list} FROM "{table}"')
+            cursor.execute(f'SELECT rowid AS _remex_rowid, {col_list} FROM "{safe_table}"')
         else:
-            cursor.execute(f'SELECT {col_list} FROM "{table}"')
+            cursor.execute(f'SELECT {col_list} FROM "{safe_table}"')
 
         rows = cursor.fetchall()
     finally:
@@ -137,7 +142,7 @@ def ingest_sqlite(
         try:
             # Extract row identity
             if use_rowid:
-                row_id = row_dict.pop("rowid")
+                row_id = row_dict.pop("_remex_rowid")
             else:
                 row_id = row_dict.get(id_column)
 
@@ -153,8 +158,14 @@ def ingest_sqlite(
                 mode=chunking,
             )
             if not chunks:
-                result.sources_skipped += 1
-                continue
+                # Row text is non-empty but shorter than min_chunk_size
+                # (common for compact DB rows). Store it as a single chunk
+                # rather than discarding — every row is a meaningful unit.
+                if text:
+                    chunks = [text]
+                else:
+                    result.sources_skipped += 1
+                    continue
 
             ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(len(chunks))]
             metadatas = [

@@ -10,7 +10,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   useCollections,
   useCollectionStats,
@@ -272,7 +271,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
           </span>
           <span>
             <strong className="text-foreground tabular-nums">{stats.total_sources.toLocaleString()}</strong>{" "}
-            documents
+            {collectionType === "sqlite" ? "tables" : "documents"}
           </span>
           <span className="font-mono text-[11px]">{stats.embedding_model}</span>
         </div>
@@ -355,7 +354,7 @@ export function SourcesPane() {
           </p>
         </div>
       ) : (
-        <ScrollArea className="flex-1">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="p-4 flex flex-col gap-3">
             {collections.map((name) => (
               <CollectionCard
@@ -368,7 +367,7 @@ export function SourcesPane() {
               />
             ))}
           </div>
-        </ScrollArea>
+        </div>
       )}
     </div>
   );

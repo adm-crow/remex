@@ -67,6 +67,12 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
             model=resolved_model,
             api_key=req.api_key or None,
         )
+    except (ValueError, ImportError) as e:
+        # Missing API key, unknown provider, or SDK not installed — user config error.
+        raise HTTPException(status_code=422, detail=str(e))
+    except RuntimeError as e:
+        # Downstream API error (auth failure, rate limit, network, etc.).
+        raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, AlertCircle } from "lucide-react";
+import { Play, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { EmbeddingModelField } from "./EmbeddingModelField";
 import {
   Select,
@@ -26,7 +26,10 @@ import type { IngestResultResponse } from "@/api/client";
 import { formatDuration } from "@/lib/formatDuration";
 
 export function SQLiteTab() {
-  const { apiUrl, currentDb, currentCollection, setCollectionType } = useAppStore();
+  const {
+    apiUrl, currentDb, currentCollection,
+    setCollectionType, setLastIngestResult, setIngestDoneUnread,
+  } = useAppStore();
 
   const [sqlitePath,      setSqlitePath]      = useState("");
   const [tables,          setTables]          = useState<string[]>([]);
@@ -34,6 +37,7 @@ export function SQLiteTab() {
   const [isLoadingTables, setIsLoadingTables] = useState(false);
   const [tableError,      setTableError]      = useState<string | null>(null);
   const [collectionName,  setCollectionName]  = useState(currentCollection ?? "");
+  const [appendModel,     setAppendModel]     = useState(false);
   const [columns,         setColumns]         = useState("");
   const [idColumn,        setIdColumn]        = useState("id");
   const [rowTemplate,     setRowTemplate]     = useState("");
@@ -42,27 +46,42 @@ export function SQLiteTab() {
   const [result,          setResult]          = useState<IngestResultResponse | null>(null);
   const [runError,        setRunError]        = useState<string | null>(null);
   const [duration,        setDuration]        = useState<string | null>(null);
-  const [elapsed,         setElapsed]         = useState<string | null>(null);
+  const [rowsDone,        setRowsDone]        = useState(0);
+  const [rowsTotal,       setRowsTotal]       = useState(0);
+  const [eta,             setEta]             = useState<string | null>(null);
+  const [showDoneAlert,   setShowDoneAlert]   = useState(false);
 
-  const loadAbortRef  = useRef<AbortController | null>(null);
-  const startTimeRef  = useRef<number | null>(null);
-  const queryClient   = useQueryClient();
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const runAbortRef  = useRef<AbortController | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const queryClient  = useQueryClient();
 
-  // Tick elapsed counter while SQLite ingest is running.
+  const effectiveCollection = appendModel
+    ? `${collectionName}-${embeddingModel}`.replace(/[^a-zA-Z0-9_-]/g, "-")
+    : collectionName;
+
+  // ETA ticker — recalculates every second while running.
   useEffect(() => {
-    if (!isRunning) { setElapsed(null); return; }
-    const id = setInterval(() => {
+    if (!isRunning || rowsDone === 0 || rowsTotal === 0) {
+      if (!isRunning) setEta(null);
+      return;
+    }
+    function update() {
       if (!startTimeRef.current) return;
-      setElapsed(formatDuration(Date.now() - startTimeRef.current));
-    }, 1000);
+      const elapsed = Date.now() - startTimeRef.current;
+      const msPerRow = elapsed / rowsDone;
+      const remainingMs = msPerRow * (rowsTotal - rowsDone);
+      setEta(remainingMs < 2000 ? "< 2s" : formatDuration(remainingMs));
+    }
+    update();
+    const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [isRunning]);
+  }, [isRunning, rowsDone, rowsTotal]);
 
   async function loadTables(path: string) {
     loadAbortRef.current?.abort();
     const ctrl = new AbortController();
     loadAbortRef.current = ctrl;
-
     setIsLoadingTables(true);
     setTableError(null);
     setTables([]);
@@ -102,96 +121,122 @@ export function SQLiteTab() {
   }
 
   async function handleRun() {
-    if (!sqlitePath || !selectedTable || !collectionName || !currentDb) return;
-    setCollectionType(currentDb, collectionName, "sqlite");
+    if (!sqlitePath || !selectedTable || !effectiveCollection || !currentDb) return;
     setIsRunning(true);
     setResult(null);
     setRunError(null);
     setDuration(null);
+    setRowsDone(0);
+    setRowsTotal(0);
+    setEta(null);
+    setShowDoneAlert(false);
     startTimeRef.current = Date.now();
     const t0 = startTimeRef.current;
+    const startedAt = new Date(t0).toISOString();
+    runAbortRef.current = new AbortController();
     try {
-      const res = await api.ingestSqlite(apiUrl, currentDb, collectionName, {
-        sqlite_path: sqlitePath,
-        table: selectedTable,
-        embedding_model: embeddingModel,
-        columns: columns
-          ? columns.split(",").map((c) => c.trim()).filter(Boolean)
-          : undefined,
-        id_column: idColumn || "id",
-        row_template: rowTemplate || undefined,
-      });
-      setDuration(formatDuration(Date.now() - t0));
-      setResult(res);
-      queryClient.invalidateQueries({
-        queryKey: ["sources", apiUrl, currentDb, collectionName],
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["collections", apiUrl, currentDb],
-      });
+      for await (const event of api.ingestSqliteStream(
+        apiUrl, currentDb, effectiveCollection,
+        {
+          sqlite_path: sqlitePath,
+          table: selectedTable,
+          embedding_model: embeddingModel,
+          columns: columns
+            ? columns.split(",").map((c) => c.trim()).filter(Boolean)
+            : undefined,
+          id_column: idColumn || "id",
+          row_template: rowTemplate || undefined,
+        },
+        runAbortRef.current.signal,
+      )) {
+        if (event.type === "progress") {
+          setRowsDone(event.files_done);
+          setRowsTotal(event.files_total);
+        } else if (event.type === "done") {
+          const completedAt = new Date().toISOString();
+          setDuration(formatDuration(Date.now() - t0));
+          setResult(event.result);
+          if (event.result.sources_ingested > 0) {
+            setCollectionType(currentDb, effectiveCollection, "sqlite");
+          }
+          queryClient.invalidateQueries({ queryKey: ["sources", apiUrl, currentDb, effectiveCollection] });
+          queryClient.invalidateQueries({ queryKey: ["collections", apiUrl, currentDb] });
+          if (event.result.sources_ingested > 0) {
+            setLastIngestResult({
+              collection: effectiveCollection,
+              sourcePath: sqlitePath,
+              startedAt,
+              completedAt,
+              sourcesFound:    event.result.sources_found,
+              sourcesIngested: event.result.sources_ingested,
+              sourcesSkipped:  event.result.sources_skipped,
+              chunksStored:    event.result.chunks_stored,
+            });
+            setShowDoneAlert(true);
+            setIngestDoneUnread(true);
+          }
+        } else if (event.type === "error") {
+          setRunError(event.detail);
+        }
+      }
     } catch (e) {
-      setRunError(e instanceof Error ? e.message : String(e));
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setRunError(e instanceof Error ? e.message : String(e));
+      }
     } finally {
       setIsRunning(false);
     }
   }
 
-  const canRun = !isRunning && !!sqlitePath && !!selectedTable && !!collectionName;
+  const canRun = !isRunning && !!sqlitePath && !!selectedTable && !!effectiveCollection;
 
   return (
-    <div className="flex flex-col h-full p-6 gap-4 overflow-y-auto">
+    <div className="flex flex-col h-full p-4 gap-3 overflow-y-auto">
 
-      {/* SQLite file picker */}
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">SQLite database</Label>
-        <div className="flex gap-2">
-          <Input
-            value={sqlitePath}
-            onChange={(e) => { void handlePathChange(e.target.value); }}
-            placeholder="/path/to/database.db"
-            className="flex-1"
-            aria-label="SQLite database path"
-          />
-          <Button variant="outline" onClick={handleBrowse} aria-label="Browse">
-            Browse
-          </Button>
-        </div>
-      </div>
-
-      {/* Table dropdown */}
-      <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Table</Label>
-        <Select
-          value={selectedTable}
-          onValueChange={setSelectedTable}
-          disabled={!sqlitePath || isLoadingTables || !!tableError || tables.length === 0}
-        >
-          <SelectTrigger aria-label="Select table">
-            <SelectValue
-              placeholder={
-                isLoadingTables
-                  ? "Loading tables…"
-                  : tableError
-                  ? "Error loading tables"
-                  : !sqlitePath
-                  ? "Select a database first"
-                  : tables.length === 0
-                  ? "No tables found"
-                  : "Select a table…"
-              }
+      {/* Database + Table — two compact rows */}
+      <div className="space-y-2">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">SQLite database</Label>
+          <div className="flex gap-2">
+            <Input
+              value={sqlitePath}
+              onChange={(e) => { void handlePathChange(e.target.value); }}
+              placeholder="/path/to/database.db"
+              className="flex-1 h-8 text-sm"
+              aria-label="SQLite database path"
             />
-          </SelectTrigger>
-          <SelectContent>
-            {tables.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {tableError && (
-          <p className="text-xs text-destructive">{tableError}</p>
-        )}
+            <Button variant="outline" size="sm" onClick={handleBrowse} aria-label="Browse">
+              Browse
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Table</Label>
+          <Select
+            value={selectedTable}
+            onValueChange={setSelectedTable}
+            disabled={!sqlitePath || isLoadingTables || !!tableError || tables.length === 0}
+          >
+            <SelectTrigger className="h-8 text-sm" aria-label="Select table">
+              <SelectValue
+                placeholder={
+                  isLoadingTables   ? "Loading tables…"
+                  : tableError      ? "Error loading tables"
+                  : !sqlitePath     ? "Select a database first"
+                  : tables.length === 0 ? "No tables found"
+                  : "Select a table…"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {tables.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {tableError && <p className="text-xs text-destructive">{tableError}</p>}
+        </div>
       </div>
 
       {/* Collection name */}
@@ -209,35 +254,58 @@ export function SQLiteTab() {
         />
       </div>
 
+      {/* Append model toggle */}
+      <div className="flex items-center gap-2">
+        <Switch
+          id="sqlite-append-model"
+          checked={appendModel}
+          onCheckedChange={setAppendModel}
+          aria-label="Append embedding model to collection name"
+        />
+        <Label htmlFor="sqlite-append-model" className="text-sm">
+          Append embedding model to name
+        </Label>
+      </div>
+      {appendModel && (
+        <p className="text-xs text-muted-foreground -mt-1">
+          Will ingest into:{" "}
+          <span className="font-mono font-medium text-foreground">
+            {effectiveCollection || "—"}
+          </span>
+        </p>
+      )}
+
       {/* Advanced */}
       <Collapsible>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="text-muted-foreground px-0">
+          <Button variant="ghost" size="sm" className="text-muted-foreground px-0 h-7">
             Advanced ▾
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-3 mt-2">
-          <div className="space-y-1">
-            <Label htmlFor="sqlite-columns" className="text-xs">
-              Columns (comma-separated, empty = all)
-            </Label>
-            <Input
-              id="sqlite-columns"
-              value={columns}
-              onChange={(e) => setColumns(e.target.value)}
-              placeholder="title, body, author"
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="sqlite-id-col" className="text-xs">ID column</Label>
-            <Input
-              id="sqlite-id-col"
-              value={idColumn}
-              onChange={(e) => setIdColumn(e.target.value)}
-              placeholder="id"
-              className="h-7 text-xs"
-            />
+        <CollapsibleContent className="space-y-3 mt-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="sqlite-columns" className="text-xs">
+                Columns (comma-sep., empty = all)
+              </Label>
+              <Input
+                id="sqlite-columns"
+                value={columns}
+                onChange={(e) => setColumns(e.target.value)}
+                placeholder="title, body, author"
+                className="h-7 text-xs"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="sqlite-id-col" className="text-xs">ID column</Label>
+              <Input
+                id="sqlite-id-col"
+                value={idColumn}
+                onChange={(e) => setIdColumn(e.target.value)}
+                placeholder="id"
+                className="h-7 text-xs"
+              />
+            </div>
           </div>
           <div className="space-y-1">
             <Label htmlFor="sqlite-template" className="text-xs">
@@ -248,7 +316,7 @@ export function SQLiteTab() {
               value={rowTemplate}
               onChange={(e) => setRowTemplate(e.target.value)}
               placeholder="{title}: {body}"
-              rows={3}
+              rows={2}
               className="text-xs resize-none"
             />
           </div>
@@ -260,21 +328,39 @@ export function SQLiteTab() {
         </CollapsibleContent>
       </Collapsible>
 
-      <Button
-        onClick={handleRun}
-        disabled={!canRun}
-        aria-label="Run ingest"
-      >
+      <Button onClick={handleRun} disabled={!canRun} aria-label="Run ingest">
         <Play className="w-4 h-4 mr-2" />
         {isRunning ? "Ingesting…" : "Start ingest"}
       </Button>
 
-      {isRunning && elapsed && (
-        <p className="text-xs text-muted-foreground text-right tabular-nums">
-          Elapsed: {elapsed}
-        </p>
+      {/* Progress bar */}
+      {isRunning && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>{rowsTotal === 0 ? "Loading…" : "Ingesting…"}</span>
+            <span className="tabular-nums">
+              {rowsTotal === 0 ? "" : `${rowsDone} / ${rowsTotal}`}
+            </span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+            {rowsTotal > 0 ? (
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.round((rowsDone / rowsTotal) * 100)}%` }}
+              />
+            ) : (
+              <div className="h-full rounded-full bg-primary animate-indeterminate" />
+            )}
+          </div>
+          {isRunning && eta && (
+            <p className="text-xs text-muted-foreground text-right tabular-nums">
+              ~{eta} remaining
+            </p>
+          )}
+        </div>
       )}
 
+      {/* Error */}
       {runError && (
         <div
           className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
@@ -285,19 +371,62 @@ export function SQLiteTab() {
         </div>
       )}
 
-      {result && (
-        <Card className="px-4 text-sm space-y-1">
-          <p>
-            Found: {result.sources_found} · Ingested: {result.sources_ingested} · Skipped:{" "}
-            {result.sources_skipped}
-          </p>
-          <p>Chunks stored: {result.chunks_stored}</p>
-          {duration && (
-            <p className="text-muted-foreground">
-              Duration: <span className="font-medium text-foreground">{duration}</span>
-            </p>
-          )}
-        </Card>
+      {/* Done alert — mirrors FilesTab */}
+      {showDoneAlert && result && (
+        <div
+          className="flex items-start justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-3"
+          role="alert"
+        >
+          <div className="flex items-start gap-2.5 text-emerald-700 dark:text-emerald-400 min-w-0">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 min-w-0">
+              <p className="text-sm font-medium">Ingest complete</p>
+              <p className="text-xs opacity-80">
+                {result.sources_ingested} ingested · {result.sources_skipped} skipped ·{" "}
+                {result.chunks_stored} chunks stored
+              </p>
+              {duration && (
+                <p className="text-xs opacity-80">
+                  Duration: <span className="font-medium">{duration}</span>
+                </p>
+              )}
+              {result.skipped_reasons.length > 0 && (
+                <details className="mt-1">
+                  <summary className="text-xs text-destructive/80 cursor-pointer select-none">
+                    {result.skipped_reasons.length} skip reason{result.skipped_reasons.length !== 1 ? "s" : ""}
+                  </summary>
+                  <ul className="mt-1 space-y-0.5 max-h-32 overflow-y-auto">
+                    {result.skipped_reasons.map((r, i) => (
+                      <li key={i} className="text-xs font-mono text-destructive/80 break-all">{r}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDoneAlert(false)}
+            className="shrink-0 text-emerald-700 dark:text-emerald-400 hover:opacity-70 transition-opacity mt-0.5"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Skipped-only result (no done alert) */}
+      {!showDoneAlert && result && result.sources_ingested === 0 && result.skipped_reasons.length > 0 && (
+        <details className="text-xs border rounded-md px-3 py-2">
+          <summary className="text-destructive cursor-pointer select-none">
+            All {result.sources_skipped} rows skipped — click to see reasons
+          </summary>
+          <ul className="mt-1 space-y-0.5 max-h-40 overflow-y-auto">
+            {result.skipped_reasons.map((r, i) => (
+              <li key={i} className="font-mono text-destructive/80 break-all">{r}</li>
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );

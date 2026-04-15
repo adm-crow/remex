@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import type { ComponentType } from "react";
+import { CheckCircle2, X } from "lucide-react";
 import { Sidebar, type View } from "./Sidebar";
 import { QueryPane } from "@/components/query/QueryPane";
 import { IngestPane } from "@/components/ingest/IngestPane";
@@ -7,6 +8,7 @@ import { SourcesPane } from "@/components/sources/SourcesPane";
 import { SettingsPane } from "@/components/settings/SettingsPane";
 import { useAppStore } from "@/store/app";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { formatDuration } from "@/lib/formatDuration";
 
 const PANE_MAP: Record<View, ComponentType> = {
   query:       QueryPane,
@@ -24,6 +26,9 @@ export function AppShell() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
+  const ingestDoneUnread = useAppStore((s) => s.ingestDoneUnread);
+  const setIngestDoneUnread = useAppStore((s) => s.setIngestDoneUnread);
+  const lastIngestResult = useAppStore((s) => s.lastIngestResult);
   const isDragging = useRef(false);
   const focusSearchRef = useRef<(() => void) | null>(null);
 
@@ -74,7 +79,7 @@ export function AppShell() {
         aria-hidden
       />
 
-      <main className="flex-1 overflow-hidden flex flex-col min-w-0">
+      <main className="flex-1 overflow-hidden flex flex-col min-w-0 relative">
         {sidecarStatus === "error" && (
           <div
             className="shrink-0 bg-destructive/8 border-b border-destructive/20 px-4 py-2.5 text-sm text-destructive flex items-center gap-2"
@@ -98,6 +103,39 @@ export function AppShell() {
             <ActivePane />
           )}
         </div>
+
+        {/* Floating ingest-done toast — overlays content, doesn't shift layout */}
+        {ingestDoneUnread && lastIngestResult && (
+          <div
+            className="absolute top-3 right-4 z-50 w-80 flex items-start justify-between gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 backdrop-blur-sm shadow-md px-4 py-3"
+            role="alert"
+          >
+            <div className="flex items-start gap-2.5 text-emerald-700 dark:text-emerald-400 min-w-0">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium leading-snug">
+                  Ingest complete — {lastIngestResult.collection}
+                </p>
+                <p className="text-xs opacity-80 mt-0.5">
+                  {lastIngestResult.sourcesIngested} ingested · {lastIngestResult.sourcesSkipped} skipped ·{" "}
+                  {lastIngestResult.chunksStored} chunks ·{" "}
+                  {formatDuration(
+                    new Date(lastIngestResult.completedAt).getTime() -
+                    new Date(lastIngestResult.startedAt).getTime()
+                  )}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIngestDoneUnread(false)}
+              className="shrink-0 text-emerald-700 dark:text-emerald-400 hover:opacity-70 transition-opacity mt-0.5"
+              aria-label="Dismiss"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

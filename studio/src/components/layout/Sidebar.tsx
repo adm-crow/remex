@@ -1,4 +1,4 @@
-import { Search, Upload, Database, Settings } from "lucide-react";
+import { Search, Upload, Database, Settings, RotateCcw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CollectionSwitcher } from "./CollectionSwitcher";
@@ -20,7 +20,7 @@ const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
 ];
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
-  const { currentDb, sidecarStatus, ingestDoneUnread, setIngestDoneUnread } = useAppStore();
+  const { currentDb, sidecarStatus, setIngestDoneUnread, triggerSidecarReconnect } = useAppStore();
 
   return (
     <aside
@@ -86,13 +86,6 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
               )}
             />
             <span>{label}</span>
-            {/* Ingest-done indicator */}
-            {view === "ingest" && ingestDoneUnread && activeView !== "ingest" && (
-              <span className="relative ml-auto flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-              </span>
-            )}
           </button>
         ))}
       </nav>
@@ -112,7 +105,7 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
           aria-label={`Server ${sidecarStatus}`}
           title={`Server ${sidecarStatus}`}
         />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-medium capitalize text-sidebar-foreground leading-none">
             {sidecarStatus}
           </p>
@@ -120,6 +113,16 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
             Remex serve
           </p>
         </div>
+        {sidecarStatus !== "starting" && (
+          <button
+            onClick={triggerSidecarReconnect}
+            className="shrink-0 text-muted-foreground hover:text-sidebar-foreground transition-colors p-1 rounded"
+            title="Restart server"
+            aria-label="Restart server"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </aside>
   );

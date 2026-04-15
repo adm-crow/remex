@@ -258,6 +258,55 @@ export const api = {
       }
     ),
 
+  async *ingestSqliteStream(
+    base: string,
+    dbPath: string,
+    collection: string,
+    req: IngestSQLiteRequest,
+    signal?: AbortSignal
+  ): AsyncGenerator<IngestStreamEvent> {
+    const res = await fetch(
+      `${base}/collections/${encodeURIComponent(collection)}/ingest/sqlite/stream`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...req, db_path: dbPath }),
+        signal,
+      }
+    );
+    if (!res.ok || !res.body) {
+      const body = await res.text().catch(() => "");
+      let message: string;
+      try {
+        message = (JSON.parse(body) as { detail?: string }).detail ?? body;
+      } catch {
+        message = body || "sqlite ingest stream failed";
+      }
+      throw new Error(`${res.status}: ${message}`);
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    try {
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          if (part.startsWith("data: ")) {
+            const event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+            yield event;
+            if (event.type === "done" || event.type === "error") break outer;
+          }
+        }
+      }
+    } finally {
+      reader.cancel().catch(() => {});
+    }
+  },
+
   async *ingestFilesStream(
     base: string,
     dbPath: string,
@@ -287,19 +336,23 @@ export const api = {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    outer: while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const parts = buffer.split("\n\n");
-      buffer = parts.pop() ?? "";
-      for (const part of parts) {
-        if (part.startsWith("data: ")) {
-          const event = JSON.parse(part.slice(6)) as IngestStreamEvent;
-          yield event;
-          if (event.type === "done" || event.type === "error") break outer;
+    try {
+      outer: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const parts = buffer.split("\n\n");
+        buffer = parts.pop() ?? "";
+        for (const part of parts) {
+          if (part.startsWith("data: ")) {
+            const event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+            yield event;
+            if (event.type === "done" || event.type === "error") break outer;
+          }
         }
       }
+    } finally {
+      reader.cancel().catch(() => {});
     }
   },
 };

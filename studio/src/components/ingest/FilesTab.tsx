@@ -95,7 +95,6 @@ export function FilesTab() {
     if (!sourcePath || !currentDb || !effectiveCollection) return;
     setShowDoneAlert(false);
     setIngestDoneUnread(false);
-    setCollectionType(currentDb, effectiveCollection, "files");
     resetIngestSession();
     setIngestRunning(true);
     abortRef.current = new AbortController();
@@ -124,6 +123,9 @@ export function FilesTab() {
             chunks_stored: event.chunks_stored,
           });
         } else if (event.type === "done") {
+          if (event.result.sources_ingested > 0) {
+            setCollectionType(currentDb, effectiveCollection, "files");
+          }
           setLastIngestResult({
             collection:      effectiveCollection,
             sourcePath,

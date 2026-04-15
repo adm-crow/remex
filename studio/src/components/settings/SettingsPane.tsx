@@ -20,19 +20,16 @@ import { useAppStore } from "@/store/app";
 import type { Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
 
+// Colors are the exact light-mode --primary values from index.css
 const THEME_OPTIONS: { value: Theme; label: string; color: string }[] = [
-  { value: "default", label: "Indigo",  color: "bg-indigo-500"  },
-  { value: "blue",    label: "Blue",    color: "bg-sky-500"     },
-  { value: "violet",  label: "Violet",  color: "bg-violet-500"  },
-  { value: "purple",  label: "Fuchsia", color: "bg-fuchsia-500" },
-  { value: "green",   label: "Green",   color: "bg-emerald-500" },
-  { value: "lime",    label: "Lime",    color: "bg-lime-500"    },
-  { value: "teal",    label: "Teal",    color: "bg-teal-500"    },
-  { value: "cyan",    label: "Cyan",    color: "bg-cyan-500"    },
-  { value: "rose",    label: "Rose",    color: "bg-rose-500"    },
-  { value: "coral",   label: "Coral",   color: "bg-orange-400"  },
-  { value: "amber",   label: "Amber",   color: "bg-amber-400"   },
-  { value: "slate",   label: "Slate",   color: "bg-slate-500"   },
+  { value: "default", label: "Indigo", color: "oklch(0.47 0.27 262)"  },
+  { value: "violet",  label: "Violet", color: "oklch(0.50 0.26 285)"  },
+  { value: "rose",    label: "Rose",   color: "oklch(0.55 0.24 345)"  },
+  { value: "coral",   label: "Coral",  color: "oklch(0.58 0.22 22)"   },
+  { value: "green",   label: "Green",  color: "oklch(0.60 0.20 155)"  },
+  { value: "yellow",  label: "Yellow", color: "oklch(0.75 0.20 92)"   },
+  { value: "lime",    label: "Lime",   color: "oklch(0.62 0.22 122)"  },
+  { value: "slate",   label: "Slate",  color: "oklch(0.50 0.08 240)"  },
 ];
 
 const AUTO_PROVIDER = "__auto__";
@@ -153,7 +150,7 @@ export function SettingsPane() {
                     )}
                     title={opt.label}
                   >
-                    <span className={cn("w-3.5 h-3.5 rounded-full shrink-0", opt.color)} />
+                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
                     <span className={cn(
                       "text-[10px] font-medium leading-none",
                       theme === opt.value ? "text-primary" : "text-muted-foreground"
@@ -282,7 +279,7 @@ export function SettingsPane() {
                   </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Stored locally, never sent to the remex server.
+                  Stored locally. Used only by the remex sidecar on your machine to call the AI provider.
                 </p>
               </Field>
 
