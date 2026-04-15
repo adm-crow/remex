@@ -1,6 +1,6 @@
 import { Database, Search, Bot, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAppStore } from "@/store/app";
 
 export function OnboardingModal() {
@@ -16,7 +16,7 @@ export function OnboardingModal() {
             <Database className="w-6 h-6 text-primary" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">Welcome to Remex Studio</h2>
+            <DialogTitle className="text-lg font-semibold">Welcome to Remex Studio</DialogTitle>
             <p className="text-sm text-muted-foreground">
               Your local semantic search and AI knowledge base.
             </p>
