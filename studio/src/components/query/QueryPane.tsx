@@ -76,8 +76,10 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const [filterOpen, setFilterOpen] = useState(false);
 
   // Keep selection in sync when the user switches collections from the sidebar.
+  // Also reset source filter so stale where-filters aren't applied to new collection.
   useEffect(() => {
     setSelectedCollections(currentCollection ? [currentCollection] : []);
+    setSelectedSources([]);
   }, [currentCollection]);
 
   const inputRef = useRef<HTMLInputElement>(null);

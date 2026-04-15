@@ -142,7 +142,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
     checked: number;
   } | null>(null);
 
-  const { currentCollection, setCurrentCollection, removeCollectionType } = useAppStore();
+  const { currentCollection, setCurrentCollection, setCollectionType, removeCollectionType } = useAppStore();
   const { data: stats, isLoading: statsLoading } = useCollectionStats(
     apiUrl,
     dbPath,
@@ -290,6 +290,10 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
                 if (currentCollection === data.old_name) {
                   setCurrentCollection(data.new_name);
                 }
+                if (collectionType !== undefined) {
+                  setCollectionType(dbPath, data.new_name, collectionType);
+                }
+                removeCollectionType(dbPath, data.old_name);
               },
               onError: (err) => {
                 alert(err.message);
