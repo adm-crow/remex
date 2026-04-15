@@ -21,16 +21,15 @@ import { useAppStore } from "@/store/app";
 import type { Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
 
-// Colors are the exact light-mode --primary values from index.css
 const THEME_OPTIONS: { value: Theme; label: string; color: string }[] = [
-  { value: "default", label: "Indigo", color: "oklch(0.47 0.27 262)"  },
-  { value: "violet",  label: "Violet", color: "oklch(0.50 0.26 285)"  },
-  { value: "rose",    label: "Rose",   color: "oklch(0.55 0.24 345)"  },
-  { value: "coral",   label: "Coral",  color: "oklch(0.58 0.22 22)"   },
-  { value: "green",   label: "Green",  color: "oklch(0.60 0.20 155)"  },
-  { value: "yellow",  label: "Yellow", color: "oklch(0.75 0.20 92)"   },
-  { value: "lime",    label: "Lime",   color: "oklch(0.62 0.22 122)"  },
-  { value: "slate",   label: "Slate",  color: "oklch(0.50 0.08 240)"  },
+  { value: "default", label: "Indigo",  color: "#4F69C6" },
+  { value: "violet",  label: "Purple",  color: "#AC4AC3" },
+  { value: "rose",    label: "Pink",    color: "#D74894" },
+  { value: "coral",   label: "Coral",   color: "#ED7464" },
+  { value: "green",   label: "Green",   color: "#1CAC78" },
+  { value: "yellow",  label: "Yellow",  color: "#D9B451" },
+  { value: "lime",    label: "Lime",    color: "#7EBD01" },
+  { value: "slate",   label: "Slate",   color: "#516572" },
 ];
 
 const AUTO_PROVIDER = "__auto__";
@@ -109,8 +108,9 @@ export function SettingsPane() {
   }
 
   return (
-    <div className="h-full p-4 overflow-hidden">
-      <div className="grid grid-cols-2 gap-3 items-start h-full">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
+      <div className="grid grid-cols-2 gap-3 items-start">
 
         {/* ── Left column ─────────────────────────────────────────────── */}
         <div className="space-y-3">
@@ -295,13 +295,26 @@ export function SettingsPane() {
             </form>
           </Card>
 
-          {appVersion && (
-            <p className="text-xs text-muted-foreground text-center pt-1">
-              Remex Studio v{appVersion}
-            </p>
-          )}
-
         </div>
+      </div>
+      </div>
+
+      {/* ── Sticky version footer ────────────────────────────────────────── */}
+      <div className="shrink-0 border-t px-4 py-2.5 flex items-center justify-between bg-background">
+        <p className="text-xs text-muted-foreground">
+          {appVersion ? `Remex Studio v${appVersion}` : "Remex Studio"}
+        </p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-6 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground"
+          onClick={() => open("https://pypi.org/project/remex/#history")}
+          aria-label="Check for updates"
+        >
+          <ExternalLink className="w-3 h-3" />
+          Check for updates
+        </Button>
       </div>
     </div>
   );

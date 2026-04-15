@@ -163,7 +163,7 @@ export function FilesTab() {
   }
 
   return (
-    <div className="flex flex-col h-full p-6 gap-4">
+    <div className="flex flex-col h-full p-4 gap-3">
       {/* Directory picker */}
       <div
         className={cn(
@@ -225,12 +225,12 @@ export function FilesTab() {
       {/* Advanced settings */}
       <Collapsible>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="text-muted-foreground px-0">
+          <Button variant="ghost" size="sm" className="text-muted-foreground px-0 h-7">
             Advanced ▾
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-3 mt-2">
-          <div className="grid grid-cols-2 gap-3">
+        <CollapsibleContent className="space-y-2 mt-1">
+          <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label htmlFor="chunk-size" className="text-xs">Chunk size</Label>
               <Input
@@ -252,11 +252,7 @@ export function FilesTab() {
               />
             </div>
           </div>
-          <EmbeddingModelField
-            value={embeddingModel}
-            onChange={setEmbeddingModel}
-          />
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2">
             <Switch
               id="incremental"
               checked={incremental}
@@ -264,9 +260,13 @@ export function FilesTab() {
               aria-label="Incremental ingest"
             />
             <Label htmlFor="incremental" className="text-xs">
-              Incremental — skip files unchanged since last ingest
+              Incremental — skip unchanged files
             </Label>
           </div>
+          <EmbeddingModelField
+            value={embeddingModel}
+            onChange={setEmbeddingModel}
+          />
         </CollapsibleContent>
       </Collapsible>
 
@@ -283,9 +283,10 @@ export function FilesTab() {
         {ingestRunning && (
           <Button
             type="button"
-            variant="outline"
+            variant="destructive"
             onClick={() => abortRef.current?.abort()}
             aria-label="Stop"
+            className="shrink-0"
           >
             Stop
           </Button>

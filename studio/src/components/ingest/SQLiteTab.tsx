@@ -3,7 +3,6 @@ import { Play, AlertCircle, CheckCircle2, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { EmbeddingModelField } from "./EmbeddingModelField";
@@ -283,11 +282,11 @@ export function SQLiteTab() {
             Advanced ▾
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-3 mt-1">
-          <div className="grid grid-cols-2 gap-3">
+        <CollapsibleContent className="space-y-2 mt-1">
+          <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label htmlFor="sqlite-columns" className="text-xs">
-                Columns (comma-sep., empty = all)
+                Columns (comma-sep.)
               </Label>
               <Input
                 id="sqlite-columns"
@@ -312,13 +311,12 @@ export function SQLiteTab() {
             <Label htmlFor="sqlite-template" className="text-xs">
               Row template (optional)
             </Label>
-            <Textarea
+            <Input
               id="sqlite-template"
               value={rowTemplate}
               onChange={(e) => setRowTemplate(e.target.value)}
               placeholder="{title}: {body}"
-              rows={2}
-              className="text-xs resize-none"
+              className="h-7 text-xs"
             />
           </div>
           <EmbeddingModelField
@@ -337,9 +335,10 @@ export function SQLiteTab() {
         {isRunning && (
           <Button
             type="button"
-            variant="outline"
+            variant="destructive"
             onClick={() => runAbortRef.current?.abort()}
             aria-label="Stop"
+            className="shrink-0"
           >
             Stop
           </Button>

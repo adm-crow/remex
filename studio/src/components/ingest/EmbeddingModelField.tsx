@@ -45,28 +45,24 @@ export function EmbeddingModelField({ value, onChange, inputId = "embedding-mode
         onChange={(e) => onChange(e.target.value)}
         className="h-7 text-xs"
       />
-      <div className="space-y-1.5 pt-1">
-        <p className="text-xs text-muted-foreground">
-          The model used at ingest time <strong className="text-foreground">must match</strong> query time.
-        </p>
-        {PRESETS.map(({ tag, tagColor, model, desc }) => (
-          <button
-            key={model}
-            type="button"
-            className="w-full text-left rounded border bg-muted/30 px-2 py-1 hover:bg-muted/60 transition-colors"
-            onClick={() => onChange(model)}
-            title={`Use ${model}`}
-          >
-            <div className="flex items-center gap-1.5">
+      <div className="pt-1 space-y-1.5">
+        <div className="flex flex-wrap gap-1.5">
+          {PRESETS.map(({ tag, tagColor, model, desc }) => (
+            <button
+              key={model}
+              type="button"
+              className="flex items-center gap-1.5 rounded-full border bg-muted/30 pl-1.5 pr-2.5 py-0.5 hover:bg-muted/60 transition-colors"
+              onClick={() => onChange(model)}
+              title={desc}
+            >
               <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${tagColor}`}>
                 {tag}
               </span>
-              <span className="font-mono text-[11px] truncate">{model}</span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
-          </button>
-        ))}
-        <div className="flex flex-row flex-wrap gap-x-3 gap-y-1 pt-0.5">
+              <span className="font-mono text-[10px] truncate max-w-[120px]">{model}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-row flex-wrap gap-x-3 gap-y-1">
           {LINKS.map(({ label, href }) => (
             <a
               key={href}

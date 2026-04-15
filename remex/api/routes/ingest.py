@@ -1,5 +1,6 @@
 import asyncio
 import json
+import threading
 from typing import AsyncIterator
 
 from fastapi import APIRouter, HTTPException, Request
@@ -52,8 +53,12 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
     """
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[dict] = asyncio.Queue()
+    cancel_event = threading.Event()
 
     def _on_progress(p: IngestProgress) -> None:
+        # Raise immediately if the client disconnected — stops the ingest thread.
+        if cancel_event.is_set():
+            raise InterruptedError("Ingest cancelled by client")
         loop.call_soon_threadsafe(
             queue.put_nowait,
             {
@@ -92,6 +97,8 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
                     "skipped_reasons": result.skipped_reasons,
                 },
             })
+        except InterruptedError:
+            pass  # Client disconnected — stream generator already exited.
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
 
@@ -100,19 +107,24 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
     async def _stream() -> AsyncIterator[str]:
         try:
             while True:
-                if await request.is_disconnected():
-                    task.cancel()
-                    break
-                event = await queue.get()
+                try:
+                    # Poll with a short timeout so we can check for client disconnect
+                    # between events, even when the ingest thread is slow.
+                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
+                    continue
+
                 yield f"data: {json.dumps(event)}\n\n"
-                # Yield to the event loop so uvicorn can flush this chunk before
-                # processing the next event. Without this, fast in-memory
-                # processing (e.g. SQLite rows) fills the queue before the
-                # generator starts consuming it, and all chunks are sent at once.
+                # Yield to the event loop so uvicorn can flush this chunk.
                 await asyncio.sleep(0)
                 if event["type"] in ("done", "error"):
                     break
         finally:
+            # Always signal the ingest thread to stop, whether the client
+            # disconnected mid-run or the stream ended normally.
+            cancel_event.set()
             if not task.done():
                 task.cancel()
 
@@ -164,8 +176,11 @@ async def ingest_sqlite_stream(
     """
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[dict] = asyncio.Queue()
+    cancel_event = threading.Event()
 
     def _on_progress(p: IngestProgress) -> None:
+        if cancel_event.is_set():
+            raise InterruptedError("Ingest cancelled by client")
         loop.call_soon_threadsafe(
             queue.put_nowait,
             {
@@ -206,6 +221,8 @@ async def ingest_sqlite_stream(
                     "skipped_reasons": result.skipped_reasons,
                 },
             })
+        except InterruptedError:
+            pass  # Client disconnected — stream generator already exited.
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
 
@@ -214,19 +231,19 @@ async def ingest_sqlite_stream(
     async def _stream() -> AsyncIterator[str]:
         try:
             while True:
-                if await request.is_disconnected():
-                    task.cancel()
-                    break
-                event = await queue.get()
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
+                except asyncio.TimeoutError:
+                    if await request.is_disconnected():
+                        break
+                    continue
+
                 yield f"data: {json.dumps(event)}\n\n"
-                # Yield to the event loop so uvicorn can flush this chunk before
-                # processing the next event. Without this, fast in-memory
-                # processing (e.g. SQLite rows) fills the queue before the
-                # generator starts consuming it, and all chunks are sent at once.
                 await asyncio.sleep(0)
                 if event["type"] in ("done", "error"):
                     break
         finally:
+            cancel_event.set()
             if not task.done():
                 task.cancel()
 
