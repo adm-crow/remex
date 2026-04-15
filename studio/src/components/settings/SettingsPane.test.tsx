@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/utils";
 import { SettingsPane } from "./SettingsPane";
 import { useAppStore } from "@/store/app";
+
+vi.mock("@tauri-apps/api/app", () => ({
+  getVersion: vi.fn().mockResolvedValue("1.2.3"),
+}));
 
 beforeEach(() => {
   localStorage.clear();
@@ -44,5 +48,12 @@ describe("SettingsPane", () => {
     fireEvent.click(screen.getByRole("button", { name: /change project/i }));
     expect(useAppStore.getState().currentDb).toBeNull();
     expect(useAppStore.getState().currentCollection).toBeNull();
+  });
+
+  it("displays app version loaded from Tauri", async () => {
+    renderWithProviders(<SettingsPane />);
+    await waitFor(() => {
+      expect(screen.getByText(/1\.2\.3/)).toBeInTheDocument();
+    });
   });
 });
