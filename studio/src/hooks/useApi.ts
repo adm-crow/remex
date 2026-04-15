@@ -161,6 +161,17 @@ export function useDeleteCollection(
   });
 }
 
+export function useRenameCollection(apiUrl: string, dbPath: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ collection, newName }: { collection: string; newName: string }) =>
+      api.renameCollection(apiUrl, dbPath, collection, newName),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["collections", apiUrl, dbPath] });
+    },
+  });
+}
+
 export function usePurgeCollection(
   apiUrl: string,
   dbPath: string,

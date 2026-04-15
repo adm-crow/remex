@@ -11,6 +11,7 @@ vi.mock("@/hooks/useApi", () => ({
   useDeleteSource: vi.fn(),
   usePurgeCollection: vi.fn(),
   useDeleteCollection: vi.fn(),
+  useRenameCollection: vi.fn(),
 }));
 
 import {
@@ -20,11 +21,13 @@ import {
   useDeleteSource,
   usePurgeCollection,
   useDeleteCollection,
+  useRenameCollection,
 } from "@/hooks/useApi";
 
 const mockDeleteMutate = vi.fn().mockResolvedValue({ deleted_chunks: 2 });
 const mockPurgeMutate  = vi.fn().mockResolvedValue({ chunks_deleted: 1, chunks_checked: 5 });
 const mockDeleteCollectionMutate = vi.fn().mockResolvedValue({ deleted: true });
+const mockRenameMutate = vi.fn();
 
 beforeEach(() => {
   localStorage.clear();
@@ -73,6 +76,12 @@ beforeEach(() => {
 
   vi.mocked(useDeleteCollection).mockReturnValue({
     mutateAsync: mockDeleteCollectionMutate,
+    isPending: false,
+    error: null,
+  } as any);
+
+  vi.mocked(useRenameCollection).mockReturnValue({
+    mutate: mockRenameMutate,
     isPending: false,
     error: null,
   } as any);

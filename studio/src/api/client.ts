@@ -307,6 +307,24 @@ export const api = {
     }
   },
 
+  renameCollection: (
+    base: string,
+    dbPath: string,
+    collection: string,
+    newName: string,
+  ): Promise<{ renamed: boolean; old_name: string; new_name: string }> => {
+    const url = new URL(`${base}/collections/${encodeURIComponent(collection)}/rename`);
+    url.searchParams.set("db_path", dbPath);
+    return apiFetch<{ renamed: boolean; old_name: string; new_name: string }>(
+      url.toString(),
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_name: newName }),
+      }
+    );
+  },
+
   async *ingestFilesStream(
     base: string,
     dbPath: string,
