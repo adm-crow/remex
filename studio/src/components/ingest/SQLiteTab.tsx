@@ -28,6 +28,7 @@ export function SQLiteTab() {
   const {
     apiUrl, currentDb, currentCollection,
     setCollectionType, setLastIngestResult, setIngestDoneUnread,
+    setIncompleteCollection, clearIncompleteCollection,
   } = useAppStore();
 
   const [sqlitePath,      setSqlitePath]      = useState("");
@@ -159,6 +160,7 @@ export function SQLiteTab() {
           setResult(event.result);
           if (event.result.sources_ingested > 0) {
             setCollectionType(currentDb, effectiveCollection, "sqlite");
+            clearIncompleteCollection(currentDb, effectiveCollection);
           }
           queryClient.invalidateQueries({ queryKey: ["sources", apiUrl, currentDb, effectiveCollection] });
           queryClient.invalidateQueries({ queryKey: ["collections", apiUrl, currentDb] });
@@ -185,6 +187,7 @@ export function SQLiteTab() {
       if (e instanceof DOMException && e.name === "AbortError") {
         if (rowsDone > 0) {
           setWasCancelled(true);
+          if (currentDb) setIncompleteCollection(currentDb, effectiveCollection);
         }
       } else {
         setRunError(e instanceof Error ? e.message : String(e));

@@ -37,6 +37,7 @@ export function FilesTab() {
     setIngestFilesDone, setIngestFilesTotal,
     setIngestRunning, setIngestStreamError, setLastIngestResult,
     setIngestDoneUnread, setCollectionType,
+    setIncompleteCollection, clearIncompleteCollection,
   } = useAppStore();
 
   // Reset session state when navigating away after a completed ingest
@@ -129,6 +130,7 @@ export function FilesTab() {
         } else if (event.type === "done") {
           if (event.result.sources_ingested > 0) {
             setCollectionType(currentDb, effectiveCollection, "files");
+            clearIncompleteCollection(currentDb, effectiveCollection);
           }
           setLastIngestResult({
             collection:      effectiveCollection,
@@ -159,6 +161,7 @@ export function FilesTab() {
       if (e instanceof DOMException && e.name === "AbortError") {
         if (useAppStore.getState().ingestFilesDone > 0) {
           setWasCancelled(true);
+          if (currentDb) setIncompleteCollection(currentDb, effectiveCollection);
         }
       } else {
         setIngestStreamError(String(e));

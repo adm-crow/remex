@@ -131,9 +131,10 @@ interface CollectionCardProps {
   dbPath: string;
   isCurrent: boolean;
   collectionType: "files" | "sqlite" | undefined;
+  isIncomplete: boolean;
 }
 
-function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: CollectionCardProps) {
+function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isIncomplete }: CollectionCardProps) {
   const [expanded,      setExpanded]      = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameOpen,    setRenameOpen]    = useState(false);
@@ -142,7 +143,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
     checked: number;
   } | null>(null);
 
-  const { currentCollection, setCurrentCollection, setCollectionType, removeCollectionType } = useAppStore();
+  const { currentCollection, setCurrentCollection, setCollectionType, removeCollectionType, clearIncompleteCollection } = useAppStore();
   const { data: stats, isLoading: statsLoading } = useCollectionStats(
     apiUrl,
     dbPath,
@@ -192,6 +193,14 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
               className="text-[10px] px-1.5 py-0 shrink-0 bg-primary/10 text-primary border-primary/20"
             >
               active
+            </Badge>
+          )}
+          {isIncomplete && (
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 py-0 shrink-0 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+            >
+              Incomplete
             </Badge>
           )}
         </button>
@@ -263,6 +272,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
                   await deleteMutation.mutateAsync(name);
                   if (currentCollection === name) setCurrentCollection(null);
                   removeCollectionType(dbPath, name);
+                  clearIncompleteCollection(dbPath, name);
                   setConfirmDelete(false);
                 } catch {
                   // error surfaced via deleteMutation.error above
@@ -294,6 +304,10 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
                   setCollectionType(dbPath, data.new_name, collectionType);
                 }
                 removeCollectionType(dbPath, data.old_name);
+                // Migrate incomplete flag to new name
+                if (isIncomplete) {
+                  clearIncompleteCollection(dbPath, data.old_name);
+                }
               },
               onError: (err) => {
                 alert(err.message);
@@ -345,7 +359,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
 // ── Main pane ─────────────────────────────────────────────────────────────
 
 export function SourcesPane() {
-  const { apiUrl, currentDb, currentCollection, collectionTypes } = useAppStore();
+  const { apiUrl, currentDb, currentCollection, collectionTypes, incompleteCollections } = useAppStore();
 
   const { data: collections = [], isLoading, error } = useCollections(
     apiUrl,
@@ -407,6 +421,7 @@ export function SourcesPane() {
                 dbPath={currentDb}
                 isCurrent={name === currentCollection}
                 collectionType={collectionTypes[`${currentDb}::${name}`]}
+                isIncomplete={!!incompleteCollections[`${currentDb}::${name}`]}
               />
             ))}
           </div>

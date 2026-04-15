@@ -52,6 +52,7 @@ export interface AppState {
   lastIngestResult: LastIngestResult | null;
   // Collection metadata (persisted)
   collectionTypes: Record<string, "files" | "sqlite">;
+  incompleteCollections: Record<string, true>;
   // Actions
   setCurrentDb: (db: string | null) => void;
   setCurrentCollection: (col: string | null) => void;
@@ -77,6 +78,8 @@ export interface AppState {
   setIngestDoneUnread: (v: boolean) => void;
   setCollectionType: (dbPath: string, collection: string, type: "files" | "sqlite") => void;
   removeCollectionType: (dbPath: string, collection: string) => void;
+  setIncompleteCollection: (dbPath: string, collection: string) => void;
+  clearIncompleteCollection: (dbPath: string, collection: string) => void;
   // Onboarding
   onboardingDone: boolean;
   setOnboardingDone: (v: boolean) => void;
@@ -105,6 +108,7 @@ export const useAppStore = create<AppState>()(
       ingestDoneUnread: false,
       lastIngestResult: null,
       collectionTypes: {},
+      incompleteCollections: {},
       onboardingDone: false,
 
       setCurrentDb: (db) => set({ currentDb: db }),
@@ -178,6 +182,19 @@ export const useAppStore = create<AppState>()(
           delete next[`${dbPath}::${collection}`];
           return { collectionTypes: next };
         }),
+      setIncompleteCollection: (dbPath, collection) =>
+        set((s) => ({
+          incompleteCollections: {
+            ...s.incompleteCollections,
+            [`${dbPath}::${collection}`]: true,
+          },
+        })),
+      clearIncompleteCollection: (dbPath, collection) =>
+        set((s) => {
+          const next = { ...s.incompleteCollections };
+          delete next[`${dbPath}::${collection}`];
+          return { incompleteCollections: next };
+        }),
       setOnboardingDone: (v) => set({ onboardingDone: v }),
     }),
     {
@@ -192,8 +209,9 @@ export const useAppStore = create<AppState>()(
         aiModel:          state.aiModel,
         aiApiKey:         state.aiApiKey,
         lastIngestResult: state.lastIngestResult,
-        collectionTypes:  state.collectionTypes,
-        onboardingDone:   state.onboardingDone,
+        collectionTypes:       state.collectionTypes,
+        incompleteCollections: state.incompleteCollections,
+        onboardingDone:        state.onboardingDone,
       }),
     }
   )
