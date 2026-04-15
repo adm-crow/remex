@@ -108,6 +108,27 @@ class ChatResponse(BaseModel):
     model: str
 
 
+class MultiChatRequest(BaseModel):
+    text: str
+    collections: list[str]
+    db_path: str = "./remex_db"
+    n_results: int = Field(default=5, ge=1)
+    embedding_model: str = "all-MiniLM-L6-v2"
+    where: Optional[dict] = None
+    min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    provider: Optional[str] = None
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+
+
+class MultiChatResponse(BaseModel):
+    answer: str
+    sources: list[QueryResultItem]
+    provider: str
+    model: str
+    collections: list[str]
+
+
 class CollectionStatsResponse(BaseModel):
     name: str
     total_chunks: int
