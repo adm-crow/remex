@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useMultiQueryResults, useChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
 
@@ -110,13 +110,29 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       min_score: minScore > 0 ? minScore : undefined,
       where: whereFilter }
   );
-  const chatResult = useChat(
-    apiUrl, currentDb ?? "", activeCollection, submitted,
-    { enabled: !!submitted && useAi, n_results: nResults,
+
+  const isMultiAi = useAi && selectedCollections.length > 1;
+  const multiChatResult = useMultiChat(
+    apiUrl, currentDb ?? "", selectedCollections, submitted,
+    { enabled: !!submitted && isMultiAi,
+      n_results: nResults,
       min_score: minScore > 0 ? minScore : undefined,
-      provider: aiProvider || undefined, model: aiModel || undefined,
-      api_key: aiApiKey || undefined }
+      provider: aiProvider || undefined,
+      model: aiModel || undefined,
+      api_key: aiApiKey || undefined,
+    }
   );
+  const singleChatResult = useChat(
+    apiUrl, currentDb ?? "", activeCollection, submitted,
+    { enabled: !!submitted && useAi && !isMultiAi,
+      n_results: nResults,
+      min_score: minScore > 0 ? minScore : undefined,
+      provider: aiProvider || undefined,
+      model: aiModel || undefined,
+      api_key: aiApiKey || undefined,
+    }
+  );
+  const chatResult = isMultiAi ? multiChatResult : singleChatResult;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -127,17 +143,13 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   }
 
   function handleCollectionToggle(col: string) {
-    if (useAi) {
-      setSelectedCollections([col]);
-    } else {
-      setSelectedCollections((prev) => {
-        if (prev.includes(col)) {
-          if (prev.length === 1) return prev; // never deselect last
-          return prev.filter((c) => c !== col);
-        }
-        return [...prev, col];
-      });
-    }
+    setSelectedCollections((prev) => {
+      if (prev.includes(col)) {
+        if (prev.length === 1) return prev; // never deselect last
+        return prev.filter((c) => c !== col);
+      }
+      return [...prev, col];
+    });
   }
 
   async function handleExport() {
@@ -327,9 +339,6 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               checked={useAi}
               onCheckedChange={(val) => {
                 setUseAi(val);
-                if (val && selectedCollections.length > 1) {
-                  setSelectedCollections([selectedCollections[0]]);
-                }
               }}
               aria-label="AI answer toggle"
             />
@@ -474,6 +483,9 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                 <span className="text-sm font-semibold">AI Answer</span>
                 <Badge variant="secondary" className="text-xs ml-auto font-mono">
                   {chatResult.data.provider} · {chatResult.data.model}
+                  {isMultiAi && (
+                    <span className="ml-1 opacity-70">({selectedCollections.length} collections)</span>
+                  )}
                 </Badge>
               </div>
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed

@@ -7,6 +7,7 @@ import { useAppStore } from "@/store/app";
 vi.mock("@/hooks/useApi", () => ({
   useMultiQueryResults: vi.fn(),
   useChat: vi.fn(),
+  useMultiChat: vi.fn(),
   useCollections: vi.fn(),
   useCollectionStats: vi.fn(),
   useSources: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock("@tauri-apps/plugin-dialog", async (importOriginal) => ({
 }));
 
 import * as useApi from "@/hooks/useApi";
-import { useMultiQueryResults, useChat, useCollections, useCollectionStats } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats } from "@/hooks/useApi";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -61,6 +62,11 @@ beforeEach(() => {
     error: null,
   } as any);
   vi.mocked(useChat).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  } as any);
+  vi.mocked(useMultiChat).mockReturnValue({
     data: undefined,
     isLoading: false,
     error: null,

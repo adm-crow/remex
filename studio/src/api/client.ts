@@ -40,6 +40,14 @@ export interface ChatResponse {
   model: string;
 }
 
+export interface MultiChatResponse {
+  answer: string;
+  sources: QueryResultItem[];
+  provider: string;
+  model: string;
+  collections: string[];
+}
+
 export interface QueryRequest {
   text: string;
   n_results?: number;
@@ -216,6 +224,20 @@ export const api = {
   ) =>
     apiFetch<ChatResponse>(
       `${base}/collections/${encodeURIComponent(collection)}/chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...req, db_path: dbPath }),
+      }
+    ),
+
+  multiChat: (
+    base: string,
+    dbPath: string,
+    req: ChatRequest & { collections: string[] }
+  ) =>
+    apiFetch<MultiChatResponse>(
+      `${base}/collections/multi-chat`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
