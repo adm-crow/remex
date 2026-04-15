@@ -186,7 +186,11 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       content = JSON.stringify(results, null, 2);
     }
 
-    await invoke("write_text_file", { path, content });
+    try {
+      await invoke("write_text_file", { path, content });
+    } catch (e) {
+      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   const results = useAi ? (chatResult.data?.sources ?? []) : (multiResult.data ?? []);

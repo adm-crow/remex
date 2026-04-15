@@ -52,9 +52,11 @@ export function SQLiteTab() {
   const [showDoneAlert,   setShowDoneAlert]   = useState(false);
   const [wasCancelled,    setWasCancelled]    = useState(false);
 
-  const loadAbortRef = useRef<AbortController | null>(null);
-  const runAbortRef  = useRef<AbortController | null>(null);
-  const startTimeRef = useRef<number | null>(null);
+  const loadAbortRef  = useRef<AbortController | null>(null);
+  const runAbortRef   = useRef<AbortController | null>(null);
+  const startTimeRef  = useRef<number | null>(null);
+  // Tracks live progress outside React state so the cancel handler (a stale closure) reads the correct value.
+  const rowsDoneRef   = useRef(0);
   const queryClient  = useQueryClient();
 
   const effectiveCollection = appendModel
@@ -129,6 +131,7 @@ export function SQLiteTab() {
     setDuration(null);
     setRowsDone(0);
     setRowsTotal(0);
+    rowsDoneRef.current = 0;
     setEta(null);
     setShowDoneAlert(false);
     setWasCancelled(false);
@@ -153,6 +156,7 @@ export function SQLiteTab() {
       )) {
         if (event.type === "progress") {
           setRowsDone(event.files_done);
+          rowsDoneRef.current = event.files_done;
           setRowsTotal(event.files_total);
         } else if (event.type === "done") {
           const completedAt = new Date().toISOString();
@@ -185,7 +189,7 @@ export function SQLiteTab() {
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
-        if (rowsDone > 0) {
+        if (rowsDoneRef.current > 0) {
           setWasCancelled(true);
           if (currentDb) setIncompleteCollection(currentDb, effectiveCollection);
         }

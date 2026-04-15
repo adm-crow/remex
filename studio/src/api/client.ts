@@ -318,7 +318,12 @@ export const api = {
         buffer = parts.pop() ?? "";
         for (const part of parts) {
           if (part.startsWith("data: ")) {
-            const event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+            let event: IngestStreamEvent;
+            try {
+              event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+            } catch {
+              continue; // skip malformed SSE event
+            }
             yield event;
             if (event.type === "done" || event.type === "error") break outer;
           }
@@ -385,7 +390,12 @@ export const api = {
         buffer = parts.pop() ?? "";
         for (const part of parts) {
           if (part.startsWith("data: ")) {
-            const event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+            let event: IngestStreamEvent;
+            try {
+              event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+            } catch {
+              continue; // skip malformed SSE event
+            }
             yield event;
             if (event.type === "done" || event.type === "error") break outer;
           }

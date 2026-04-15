@@ -143,7 +143,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
     checked: number;
   } | null>(null);
 
-  const { currentCollection, setCurrentCollection, setCollectionType, removeCollectionType, clearIncompleteCollection } = useAppStore();
+  const { currentCollection, setCurrentCollection, setCollectionType, removeCollectionType, setIncompleteCollection, clearIncompleteCollection } = useAppStore();
   const { data: stats, isLoading: statsLoading } = useCollectionStats(
     apiUrl,
     dbPath,
@@ -186,6 +186,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
           )}
           {collectionType === "files"  && <FileText className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />}
           {collectionType === "sqlite" && <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground/70" />}
+          {isIncomplete && <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-500" />}
           <span className="font-medium text-sm truncate">{name}</span>
           {isCurrent && (
             <Badge
@@ -307,6 +308,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
                 // Migrate incomplete flag to new name
                 if (isIncomplete) {
                   clearIncompleteCollection(dbPath, data.old_name);
+                  setIncompleteCollection(dbPath, data.new_name);
                 }
               },
               onError: (err) => {
