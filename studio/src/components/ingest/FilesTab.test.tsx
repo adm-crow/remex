@@ -207,4 +207,30 @@ describe("FilesTab", () => {
       expect(alert.textContent).toMatch(/\d/);
     });
   });
+
+  it("shows Stop button while ingesting and aborts stream on click", async () => {
+    let resolveAbort!: (val: unknown) => void;
+    const abortPromise = new Promise((res) => { resolveAbort = res; });
+    vi.mocked(api.ingestFilesStream).mockReturnValue(
+      (async function* () {
+        await abortPromise; // never resolves in this test
+      })()
+    );
+
+    useAppStore.setState({ currentDb: "./remex_db", currentCollection: "col", apiUrl: "http://localhost:8000" } as any);
+    renderWithProviders(<FilesTab />);
+    fireEvent.change(screen.getByRole("textbox", { name: /source directory/i }), { target: { value: "/docs" } });
+    fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /stop/i }));
+    resolveAbort(undefined);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /stop/i })).not.toBeInTheDocument();
+    });
+  });
 });

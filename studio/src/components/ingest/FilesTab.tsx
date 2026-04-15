@@ -256,14 +256,27 @@ export function FilesTab() {
         </CollapsibleContent>
       </Collapsible>
 
-      <Button
-        onClick={handleStart}
-        disabled={ingestRunning || !sourcePath || !effectiveCollection}
-        aria-label="Start ingest"
-      >
-        <Play className="w-4 h-4 mr-2" />
-        {ingestRunning ? "Ingesting…" : "Start ingest"}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          onClick={handleStart}
+          disabled={ingestRunning || !sourcePath || !effectiveCollection}
+          aria-label="Start ingest"
+          className="flex-1"
+        >
+          <Play className="w-4 h-4 mr-2" />
+          {ingestRunning ? "Ingesting…" : "Start ingest"}
+        </Button>
+        {ingestRunning && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => abortRef.current?.abort()}
+            aria-label="Stop"
+          >
+            Stop
+          </Button>
+        )}
+      </div>
 
       {(ingestRunning || (ingestFilesTotal > 0 && !ingestStreamError)) && (
         <div className="space-y-1.5">
