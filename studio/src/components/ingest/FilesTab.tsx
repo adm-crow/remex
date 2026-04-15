@@ -55,6 +55,7 @@ export function FilesTab() {
   const [chunkSize,      setChunkSize]      = useState(1000);
   const [overlap,        setOverlap]        = useState(200);
   const [embeddingModel, setEmbeddingModel] = useState("all-MiniLM-L6-v2");
+  const [incremental,    setIncremental]    = useState(false);
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
   const [eta,            setEta]            = useState<string | null>(null);
   const abortRef    = useRef<AbortController | null>(null);
@@ -111,6 +112,7 @@ export function FilesTab() {
           chunk_size:      chunkSize,
           overlap,
           embedding_model: embeddingModel,
+          incremental,
         },
         abortRef.current.signal
       )) {
@@ -253,6 +255,17 @@ export function FilesTab() {
             value={embeddingModel}
             onChange={setEmbeddingModel}
           />
+          <div className="flex items-center gap-2 pt-1">
+            <Switch
+              id="incremental"
+              checked={incremental}
+              onCheckedChange={setIncremental}
+              aria-label="Incremental ingest"
+            />
+            <Label htmlFor="incremental" className="text-xs">
+              Incremental — skip files unchanged since last ingest
+            </Label>
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
