@@ -9,9 +9,48 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useCollections, useCollectionStats } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
+
+function CollectionPill({
+  col,
+  isSelected,
+  apiUrl,
+  currentDb,
+  onClick,
+}: {
+  col: string;
+  isSelected: boolean;
+  apiUrl: string;
+  currentDb: string;
+  onClick: () => void;
+}) {
+  const { data: stats } = useCollectionStats(apiUrl, currentDb, col);
+  const tooltip = stats
+    ? `${stats.total_chunks} chunks · ${stats.embedding_model}`
+    : col;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={tooltip}
+      className={cn(
+        "text-xs px-2.5 py-1 rounded-md border transition-colors font-medium",
+        isSelected
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+      )}
+    >
+      {col}
+      {stats && (
+        <span className={cn("ml-1.5 opacity-60 font-normal tabular-nums", isSelected && "opacity-80")}>
+          {stats.total_chunks}
+        </span>
+      )}
+    </button>
+  );
+}
 
 interface QueryPaneProps {
   onFocusReady?: (fn: () => void) => void;
@@ -188,24 +227,16 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               <Layers className="w-3 h-3" />
               Collections
             </span>
-            {collections.map((col) => {
-              const isSelected = selectedCollections.includes(col);
-              return (
-                <button
-                  key={col}
-                  type="button"
-                  onClick={() => handleCollectionToggle(col)}
-                  className={cn(
-                    "text-xs px-2.5 py-1 rounded-md border transition-colors font-medium",
-                    isSelected
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  {col}
-                </button>
-              );
-            })}
+            {collections.map((col) => (
+              <CollectionPill
+                key={col}
+                col={col}
+                isSelected={selectedCollections.includes(col)}
+                apiUrl={apiUrl}
+                currentDb={currentDb ?? ""}
+                onClick={() => handleCollectionToggle(col)}
+              />
+            ))}
           </div>
         )}
 

@@ -8,9 +8,10 @@ vi.mock("@/hooks/useApi", () => ({
   useMultiQueryResults: vi.fn(),
   useChat: vi.fn(),
   useCollections: vi.fn(),
+  useCollectionStats: vi.fn(),
 }));
 
-import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useCollections, useCollectionStats } from "@/hooks/useApi";
 
 const mockResults = [
   {
@@ -37,6 +38,11 @@ beforeEach(() => {
   } as any);
   vi.mocked(useCollections).mockReturnValue({
     data: ["myCol"],
+    isLoading: false,
+    error: null,
+  } as any);
+  vi.mocked(useCollectionStats).mockReturnValue({
+    data: undefined,
     isLoading: false,
     error: null,
   } as any);
@@ -248,6 +254,23 @@ describe("QueryPane", () => {
     fireEvent.click(screen.getByRole("button", { name: /clear all/i }));
     expect(screen.queryByRole("button", { name: "first" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "second" })).not.toBeInTheDocument();
+  });
+
+  it("collection pill shows chunk count and embedding model in title", () => {
+    vi.mocked(useCollectionStats).mockReturnValue({
+      data: {
+        name: "myCol",
+        total_chunks: 42,
+        total_sources: 3,
+        embedding_model: "all-MiniLM-L6-v2",
+      },
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    const pill = screen.getByRole("button", { name: /myCol/ });
+    expect(pill).toHaveAttribute("title", expect.stringContaining("42 chunks"));
+    expect(pill).toHaveAttribute("title", expect.stringContaining("all-MiniLM-L6-v2"));
   });
 
   it("shows 'No project open' when currentDb is null", () => {
