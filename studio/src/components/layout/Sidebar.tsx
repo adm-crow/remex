@@ -29,6 +29,7 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
     >
       {/* ── Brand ───────────────────────────────────────────────────────── */}
       <div className="px-4 pt-5 pb-4 flex items-center gap-3 shrink-0">
+        <img src="/remex.svg" alt="" aria-hidden="true" className="h-6 w-3 shrink-0 select-none" draggable={false} />
         <div className="min-w-0">
           <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground">
             Remex Studio

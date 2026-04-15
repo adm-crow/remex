@@ -65,7 +65,7 @@ export function Home() {
           <img
             src="/remex.svg"
             alt="remex"
-            className="w-14 h-14 drop-shadow-sm select-none"
+            className="h-16 w-8 drop-shadow-sm select-none"
             draggable={false}
           />
           <div>

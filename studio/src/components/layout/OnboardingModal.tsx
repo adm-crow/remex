@@ -1,4 +1,4 @@
-import { Database, Search, Bot, ArrowRight } from "lucide-react";
+import { Search, Bot, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useAppStore } from "@/store/app";
@@ -12,9 +12,7 @@ export function OnboardingModal() {
     <Dialog open>
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <div className="flex flex-col items-center gap-4 py-2 text-center">
-          <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Database className="w-6 h-6 text-primary" />
-          </div>
+          <img src="/remex.svg" alt="" aria-hidden="true" className="h-12 w-6 select-none" draggable={false} />
           <div className="space-y-1">
             <DialogTitle className="text-lg font-semibold">Welcome to Remex Studio</DialogTitle>
             <p className="text-sm text-muted-foreground">
