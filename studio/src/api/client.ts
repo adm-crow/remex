@@ -40,6 +40,14 @@ export interface ChatResponse {
   model: string;
 }
 
+export interface MultiChatResponse {
+  answer: string;
+  sources: QueryResultItem[];
+  provider: string;
+  model: string;
+  collections: string[];
+}
+
 export interface QueryRequest {
   text: string;
   n_results?: number;
@@ -223,6 +231,20 @@ export const api = {
       }
     ),
 
+  multiChat: (
+    base: string,
+    dbPath: string,
+    req: ChatRequest & { collections: string[] }
+  ) =>
+    apiFetch<MultiChatResponse>(
+      `${base}/collections/multi-chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...req, db_path: dbPath }),
+      }
+    ),
+
   ingestFiles: (
     base: string,
     dbPath: string,
@@ -305,6 +327,24 @@ export const api = {
     } finally {
       reader.cancel().catch(() => {});
     }
+  },
+
+  renameCollection: (
+    base: string,
+    dbPath: string,
+    collection: string,
+    newName: string,
+  ): Promise<{ renamed: boolean; old_name: string; new_name: string }> => {
+    const url = new URL(`${base}/collections/${encodeURIComponent(collection)}/rename`);
+    url.searchParams.set("db_path", dbPath);
+    return apiFetch<{ renamed: boolean; old_name: string; new_name: string }>(
+      url.toString(),
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_name: newName }),
+      }
+    );
   },
 
   async *ingestFilesStream(

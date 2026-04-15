@@ -9,6 +9,8 @@ from remex.api.schemas import (
     PurgeResultResponse,
     SQLiteTablesResponse,
     SourceItem,
+    RenameRequest,
+    RenamedResponse,
 )
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -96,3 +98,40 @@ def purge_collection(
         chunks_deleted=result.chunks_deleted,
         chunks_checked=result.chunks_checked,
     )
+
+
+@router.patch("/{collection}/rename", response_model=RenamedResponse)
+def rename_collection(
+    collection: str,
+    req: RenameRequest,
+    db_path: str = Query(default="./remex_db"),
+) -> RenamedResponse:
+    """Rename a ChromaDB collection by copying all chunks then deleting the old one."""
+    import chromadb
+    client = chromadb.PersistentClient(path=db_path)
+    try:
+        old_col = client.get_collection(collection)
+    except Exception:
+        raise HTTPException(status_code=404, detail=f"Collection '{collection}' not found")
+
+    # Check new name isn't already taken
+    try:
+        client.get_collection(req.new_name)
+        raise HTTPException(status_code=409, detail=f"Collection '{req.new_name}' already exists")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # new name is free
+
+    # Copy all documents to the new collection
+    all_data = old_col.get(include=["documents", "metadatas", "embeddings"])
+    new_col = client.create_collection(req.new_name, metadata=old_col.metadata or {})
+    if all_data["ids"]:
+        new_col.add(
+            ids=all_data["ids"],
+            documents=all_data["documents"],
+            metadatas=all_data["metadatas"],
+            embeddings=all_data["embeddings"],
+        )
+    client.delete_collection(collection)
+    return RenamedResponse(renamed=True, old_name=collection, new_name=req.new_name)

@@ -156,3 +156,13 @@ class SQLiteTablesResponse(BaseModel):
 class SourceItem(BaseModel):
     source: str
     chunk_count: int
+
+
+class RenameRequest(BaseModel):
+    new_name: str
+
+
+class RenamedResponse(BaseModel):
+    renamed: bool
+    old_name: str
+    new_name: str

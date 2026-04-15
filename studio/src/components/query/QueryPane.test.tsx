@@ -7,10 +7,21 @@ import { useAppStore } from "@/store/app";
 vi.mock("@/hooks/useApi", () => ({
   useMultiQueryResults: vi.fn(),
   useChat: vi.fn(),
+  useMultiChat: vi.fn(),
   useCollections: vi.fn(),
+  useCollectionStats: vi.fn(),
+  useSources: vi.fn(),
 }));
 
-import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
+vi.mock("@tauri-apps/plugin-dialog", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tauri-apps/plugin-dialog")>()),
+  save: vi.fn().mockResolvedValue("/tmp/results.json"),
+}));
+
+import * as useApi from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats } from "@/hooks/useApi";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 
 const mockResults = [
   {
@@ -40,6 +51,11 @@ beforeEach(() => {
     isLoading: false,
     error: null,
   } as any);
+  vi.mocked(useCollectionStats).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  } as any);
   vi.mocked(useMultiQueryResults).mockReturnValue({
     data: undefined,
     isLoading: false,
@@ -47,6 +63,16 @@ beforeEach(() => {
   } as any);
   vi.mocked(useChat).mockReturnValue({
     data: undefined,
+    isLoading: false,
+    error: null,
+  } as any);
+  vi.mocked(useMultiChat).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  } as any);
+  vi.mocked(useApi.useSources).mockReturnValue({
+    data: [],
     isLoading: false,
     error: null,
   } as any);
@@ -250,6 +276,23 @@ describe("QueryPane", () => {
     expect(screen.queryByRole("button", { name: "second" })).not.toBeInTheDocument();
   });
 
+  it("collection pill shows chunk count and embedding model in title", () => {
+    vi.mocked(useCollectionStats).mockReturnValue({
+      data: {
+        name: "myCol",
+        total_chunks: 42,
+        total_sources: 3,
+        embedding_model: "all-MiniLM-L6-v2",
+      },
+      isLoading: false,
+      error: null,
+    } as any);
+    renderWithProviders(<QueryPane />);
+    const pill = screen.getByRole("button", { name: /myCol/ });
+    expect(pill).toHaveAttribute("title", expect.stringContaining("42 chunks"));
+    expect(pill).toHaveAttribute("title", expect.stringContaining("all-MiniLM-L6-v2"));
+  });
+
   it("shows 'No project open' when currentDb is null", () => {
     useAppStore.setState({ currentDb: null } as any);
     renderWithProviders(<QueryPane />);
@@ -271,12 +314,99 @@ describe("QueryPane", () => {
     expect(screen.getByText("No collections yet")).toBeInTheDocument();
   });
 
+  it("passes where filter to useMultiQueryResults when source filter is active", async () => {
+    vi.mocked(useApi.useSources).mockReturnValue({
+      data: [
+        { source: "/docs/readme.md", chunk_count: 5 },
+      ],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    useAppStore.setState({
+      currentDb: "./db",
+      currentCollection: "myCol",
+      apiUrl: "http://localhost:8000",
+    } as any);
+
+    renderWithProviders(<QueryPane />);
+
+    // Open the filter section
+    fireEvent.click(screen.getByRole("button", { name: /filter by source/i }));
+
+    // Click the source chip
+    const chip = await screen.findByRole("button", { name: /readme\.md/i });
+    fireEvent.click(chip);
+
+    // Submit a query
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "my query" } });
+    fireEvent.click(screen.getByRole("button", { name: /^search$/i }));
+
+    await waitFor(() => {
+      expect(vi.mocked(useMultiQueryResults)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.any(Array),
+        "my query",
+        expect.objectContaining({
+          where: { source: { "$eq": "/docs/readme.md" } },
+        })
+      );
+    });
+  });
+
   it("calls onFocusReady with a function that focuses the query input", () => {
     let focusFn: (() => void) | undefined;
     renderWithProviders(
       <QueryPane onFocusReady={(fn) => { focusFn = fn; }} />
     );
     expect(focusFn).toBeDefined();
+  });
+
+  it("shows Export button when results exist and exports on click", async () => {
+    vi.mocked(useMultiQueryResults).mockReturnValue({
+      data: [
+        {
+          text: "hello world",
+          source: "/docs/readme.md",
+          source_type: "files",
+          score: 0.9,
+          distance: 0.1,
+          chunk: 0,
+          doc_title: "",
+          doc_author: "",
+          doc_created: "",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    useAppStore.setState({
+      currentDb: "./db",
+      currentCollection: "myCol",
+      apiUrl: "http://localhost:8000",
+      queryHistory: [],
+    } as any);
+
+    renderWithProviders(<QueryPane />);
+
+    // Submit a query to see results
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "test" } });
+    fireEvent.click(screen.getByRole("button", { name: /^search$/i }));
+
+    const exportBtn = await screen.findByRole("button", { name: /export/i });
+    expect(exportBtn).toBeInTheDocument();
+
+    fireEvent.click(exportBtn);
+
+    await waitFor(() => {
+      expect(vi.mocked(save)).toHaveBeenCalled();
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith(
+        "write_text_file",
+        expect.objectContaining({ path: "/tmp/results.json" })
+      );
+    });
   });
 
   it("Escape on the input clears text and dismisses results", async () => {

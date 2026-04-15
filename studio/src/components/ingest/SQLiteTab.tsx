@@ -171,6 +171,7 @@ export function SQLiteTab() {
               sourcesIngested: event.result.sources_ingested,
               sourcesSkipped:  event.result.sources_skipped,
               chunksStored:    event.result.chunks_stored,
+              skippedReasons:  event.result.skipped_reasons,
             });
             setShowDoneAlert(true);
             setIngestDoneUnread(true);
@@ -328,10 +329,22 @@ export function SQLiteTab() {
         </CollapsibleContent>
       </Collapsible>
 
-      <Button onClick={handleRun} disabled={!canRun} aria-label="Run ingest">
-        <Play className="w-4 h-4 mr-2" />
-        {isRunning ? "Ingesting…" : "Start ingest"}
-      </Button>
+      <div className="flex gap-2">
+        <Button onClick={handleRun} disabled={!canRun} aria-label="Run ingest" className="flex-1">
+          <Play className="w-4 h-4 mr-2" />
+          {isRunning ? "Ingesting…" : "Start ingest"}
+        </Button>
+        {isRunning && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => runAbortRef.current?.abort()}
+            aria-label="Stop"
+          >
+            Stop
+          </Button>
+        )}
+      </div>
 
       {/* Progress bar */}
       {isRunning && (

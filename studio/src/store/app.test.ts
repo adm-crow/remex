@@ -131,6 +131,11 @@ describe("useAppStore", () => {
     expect(collectionTypes["./db::other"]).toBe("sqlite");
   });
 
+  it("setOnboardingDone updates onboardingDone", () => {
+    useAppStore.getState().setOnboardingDone(true);
+    expect(useAppStore.getState().onboardingDone).toBe(true);
+  });
+
   it("clearQueryHistory empties the history", () => {
     useAppStore.getState().addQueryHistory("first");
     useAppStore.getState().addQueryHistory("second");
@@ -174,9 +179,26 @@ describe("useAppStore", () => {
       sourcesIngested: 3,
       sourcesSkipped:  0,
       chunksStored:    12,
+      skippedReasons:  [],
     });
     const { lastIngestResult } = useAppStore.getState();
     expect(lastIngestResult?.collection).toBe("docs");
     expect(lastIngestResult?.chunksStored).toBe(12);
+  });
+
+  it("setLastIngestResult persists skippedReasons", () => {
+    useAppStore.getState().setLastIngestResult({
+      collection: "col",
+      sourcePath: "/docs",
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      sourcesFound: 3,
+      sourcesIngested: 2,
+      sourcesSkipped: 1,
+      chunksStored: 10,
+      skippedReasons: ["file.txt: extract_error: permission denied"],
+    });
+    expect(useAppStore.getState().lastIngestResult?.skippedReasons).toHaveLength(1);
+    expect(useAppStore.getState().lastIngestResult?.skippedReasons?.[0]).toMatch(/permission denied/);
   });
 });

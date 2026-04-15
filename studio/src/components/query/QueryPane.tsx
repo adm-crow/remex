@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter, Download } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,9 +11,48 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useMultiQueryResults, useChat, useCollections } from "@/hooks/useApi";
+import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { ResultCard } from "./ResultCard";
+
+function CollectionPill({
+  col,
+  isSelected,
+  apiUrl,
+  currentDb,
+  onClick,
+}: {
+  col: string;
+  isSelected: boolean;
+  apiUrl: string;
+  currentDb: string;
+  onClick: () => void;
+}) {
+  const { data: stats } = useCollectionStats(apiUrl, currentDb, col);
+  const tooltip = stats
+    ? `${stats.total_chunks} chunks · ${stats.embedding_model}`
+    : col;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={tooltip}
+      className={cn(
+        "text-xs px-2.5 py-1 rounded-md border transition-colors font-medium",
+        isSelected
+          ? "bg-primary text-primary-foreground border-primary"
+          : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+      )}
+    >
+      {col}
+      {stats && (
+        <span className={cn("ml-1.5 opacity-60 font-normal tabular-nums", isSelected && "opacity-80")}>
+          {stats.total_chunks}
+        </span>
+      )}
+    </button>
+  );
+}
 
 interface QueryPaneProps {
   onFocusReady?: (fn: () => void) => void;
@@ -31,10 +72,14 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const [selectedCollections, setSelectedCollections] = useState<string[]>(
     currentCollection ? [currentCollection] : []
   );
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Keep selection in sync when the user switches collections from the sidebar.
+  // Also reset source filter so stale where-filters aren't applied to new collection.
   useEffect(() => {
     setSelectedCollections(currentCollection ? [currentCollection] : []);
+    setSelectedSources([]);
   }, [currentCollection]);
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,18 +95,46 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   // For AI mode (single-collection): use first selected or fall back to currentCollection
   const activeCollection = selectedCollections[0] ?? currentCollection ?? "";
 
+  const { data: sourcesData = [] } = useSources(
+    apiUrl, currentDb ?? "", selectedCollections[0] ?? currentCollection ?? ""
+  );
+
+  const whereFilter: Record<string, unknown> | undefined =
+    selectedSources.length === 1
+      ? { source: { "$eq": selectedSources[0] } }
+      : selectedSources.length > 1
+      ? { source: { "$in": selectedSources } }
+      : undefined;
+
   const multiResult = useMultiQueryResults(
     apiUrl, currentDb ?? "", selectedCollections, submitted,
     { enabled: !!submitted && !useAi, n_results: nResults,
-      min_score: minScore > 0 ? minScore : undefined }
-  );
-  const chatResult = useChat(
-    apiUrl, currentDb ?? "", activeCollection, submitted,
-    { enabled: !!submitted && useAi, n_results: nResults,
       min_score: minScore > 0 ? minScore : undefined,
-      provider: aiProvider || undefined, model: aiModel || undefined,
-      api_key: aiApiKey || undefined }
+      where: whereFilter }
   );
+
+  const isMultiAi = useAi && selectedCollections.length > 1;
+  const multiChatResult = useMultiChat(
+    apiUrl, currentDb ?? "", selectedCollections, submitted,
+    { enabled: !!submitted && isMultiAi,
+      n_results: nResults,
+      min_score: minScore > 0 ? minScore : undefined,
+      provider: aiProvider || undefined,
+      model: aiModel || undefined,
+      api_key: aiApiKey || undefined,
+    }
+  );
+  const singleChatResult = useChat(
+    apiUrl, currentDb ?? "", activeCollection, submitted,
+    { enabled: !!submitted && useAi && !isMultiAi,
+      n_results: nResults,
+      min_score: minScore > 0 ? minScore : undefined,
+      provider: aiProvider || undefined,
+      model: aiModel || undefined,
+      api_key: aiApiKey || undefined,
+    }
+  );
+  const chatResult = isMultiAi ? multiChatResult : singleChatResult;
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -72,17 +145,48 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   }
 
   function handleCollectionToggle(col: string) {
-    if (useAi) {
-      setSelectedCollections([col]);
+    setSelectedCollections((prev) => {
+      if (prev.includes(col)) {
+        if (prev.length === 1) return prev; // never deselect last
+        return prev.filter((c) => c !== col);
+      }
+      return [...prev, col];
+    });
+  }
+
+  async function handleExport() {
+    if (results.length === 0) return;
+    const path = await save({
+      defaultPath: "remex-results.json",
+      filters: [
+        { name: "JSON",     extensions: ["json"] },
+        { name: "CSV",      extensions: ["csv"]  },
+        { name: "Markdown", extensions: ["md"]   },
+      ],
+    });
+    if (!path) return;
+
+    let content: string;
+    if (path.endsWith(".csv")) {
+      const header = "score,source,chunk,text\n";
+      const rows = results.map(
+        (r) =>
+          `${r.score},"${r.source.replace(/"/g, '""')}",${r.chunk},"${r.text.replace(/"/g, '""').replace(/\n/g, " ")}"`
+      );
+      content = header + rows.join("\n");
+    } else if (path.endsWith(".md")) {
+      content = `# Remex Query Results\n\n**Query:** ${submitted}\n\n`;
+      content += results
+        .map(
+          (r, i) =>
+            `## ${i + 1}. ${r.source.split(/[/\\]/).pop() ?? r.source} (score: ${r.score.toFixed(3)})\n\n${r.text}\n`
+        )
+        .join("\n---\n\n");
     } else {
-      setSelectedCollections((prev) => {
-        if (prev.includes(col)) {
-          if (prev.length === 1) return prev; // never deselect last
-          return prev.filter((c) => c !== col);
-        }
-        return [...prev, col];
-      });
+      content = JSON.stringify(results, null, 2);
     }
+
+    await invoke("write_text_file", { path, content });
   }
 
   const results = useAi ? (chatResult.data?.sources ?? []) : (multiResult.data ?? []);
@@ -188,24 +292,16 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               <Layers className="w-3 h-3" />
               Collections
             </span>
-            {collections.map((col) => {
-              const isSelected = selectedCollections.includes(col);
-              return (
-                <button
-                  key={col}
-                  type="button"
-                  onClick={() => handleCollectionToggle(col)}
-                  className={cn(
-                    "text-xs px-2.5 py-1 rounded-md border transition-colors font-medium",
-                    isSelected
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background text-muted-foreground border-border hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  {col}
-                </button>
-              );
-            })}
+            {collections.map((col) => (
+              <CollectionPill
+                key={col}
+                col={col}
+                isSelected={selectedCollections.includes(col)}
+                apiUrl={apiUrl}
+                currentDb={currentDb ?? ""}
+                onClick={() => handleCollectionToggle(col)}
+              />
+            ))}
           </div>
         )}
 
@@ -245,9 +341,6 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               checked={useAi}
               onCheckedChange={(val) => {
                 setUseAi(val);
-                if (val && selectedCollections.length > 1) {
-                  setSelectedCollections([selectedCollections[0]]);
-                }
               }}
               aria-label="AI answer toggle"
             />
@@ -260,6 +353,62 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
             </Label>
           </div>
         </div>
+
+        {/* Filter by source — collapsible chip strip */}
+        {sourcesData.length > 0 && (
+          <Collapsible open={filterOpen} onOpenChange={setFilterOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground gap-1.5 text-xs">
+                <Filter className="w-3 h-3" />
+                Filter by source
+                {selectedSources.length > 0 && (
+                  <span className="rounded-full bg-primary text-primary-foreground text-[10px] px-1.5">
+                    {selectedSources.length}
+                  </span>
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="flex flex-wrap gap-1.5 pt-1.5">
+                {sourcesData.map((s) => {
+                  const label = s.source.split(/[/\\]/).pop() ?? s.source;
+                  const isSelected = selectedSources.includes(s.source);
+                  return (
+                    <button
+                      key={s.source}
+                      type="button"
+                      title={s.source}
+                      onClick={() =>
+                        setSelectedSources((prev) =>
+                          prev.includes(s.source)
+                            ? prev.filter((x) => x !== s.source)
+                            : [...prev, s.source]
+                        )
+                      }
+                      className={cn(
+                        "text-xs px-2 py-0.5 rounded border transition-colors font-mono truncate max-w-[200px]",
+                        isSelected
+                          ? "bg-primary/10 border-primary text-primary"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                {selectedSources.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSources([])}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
 
         {/* AI Agent notice — shown below the strip when toggle is on but not configured */}
         {useAi && !aiProvider && !aiModel && (
@@ -336,6 +485,9 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                 <span className="text-sm font-semibold">AI Answer</span>
                 <Badge variant="secondary" className="text-xs ml-auto font-mono">
                   {chatResult.data.provider} · {chatResult.data.model}
+                  {isMultiAi && (
+                    <span className="ml-1 opacity-70">({selectedCollections.length} collections)</span>
+                  )}
                 </Badge>
               </div>
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed
@@ -407,6 +559,18 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                     Results
                   </span>
                   <span className="text-xs text-muted-foreground">{results.length}</span>
+                  <div className="flex-1" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-xs gap-1.5"
+                    onClick={() => void handleExport()}
+                    aria-label="Export results"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export
+                  </Button>
                 </div>
                 <div className="flex flex-col gap-2">
                   {results.map((r, i) => (

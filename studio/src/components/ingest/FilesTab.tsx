@@ -55,6 +55,7 @@ export function FilesTab() {
   const [chunkSize,      setChunkSize]      = useState(1000);
   const [overlap,        setOverlap]        = useState(200);
   const [embeddingModel, setEmbeddingModel] = useState("all-MiniLM-L6-v2");
+  const [incremental,    setIncremental]    = useState(false);
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
   const [eta,            setEta]            = useState<string | null>(null);
   const abortRef    = useRef<AbortController | null>(null);
@@ -111,6 +112,7 @@ export function FilesTab() {
           chunk_size:      chunkSize,
           overlap,
           embedding_model: embeddingModel,
+          incremental,
         },
         abortRef.current.signal
       )) {
@@ -135,6 +137,7 @@ export function FilesTab() {
             sourcesIngested: event.result.sources_ingested,
             sourcesSkipped:  event.result.sources_skipped,
             chunksStored:    event.result.chunks_stored,
+            skippedReasons:  event.result.skipped_reasons,
           });
           queryClient.invalidateQueries({
             queryKey: ["sources", apiUrl, currentDb, effectiveCollection],
@@ -253,17 +256,41 @@ export function FilesTab() {
             value={embeddingModel}
             onChange={setEmbeddingModel}
           />
+          <div className="flex items-center gap-2 pt-1">
+            <Switch
+              id="incremental"
+              checked={incremental}
+              onCheckedChange={setIncremental}
+              aria-label="Incremental ingest"
+            />
+            <Label htmlFor="incremental" className="text-xs">
+              Incremental — skip files unchanged since last ingest
+            </Label>
+          </div>
         </CollapsibleContent>
       </Collapsible>
 
-      <Button
-        onClick={handleStart}
-        disabled={ingestRunning || !sourcePath || !effectiveCollection}
-        aria-label="Start ingest"
-      >
-        <Play className="w-4 h-4 mr-2" />
-        {ingestRunning ? "Ingesting…" : "Start ingest"}
-      </Button>
+      <div className="flex gap-2">
+        <Button
+          onClick={handleStart}
+          disabled={ingestRunning || !sourcePath || !effectiveCollection}
+          aria-label="Start ingest"
+          className="flex-1"
+        >
+          <Play className="w-4 h-4 mr-2" />
+          {ingestRunning ? "Ingesting…" : "Start ingest"}
+        </Button>
+        {ingestRunning && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => abortRef.current?.abort()}
+            aria-label="Stop"
+          >
+            Stop
+          </Button>
+        )}
+      </div>
 
       {(ingestRunning || (ingestFilesTotal > 0 && !ingestStreamError)) && (
         <div className="space-y-1.5">

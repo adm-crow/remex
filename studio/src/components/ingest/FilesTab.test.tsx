@@ -207,4 +207,61 @@ describe("FilesTab", () => {
       expect(alert.textContent).toMatch(/\d/);
     });
   });
+
+  it("shows Stop button while ingesting and aborts stream on click", async () => {
+    let resolveAbort!: (val: unknown) => void;
+    const abortPromise = new Promise((res) => { resolveAbort = res; });
+    vi.mocked(api.ingestFilesStream).mockReturnValue(
+      (async function* () {
+        await abortPromise; // never resolves in this test
+      })()
+    );
+
+    useAppStore.setState({ currentDb: "./remex_db", currentCollection: "col", apiUrl: "http://localhost:8000" } as any);
+    renderWithProviders(<FilesTab />);
+    fireEvent.change(screen.getByRole("textbox", { name: /source directory/i }), { target: { value: "/docs" } });
+    fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /stop/i }));
+    resolveAbort(undefined);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /stop/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it("sends incremental:true when toggle is on", async () => {
+    vi.mocked(api.ingestFilesStream).mockReturnValue(
+      makeStream([
+        { type: "done", result: { sources_found: 1, sources_ingested: 1, sources_skipped: 0, chunks_stored: 3, skipped_reasons: [] } },
+      ]) as any
+    );
+    useAppStore.setState({ currentDb: "./remex_db", currentCollection: "col", apiUrl: "http://localhost:8000" } as any);
+    renderWithProviders(<FilesTab />);
+    fireEvent.change(screen.getByRole("textbox", { name: /source directory/i }), { target: { value: "/docs" } });
+
+    // Open Advanced section
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+
+    // Find and click the incremental toggle
+    const toggle = await screen.findByRole("switch", { name: /incremental/i });
+    fireEvent.click(toggle);
+
+    // Start ingest
+    fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
+
+    await waitFor(() => {
+      expect(vi.mocked(api.ingestFilesStream)).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({ incremental: true }),
+        expect.any(AbortSignal)
+      );
+    });
+  });
 });

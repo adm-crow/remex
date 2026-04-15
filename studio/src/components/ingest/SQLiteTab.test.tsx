@@ -8,6 +8,7 @@ vi.mock("@/api/client", () => ({
   api: {
     listSqliteTables: vi.fn(),
     ingestSqlite: vi.fn(),
+    ingestSqliteStream: vi.fn(),
   },
 }));
 

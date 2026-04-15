@@ -9,6 +9,7 @@ import { SettingsPane } from "@/components/settings/SettingsPane";
 import { useAppStore } from "@/store/app";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { formatDuration } from "@/lib/formatDuration";
+import { OnboardingModal } from "./OnboardingModal";
 
 const PANE_MAP: Record<View, ComponentType> = {
   query:       QueryPane,
@@ -124,6 +125,18 @@ export function AppShell() {
                     new Date(lastIngestResult.startedAt).getTime()
                   )}
                 </p>
+                {lastIngestResult.skippedReasons.length > 0 && (
+                  <details className="mt-1">
+                    <summary className="text-xs text-destructive/80 cursor-pointer select-none">
+                      {lastIngestResult.skippedReasons.length} skip reason{lastIngestResult.skippedReasons.length !== 1 ? "s" : ""}
+                    </summary>
+                    <ul className="mt-1 space-y-0.5 max-h-28 overflow-y-auto pr-1">
+                      {lastIngestResult.skippedReasons.map((r, i) => (
+                        <li key={i} className="text-[10px] font-mono text-destructive/80 break-all">{r}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             </div>
             <button
@@ -137,6 +150,7 @@ export function AppShell() {
           </div>
         )}
       </main>
+      <OnboardingModal />
     </div>
   );
 }

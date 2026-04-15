@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import {
   Sun, Moon, Palette, Bot, Eye, EyeOff,
   Server, FolderOpen, ChevronRight, ExternalLink,
@@ -90,6 +91,11 @@ export function SettingsPane() {
   const [localModel,  setLocalModel]  = useState(aiModel);
   const [localApiKey, setLocalApiKey] = useState(aiApiKey);
   const [showKey,     setShowKey]     = useState(false);
+  const [appVersion,  setAppVersion]  = useState<string>("");
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   function handleSaveApi(e: FormEvent) {
     e.preventDefault();
@@ -288,6 +294,12 @@ export function SettingsPane() {
               </Button>
             </form>
           </Card>
+
+          {appVersion && (
+            <p className="text-xs text-muted-foreground text-center pt-1">
+              Remex Studio v{appVersion}
+            </p>
+          )}
 
         </div>
       </div>

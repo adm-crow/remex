@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle, FileText, Database } from "lucide-react";
+import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle, FileText, Database, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,10 +17,12 @@ import {
   useDeleteSource,
   usePurgeCollection,
   useDeleteCollection,
+  useRenameCollection,
   type SourceItem,
 } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { cn } from "@/lib/utils";
+import { RenameCollectionDialog } from "./RenameCollectionDialog";
 
 // ── Per-collection sources list ───────────────────────────────────────────
 
@@ -134,12 +136,13 @@ interface CollectionCardProps {
 function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: CollectionCardProps) {
   const [expanded,      setExpanded]      = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameOpen,    setRenameOpen]    = useState(false);
   const [purgeResult, setPurgeResult] = useState<{
     deleted: number;
     checked: number;
   } | null>(null);
 
-  const { currentCollection, setCurrentCollection, removeCollectionType } = useAppStore();
+  const { currentCollection, setCurrentCollection, setCollectionType, removeCollectionType } = useAppStore();
   const { data: stats, isLoading: statsLoading } = useCollectionStats(
     apiUrl,
     dbPath,
@@ -147,6 +150,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
   );
   const purgeMutation  = usePurgeCollection(apiUrl, dbPath, name);
   const deleteMutation = useDeleteCollection(apiUrl, dbPath);
+  const renameMutation = useRenameCollection(apiUrl, dbPath);
 
   async function handlePurge() {
     setPurgeResult(null);
@@ -205,6 +209,17 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
         <Button
           variant="ghost"
           size="sm"
+          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
+          onClick={() => setRenameOpen(true)}
+          disabled={renameMutation.isPending}
+          title="Rename collection"
+          aria-label={`Rename collection ${name}`}
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
           onClick={() => setConfirmDelete(true)}
           disabled={deleteMutation.isPending}
@@ -259,6 +274,34 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType }: Col
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Rename dialog */}
+      <RenameCollectionDialog
+        open={renameOpen}
+        currentName={name}
+        onClose={() => setRenameOpen(false)}
+        isLoading={renameMutation.isPending}
+        onRename={(newName) => {
+          renameMutation.mutate(
+            { collection: name, newName },
+            {
+              onSuccess: (data) => {
+                setRenameOpen(false);
+                if (currentCollection === data.old_name) {
+                  setCurrentCollection(data.new_name);
+                }
+                if (collectionType !== undefined) {
+                  setCollectionType(dbPath, data.new_name, collectionType);
+                }
+                removeCollectionType(dbPath, data.old_name);
+              },
+              onError: (err) => {
+                alert(err.message);
+              },
+            }
+          );
+        }}
+      />
 
       {/* Stats row */}
       {statsLoading ? (

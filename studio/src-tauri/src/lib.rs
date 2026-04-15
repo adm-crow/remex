@@ -1,3 +1,4 @@
+use std::fs;
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -55,6 +56,23 @@ fn is_sidecar_alive(state: State<'_, SidecarState>) -> bool {
 }
 
 #[tauri::command]
+fn write_text_file(path: String, content: String) -> Result<(), String> {
+    let path_buf = std::path::PathBuf::from(&path);
+    if !path_buf.is_absolute() {
+        return Err("Path must be absolute".to_string());
+    }
+    let ext = path_buf
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if !matches!(ext.as_str(), "json" | "csv" | "md") {
+        return Err("Only .json, .csv, and .md files are supported".to_string());
+    }
+    fs::write(&path, content).map_err(|e| format!("Failed to write file: {e}"))
+}
+
+#[tauri::command]
 fn kill_sidecar(state: State<'_, SidecarState>) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     if let Some(mut child) = guard.take() {
@@ -68,7 +86,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![spawn_sidecar, kill_sidecar, is_sidecar_alive])
+        .invoke_handler(tauri::generate_handler![spawn_sidecar, kill_sidecar, is_sidecar_alive, write_text_file])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let icon = tauri::image::Image::from_bytes(
