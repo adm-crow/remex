@@ -57,7 +57,19 @@ fn is_sidecar_alive(state: State<'_, SidecarState>) -> bool {
 
 #[tauri::command]
 fn write_text_file(path: String, content: String) -> Result<(), String> {
-    fs::write(&path, content).map_err(|e| format!("Failed to write file '{path}': {e}"))
+    let path_buf = std::path::PathBuf::from(&path);
+    if !path_buf.is_absolute() {
+        return Err("Path must be absolute".to_string());
+    }
+    let ext = path_buf
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if !matches!(ext.as_str(), "json" | "csv" | "md") {
+        return Err("Only .json, .csv, and .md files are supported".to_string());
+    }
+    fs::write(&path, content).map_err(|e| format!("Failed to write file: {e}"))
 }
 
 #[tauri::command]
