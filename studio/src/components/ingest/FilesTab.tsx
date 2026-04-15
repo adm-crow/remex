@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, AlertCircle, CheckCircle2, Loader2, X } from "lucide-react";
+import { Play, AlertCircle, AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ export function FilesTab() {
   const [embeddingModel, setEmbeddingModel] = useState("all-MiniLM-L6-v2");
   const [incremental,    setIncremental]    = useState(false);
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
+  const [wasCancelled,   setWasCancelled]   = useState(false);
   const [eta,            setEta]            = useState<string | null>(null);
   const abortRef    = useRef<AbortController | null>(null);
   const startTimeRef = useRef<number | null>(null);
@@ -95,6 +96,7 @@ export function FilesTab() {
   async function handleStart() {
     if (!sourcePath || !currentDb || !effectiveCollection) return;
     setShowDoneAlert(false);
+    setWasCancelled(false);
     setIngestDoneUnread(false);
     resetIngestSession();
     setIngestRunning(true);
@@ -154,7 +156,11 @@ export function FilesTab() {
         }
       }
     } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError")) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        if (useAppStore.getState().ingestFilesDone > 0) {
+          setWasCancelled(true);
+        }
+      } else {
         setIngestStreamError(String(e));
       }
     } finally {
@@ -229,8 +235,8 @@ export function FilesTab() {
             Advanced ▾
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-2 mt-1">
-          <div className="grid grid-cols-2 gap-2">
+        <CollapsibleContent className="space-y-3 mt-2">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="chunk-size" className="text-xs">Chunk size</Label>
               <Input
@@ -328,6 +334,32 @@ export function FilesTab() {
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{ingestStreamError}</span>
+        </div>
+      )}
+
+      {wasCancelled && (
+        <div
+          className="flex items-start justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5"
+          role="alert"
+        >
+          <div className="flex items-start gap-2.5 text-amber-700 dark:text-amber-400 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">Incomplete</p>
+              <p className="text-xs opacity-80">
+                Ingestion was stopped early — {ingestFilesDone} file{ingestFilesDone !== 1 ? "s" : ""} ingested.
+                The collection is partially populated.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWasCancelled(false)}
+            className="shrink-0 text-amber-700 dark:text-amber-400 hover:opacity-70 transition-opacity mt-0.5"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

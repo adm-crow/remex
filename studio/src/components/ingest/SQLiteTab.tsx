@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { Play, AlertCircle, AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,7 @@ export function SQLiteTab() {
   const [rowsTotal,       setRowsTotal]       = useState(0);
   const [eta,             setEta]             = useState<string | null>(null);
   const [showDoneAlert,   setShowDoneAlert]   = useState(false);
+  const [wasCancelled,    setWasCancelled]    = useState(false);
 
   const loadAbortRef = useRef<AbortController | null>(null);
   const runAbortRef  = useRef<AbortController | null>(null);
@@ -129,6 +130,7 @@ export function SQLiteTab() {
     setRowsTotal(0);
     setEta(null);
     setShowDoneAlert(false);
+    setWasCancelled(false);
     startTimeRef.current = Date.now();
     const t0 = startTimeRef.current;
     const startedAt = new Date(t0).toISOString();
@@ -180,7 +182,11 @@ export function SQLiteTab() {
         }
       }
     } catch (e) {
-      if (!(e instanceof DOMException && e.name === "AbortError")) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        if (rowsDone > 0) {
+          setWasCancelled(true);
+        }
+      } else {
         setRunError(e instanceof Error ? e.message : String(e));
       }
     } finally {
@@ -282,8 +288,8 @@ export function SQLiteTab() {
             Advanced ▾
           </Button>
         </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-2 mt-1">
-          <div className="grid grid-cols-2 gap-2">
+        <CollapsibleContent className="space-y-3 mt-2">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="sqlite-columns" className="text-xs">
                 Columns (comma-sep.)
@@ -380,6 +386,33 @@ export function SQLiteTab() {
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>{runError}</span>
+        </div>
+      )}
+
+      {/* Incomplete — ingestion was stopped early */}
+      {wasCancelled && (
+        <div
+          className="flex items-start justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5"
+          role="alert"
+        >
+          <div className="flex items-start gap-2.5 text-amber-700 dark:text-amber-400 min-w-0">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">Incomplete</p>
+              <p className="text-xs opacity-80">
+                Ingestion was stopped early — {rowsDone} row{rowsDone !== 1 ? "s" : ""} ingested.
+                The collection is partially populated.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWasCancelled(false)}
+            className="shrink-0 text-amber-700 dark:text-amber-400 hover:opacity-70 transition-opacity mt-0.5"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 

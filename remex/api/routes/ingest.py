@@ -102,29 +102,47 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
 
-    task = asyncio.create_task(_run())
+    async def _monitor_disconnect() -> None:
+        """Polls every 100 ms and sets cancel_event the moment the client drops.
+
+        Running this as a separate task means we detect disconnect immediately
+        even when the queue is being drained at full speed (e.g. many SQLite
+        rows) and the stream loop never hits its wait_for timeout.
+        """
+        while True:
+            if await request.is_disconnected():
+                cancel_event.set()
+                return
+            await asyncio.sleep(0.1)
+
+    task    = asyncio.create_task(_run())
+    monitor = asyncio.create_task(_monitor_disconnect())
 
     async def _stream() -> AsyncIterator[str]:
         try:
             while True:
                 try:
-                    # Poll with a short timeout so we can check for client disconnect
-                    # between events, even when the ingest thread is slow.
-                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
+                    # Keep a generous timeout so the loop stays alive while the
+                    # ingest is running but the queue is momentarily empty (e.g.
+                    # embedding a large file).  The disconnect monitor handles
+                    # cancellation independently, so no need for a tight timeout.
+                    event = await asyncio.wait_for(queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
-                    if await request.is_disconnected():
+                    if cancel_event.is_set():
                         break
                     continue
 
                 yield f"data: {json.dumps(event)}\n\n"
-                # Yield to the event loop so uvicorn can flush this chunk.
+                # Yield to the event loop so uvicorn can flush this chunk before
+                # processing the next event.
                 await asyncio.sleep(0)
                 if event["type"] in ("done", "error"):
                     break
         finally:
-            # Always signal the ingest thread to stop, whether the client
-            # disconnected mid-run or the stream ended normally.
+            # Always cancel the monitor and signal the thread, whether the run
+            # finished normally, the client disconnected, or we hit an error.
             cancel_event.set()
+            monitor.cancel()
             if not task.done():
                 task.cancel()
 
@@ -226,15 +244,23 @@ async def ingest_sqlite_stream(
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
 
-    task = asyncio.create_task(_run())
+    async def _monitor_disconnect() -> None:
+        while True:
+            if await request.is_disconnected():
+                cancel_event.set()
+                return
+            await asyncio.sleep(0.1)
+
+    task    = asyncio.create_task(_run())
+    monitor = asyncio.create_task(_monitor_disconnect())
 
     async def _stream() -> AsyncIterator[str]:
         try:
             while True:
                 try:
-                    event = await asyncio.wait_for(queue.get(), timeout=0.3)
+                    event = await asyncio.wait_for(queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
-                    if await request.is_disconnected():
+                    if cancel_event.is_set():
                         break
                     continue
 
@@ -244,6 +270,7 @@ async def ingest_sqlite_stream(
                     break
         finally:
             cancel_event.set()
+            monitor.cancel()
             if not task.done():
                 task.cancel()
 
