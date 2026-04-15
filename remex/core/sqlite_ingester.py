@@ -146,8 +146,16 @@ def ingest_sqlite(
             else:
                 row_id = row_dict.get(id_column)
 
-            # Only include selected columns in the text representation
-            text_dict = {k: row_dict[k] for k in selected if k in row_dict}
+            # Only include selected columns in the text representation.
+            # Exclude the id_column in the default serialization — it's an
+            # identifier, not content, so a row whose only populated column is
+            # the ID has no ingestable text. Users who want the ID in the text
+            # can reference it explicitly via row_template.
+            text_dict = {
+                k: row_dict[k]
+                for k in selected
+                if k in row_dict and (row_template or k != id_column)
+            }
             text = _row_to_text(text_dict, row_template)
 
             chunks = chunk_text(

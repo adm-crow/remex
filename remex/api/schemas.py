@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from typing import Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+
+def _validate_overlap(values):
+    if values.overlap >= values.chunk_size:
+        raise ValueError(
+            f"overlap ({values.overlap}) must be smaller than chunk_size ({values.chunk_size})"
+        )
+    return values
 
 
 # ---------------------------------------------------------------------------
@@ -21,6 +29,8 @@ class IngestRequest(BaseModel):
     incremental: bool = False
     streaming_threshold_mb: int = Field(default=50, ge=0)
 
+    _check_overlap = model_validator(mode="after")(_validate_overlap)
+
 
 class IngestSQLiteRequest(BaseModel):
     sqlite_path: str
@@ -34,6 +44,8 @@ class IngestSQLiteRequest(BaseModel):
     overlap: int = Field(default=200, ge=0)
     min_chunk_size: int = Field(default=50, ge=1)
     chunking: Literal["word", "sentence"] = "word"
+
+    _check_overlap = model_validator(mode="after")(_validate_overlap)
 
 
 class QueryRequest(BaseModel):
