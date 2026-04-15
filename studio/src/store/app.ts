@@ -77,6 +77,9 @@ export interface AppState {
   setIngestDoneUnread: (v: boolean) => void;
   setCollectionType: (dbPath: string, collection: string, type: "files" | "sqlite") => void;
   removeCollectionType: (dbPath: string, collection: string) => void;
+  // Onboarding
+  onboardingDone: boolean;
+  setOnboardingDone: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -102,6 +105,7 @@ export const useAppStore = create<AppState>()(
       ingestDoneUnread: false,
       lastIngestResult: null,
       collectionTypes: {},
+      onboardingDone: false,
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -174,6 +178,7 @@ export const useAppStore = create<AppState>()(
           delete next[`${dbPath}::${collection}`];
           return { collectionTypes: next };
         }),
+      setOnboardingDone: (v) => set({ onboardingDone: v }),
     }),
     {
       name: "remex-studio",
@@ -188,6 +193,7 @@ export const useAppStore = create<AppState>()(
         aiApiKey:         state.aiApiKey,
         lastIngestResult: state.lastIngestResult,
         collectionTypes:  state.collectionTypes,
+        onboardingDone:   state.onboardingDone,
       }),
     }
   )

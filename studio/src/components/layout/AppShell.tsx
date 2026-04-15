@@ -9,6 +9,7 @@ import { SettingsPane } from "@/components/settings/SettingsPane";
 import { useAppStore } from "@/store/app";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { formatDuration } from "@/lib/formatDuration";
+import { OnboardingModal } from "./OnboardingModal";
 
 const PANE_MAP: Record<View, ComponentType> = {
   query:       QueryPane,
@@ -149,6 +150,7 @@ export function AppShell() {
           </div>
         )}
       </main>
+      <OnboardingModal />
     </div>
   );
 }

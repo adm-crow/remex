@@ -131,6 +131,11 @@ describe("useAppStore", () => {
     expect(collectionTypes["./db::other"]).toBe("sqlite");
   });
 
+  it("setOnboardingDone updates onboardingDone", () => {
+    useAppStore.getState().setOnboardingDone(true);
+    expect(useAppStore.getState().onboardingDone).toBe(true);
+  });
+
   it("clearQueryHistory empties the history", () => {
     useAppStore.getState().addQueryHistory("first");
     useAppStore.getState().addQueryHistory("second");
