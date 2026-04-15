@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter, Download } from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -136,6 +138,41 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         return [...prev, col];
       });
     }
+  }
+
+  async function handleExport() {
+    if (results.length === 0) return;
+    const path = await save({
+      defaultPath: "remex-results.json",
+      filters: [
+        { name: "JSON",     extensions: ["json"] },
+        { name: "CSV",      extensions: ["csv"]  },
+        { name: "Markdown", extensions: ["md"]   },
+      ],
+    });
+    if (!path) return;
+
+    let content: string;
+    if (path.endsWith(".csv")) {
+      const header = "score,source,chunk,text\n";
+      const rows = results.map(
+        (r) =>
+          `${r.score},"${r.source.replace(/"/g, '""')}",${r.chunk},"${r.text.replace(/"/g, '""').replace(/\n/g, " ")}"`
+      );
+      content = header + rows.join("\n");
+    } else if (path.endsWith(".md")) {
+      content = `# Remex Query Results\n\n**Query:** ${submitted}\n\n`;
+      content += results
+        .map(
+          (r, i) =>
+            `## ${i + 1}. ${r.source.split(/[/\\]/).pop() ?? r.source} (score: ${r.score.toFixed(3)})\n\n${r.text}\n`
+        )
+        .join("\n---\n\n");
+    } else {
+      content = JSON.stringify(results, null, 2);
+    }
+
+    await invoke("write_text_file", { path, content });
   }
 
   const results = useAi ? (chatResult.data?.sources ?? []) : (multiResult.data ?? []);
@@ -508,6 +545,18 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                     Results
                   </span>
                   <span className="text-xs text-muted-foreground">{results.length}</span>
+                  <div className="flex-1" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-6 text-xs gap-1.5"
+                    onClick={() => void handleExport()}
+                    aria-label="Export results"
+                  >
+                    <Download className="w-3 h-3" />
+                    Export
+                  </Button>
                 </div>
                 <div className="flex flex-col gap-2">
                   {results.map((r, i) => (

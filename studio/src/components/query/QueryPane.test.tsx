@@ -12,8 +12,15 @@ vi.mock("@/hooks/useApi", () => ({
   useSources: vi.fn(),
 }));
 
+vi.mock("@tauri-apps/plugin-dialog", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tauri-apps/plugin-dialog")>()),
+  save: vi.fn().mockResolvedValue("/tmp/results.json"),
+}));
+
 import * as useApi from "@/hooks/useApi";
 import { useMultiQueryResults, useChat, useCollections, useCollectionStats } from "@/hooks/useApi";
+import { save } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 
 const mockResults = [
   {
@@ -348,6 +355,52 @@ describe("QueryPane", () => {
       <QueryPane onFocusReady={(fn) => { focusFn = fn; }} />
     );
     expect(focusFn).toBeDefined();
+  });
+
+  it("shows Export button when results exist and exports on click", async () => {
+    vi.mocked(useMultiQueryResults).mockReturnValue({
+      data: [
+        {
+          text: "hello world",
+          source: "/docs/readme.md",
+          source_type: "files",
+          score: 0.9,
+          distance: 0.1,
+          chunk: 0,
+          doc_title: "",
+          doc_author: "",
+          doc_created: "",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    } as any);
+
+    useAppStore.setState({
+      currentDb: "./db",
+      currentCollection: "myCol",
+      apiUrl: "http://localhost:8000",
+      queryHistory: [],
+    } as any);
+
+    renderWithProviders(<QueryPane />);
+
+    // Submit a query to see results
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "test" } });
+    fireEvent.click(screen.getByRole("button", { name: /^search$/i }));
+
+    const exportBtn = await screen.findByRole("button", { name: /export/i });
+    expect(exportBtn).toBeInTheDocument();
+
+    fireEvent.click(exportBtn);
+
+    await waitFor(() => {
+      expect(vi.mocked(save)).toHaveBeenCalled();
+      expect(vi.mocked(invoke)).toHaveBeenCalledWith(
+        "write_text_file",
+        expect.objectContaining({ path: "/tmp/results.json" })
+      );
+    });
   });
 
   it("Escape on the input clears text and dismisses results", async () => {
