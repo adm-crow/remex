@@ -137,6 +137,7 @@ export function FilesTab() {
             sourcesIngested: event.result.sources_ingested,
             sourcesSkipped:  event.result.sources_skipped,
             chunksStored:    event.result.chunks_stored,
+            skippedReasons:  event.result.skipped_reasons,
           });
           queryClient.invalidateQueries({
             queryKey: ["sources", apiUrl, currentDb, effectiveCollection],

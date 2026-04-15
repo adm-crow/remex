@@ -23,6 +23,7 @@ export interface LastIngestResult {
   sourcesIngested: number;
   sourcesSkipped: number;
   chunksStored: number;
+  skippedReasons: string[];
 }
 
 export interface AppState {
