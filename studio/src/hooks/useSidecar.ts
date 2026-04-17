@@ -59,7 +59,8 @@ export function useSidecar() {
       try {
         await invoke("spawn_sidecar", { host, port });
         didSpawnRef.current = true;
-      } catch {
+      } catch (err) {
+        console.error("[useSidecar] spawn_sidecar failed:", err);
         if (!cancelled) setSidecarStatus("error");
         return;
       }

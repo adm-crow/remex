@@ -58,7 +58,13 @@ def test_ingest_multiple_files(mock_chroma, tmp_path):
         ("b.md", "Content of B " * 20),
     )
     ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
-    assert mock_chroma.upsert.call_count == 2
+    # Batch upsert may combine small files into a single call.
+    assert mock_chroma.upsert.call_count >= 1
+    # All chunks from both files must appear across all upsert calls.
+    total_ids = sum(
+        len(call.kwargs["ids"]) for call in mock_chroma.upsert.call_args_list
+    )
+    assert total_ids >= 2  # at least one chunk per file
 
 
 def test_ingest_is_idempotent(mock_chroma, tmp_path):
@@ -91,11 +97,14 @@ def test_upsert_payload_structure(mock_chroma, tmp_path):
     docs = make_docs_dir(tmp_path, ("test.txt", "word " * 100))
     ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False)
 
-    call_kwargs = mock_chroma.upsert.call_args.kwargs
+    # With batch upserts the call may be the first or only call
+    assert mock_chroma.upsert.call_count >= 1
+    call_kwargs = mock_chroma.upsert.call_args_list[0].kwargs
     assert "ids" in call_kwargs
     assert "documents" in call_kwargs
     assert "metadatas" in call_kwargs
     assert len(call_kwargs["ids"]) == len(call_kwargs["documents"])
+    assert len(call_kwargs["metadatas"]) > 0
     assert call_kwargs["metadatas"][0]["source_type"] == "file"
 
 

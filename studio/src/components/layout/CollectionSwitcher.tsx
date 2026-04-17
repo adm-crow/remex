@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { X } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -59,29 +60,42 @@ export function CollectionSwitcher() {
   }
 
   return (
-    <Select
-      value={currentCollection ?? ""}
-      onValueChange={(v) => {
-        if (v === NEW_SENTINEL) {
-          setIsNew(true);
-        } else {
-          setCurrentCollection(v);
-        }
-      }}
-    >
-      <SelectTrigger className="h-7 text-xs w-full" aria-label="Collection">
-        <SelectValue placeholder="Select collection…" />
-      </SelectTrigger>
-      <SelectContent>
-        {collections.map((c) => (
-          <SelectItem key={c} value={c} className="text-xs">
-            {c}
+    <div className="flex gap-1 items-center">
+      <Select
+        value={currentCollection ?? ""}
+        onValueChange={(v) => {
+          if (v === NEW_SENTINEL) {
+            setIsNew(true);
+          } else {
+            setCurrentCollection(v);
+          }
+        }}
+      >
+        <SelectTrigger className="h-7 text-xs w-full" aria-label="Collection">
+          <SelectValue placeholder="Select collection…" />
+        </SelectTrigger>
+        <SelectContent>
+          {collections.map((c) => (
+            <SelectItem key={c} value={c} className="text-xs">
+              {c}
+            </SelectItem>
+          ))}
+          <SelectItem value={NEW_SENTINEL} className="text-xs text-muted-foreground">
+            Type a new name…
           </SelectItem>
-        ))}
-        <SelectItem value={NEW_SENTINEL} className="text-xs text-muted-foreground">
-          Type a new name…
-        </SelectItem>
-      </SelectContent>
-    </Select>
+        </SelectContent>
+      </Select>
+      {currentCollection && (
+        <button
+          type="button"
+          onClick={() => setCurrentCollection(null)}
+          className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          aria-label="Clear collection"
+          title="Clear collection"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
   );
 }

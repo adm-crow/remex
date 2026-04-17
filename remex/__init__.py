@@ -13,6 +13,7 @@ from remex.core import (
     query_async,
     reset,
     setup_logging,
+    source_chunk_counts,
     sources,
     # config
     load_config,
@@ -54,6 +55,7 @@ __all__ = [
     "query_async",
     "reset",
     "setup_logging",
+    "source_chunk_counts",
     "sources",
     # config
     "load_config",

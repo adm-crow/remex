@@ -203,6 +203,21 @@ def ingest(
 
     collection = _get_collection(db_path, collection_name, embedding_model)
 
+    # Batch upserts: accumulate chunks across files and flush when the batch
+    # is large enough.  This lets the SentenceTransformer embed many chunks in
+    # a single forward pass (much faster than one upsert per file).
+    BATCH_LIMIT = 64
+    batch_docs: list[str] = []
+    batch_ids: list[str] = []
+    batch_metas: list[dict[str, Any]] = []
+
+    def _flush() -> None:
+        if batch_docs:
+            collection.upsert(documents=list(batch_docs), ids=list(batch_ids), metadatas=list(batch_metas))  # type: ignore[arg-type]
+            batch_docs.clear()
+            batch_ids.clear()
+            batch_metas.clear()
+
     files_done = 0
     for file_path in files:
         source_str = str(file_path.resolve())
@@ -237,6 +252,9 @@ def ingest(
             if use_streaming:
                 try:
                     doc_meta = extract_metadata(file_path)
+                    # Flush batch before streaming to avoid mixing batched and
+                    # streamed chunks (streaming does its own upserts internally).
+                    _flush()
                     n = _ingest_file_streaming(
                         file_path, source, collection, source_str,
                         chunk_size, overlap, min_chunk_size, chunking,
@@ -298,8 +316,13 @@ def ingest(
                     for meta in metadatas:
                         meta["file_hash"] = current_hash
 
-                # Upsert so re-running is idempotent
-                collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
+                # Accumulate into batch instead of upserting per file
+                batch_docs.extend(chunks)
+                batch_ids.extend(ids)
+                batch_metas.extend(metadatas)
+                if len(batch_docs) >= BATCH_LIMIT:
+                    _flush()
+
                 result.sources_ingested += 1
                 result.chunks_stored += len(chunks)
                 _status = "ingested"
@@ -318,6 +341,9 @@ def ingest(
                     status=_status,  # type: ignore[arg-type]
                     chunks_stored=result.chunks_stored,
                 ))
+
+    # Flush any remaining chunks from the last batch
+    _flush()
 
     if verbose:
         logger.info("Done. Collection '%s' in '%s'", collection_name, db_path)

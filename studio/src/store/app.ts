@@ -207,7 +207,8 @@ export const useAppStore = create<AppState>()(
         theme:            state.theme,
         aiProvider:       state.aiProvider,
         aiModel:          state.aiModel,
-        aiApiKey:         state.aiApiKey,
+        // aiApiKey intentionally NOT persisted — API keys should not survive
+        // in localStorage across sessions for security.
         lastIngestResult: state.lastIngestResult,
         collectionTypes:       state.collectionTypes,
         incompleteCollections: state.incompleteCollections,

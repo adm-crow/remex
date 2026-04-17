@@ -24,6 +24,9 @@ import { useAppStore } from "@/store/app";
 import type { IngestResultResponse } from "@/api/client";
 import { formatDuration } from "@/lib/formatDuration";
 
+/** Sentinel value that can never be a real SQLite table name. */
+const ALL_TABLES = "\x00__all__";
+
 export function SQLiteTab() {
   const {
     apiUrl, currentDb, currentCollection,
@@ -123,8 +126,48 @@ export function SQLiteTab() {
     }
   }
 
+  async function ingestOneTable(
+    table: string,
+    signal: AbortSignal,
+    t0: number,
+    startedAt: string,
+    /** Offset added to progress so multi-table totals are cumulative. */
+    rowOffset: number,
+  ): Promise<IngestResultResponse | null> {
+    let tableResult: IngestResultResponse | null = null;
+    for await (const event of api.ingestSqliteStream(
+      apiUrl, currentDb!, effectiveCollection,
+      {
+        sqlite_path: sqlitePath,
+        table,
+        embedding_model: embeddingModel,
+        columns: columns
+          ? columns.split(",").map((c) => c.trim()).filter(Boolean)
+          : undefined,
+        id_column: idColumn || "id",
+        row_template: rowTemplate || undefined,
+      },
+      signal,
+    )) {
+      if (event.type === "progress") {
+        setRowsDone(rowOffset + event.files_done);
+        rowsDoneRef.current = rowOffset + event.files_done;
+        setRowsTotal(rowOffset + event.files_total);
+      } else if (event.type === "done") {
+        tableResult = event.result;
+      } else if (event.type === "error") {
+        setRunError(event.detail);
+      }
+    }
+    return tableResult;
+  }
+
   async function handleRun() {
     if (!sqlitePath || !selectedTable || !effectiveCollection || !currentDb) return;
+
+    const tablesToIngest = selectedTable === ALL_TABLES ? tables : [selectedTable];
+    if (tablesToIngest.length === 0) return;
+
     setIsRunning(true);
     setResult(null);
     setRunError(null);
@@ -139,53 +182,61 @@ export function SQLiteTab() {
     const t0 = startTimeRef.current;
     const startedAt = new Date(t0).toISOString();
     runAbortRef.current = new AbortController();
+
+    // Accumulate results across tables
+    let totalFound = 0;
+    let totalIngested = 0;
+    let totalSkipped = 0;
+    let totalChunks = 0;
+    const allSkippedReasons: string[] = [];
+
     try {
-      for await (const event of api.ingestSqliteStream(
-        apiUrl, currentDb, effectiveCollection,
-        {
-          sqlite_path: sqlitePath,
-          table: selectedTable,
-          embedding_model: embeddingModel,
-          columns: columns
-            ? columns.split(",").map((c) => c.trim()).filter(Boolean)
-            : undefined,
-          id_column: idColumn || "id",
-          row_template: rowTemplate || undefined,
-        },
-        runAbortRef.current.signal,
-      )) {
-        if (event.type === "progress") {
-          setRowsDone(event.files_done);
-          rowsDoneRef.current = event.files_done;
-          setRowsTotal(event.files_total);
-        } else if (event.type === "done") {
-          const completedAt = new Date().toISOString();
-          setDuration(formatDuration(Date.now() - t0));
-          setResult(event.result);
-          if (event.result.sources_ingested > 0) {
-            setCollectionType(currentDb, effectiveCollection, "sqlite");
-            clearIncompleteCollection(currentDb, effectiveCollection);
-          }
-          queryClient.invalidateQueries({ queryKey: ["sources", apiUrl, currentDb, effectiveCollection] });
-          queryClient.invalidateQueries({ queryKey: ["collections", apiUrl, currentDb] });
-          if (event.result.sources_ingested > 0) {
-            setLastIngestResult({
-              collection: effectiveCollection,
-              sourcePath: sqlitePath,
-              startedAt,
-              completedAt,
-              sourcesFound:    event.result.sources_found,
-              sourcesIngested: event.result.sources_ingested,
-              sourcesSkipped:  event.result.sources_skipped,
-              chunksStored:    event.result.chunks_stored,
-              skippedReasons:  event.result.skipped_reasons,
-            });
-            setShowDoneAlert(true);
-            setIngestDoneUnread(true);
-          }
-        } else if (event.type === "error") {
-          setRunError(event.detail);
+      let rowOffset = 0;
+      for (const table of tablesToIngest) {
+        const tableResult = await ingestOneTable(
+          table, runAbortRef.current.signal, t0, startedAt, rowOffset,
+        );
+        if (tableResult) {
+          totalFound    += tableResult.sources_found;
+          totalIngested += tableResult.sources_ingested;
+          totalSkipped  += tableResult.sources_skipped;
+          totalChunks   += tableResult.chunks_stored;
+          allSkippedReasons.push(...tableResult.skipped_reasons);
+          rowOffset += tableResult.sources_found;
         }
+      }
+
+      // Build merged result
+      const merged: IngestResultResponse = {
+        sources_found: totalFound,
+        sources_ingested: totalIngested,
+        sources_skipped: totalSkipped,
+        chunks_stored: totalChunks,
+        skipped_reasons: allSkippedReasons,
+      };
+      const completedAt = new Date().toISOString();
+      setDuration(formatDuration(Date.now() - t0));
+      setResult(merged);
+      if (totalIngested > 0) {
+        setCollectionType(currentDb, effectiveCollection, "sqlite");
+        clearIncompleteCollection(currentDb, effectiveCollection);
+      }
+      queryClient.invalidateQueries({ queryKey: ["sources", apiUrl, currentDb, effectiveCollection] });
+      queryClient.invalidateQueries({ queryKey: ["collections", apiUrl, currentDb] });
+      if (totalIngested > 0) {
+        setLastIngestResult({
+          collection: effectiveCollection,
+          sourcePath: sqlitePath,
+          startedAt,
+          completedAt,
+          sourcesFound:    totalFound,
+          sourcesIngested: totalIngested,
+          sourcesSkipped:  totalSkipped,
+          chunksStored:    totalChunks,
+          skippedReasons:  allSkippedReasons,
+        });
+        setShowDoneAlert(true);
+        setIngestDoneUnread(true);
       }
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
@@ -243,6 +294,11 @@ export function SQLiteTab() {
               />
             </SelectTrigger>
             <SelectContent>
+              {tables.length > 1 && (
+                <SelectItem value={ALL_TABLES} className="font-medium">
+                  All tables ({tables.length})
+                </SelectItem>
+              )}
               {tables.map((t) => (
                 <SelectItem key={t} value={t}>{t}</SelectItem>
               ))}

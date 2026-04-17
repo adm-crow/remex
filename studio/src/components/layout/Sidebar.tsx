@@ -28,22 +28,19 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
       style={style}
     >
       {/* ── Brand ───────────────────────────────────────────────────────── */}
-      <div className="px-4 pt-5 pb-4 flex items-center gap-3 shrink-0">
-        <img src="/remex.svg" alt="" aria-hidden="true" className="h-6 w-3 shrink-0 select-none" draggable={false} />
-        <div className="min-w-0">
-          <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground">
-            Remex Studio
+      <div className="px-4 pt-5 pb-4 shrink-0">
+        <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground">
+          Remex Studio
+        </p>
+        {currentDb && (
+          <p
+            className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 font-mono"
+            title={currentDb}
+            aria-label="Current database"
+          >
+            {currentDb}
           </p>
-          {currentDb && (
-            <p
-              className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 font-mono"
-              title={currentDb}
-              aria-label="Current database"
-            >
-              {currentDb}
-            </p>
-          )}
-        </div>
+        )}
       </div>
 
       {/* ── Collection switcher ─────────────────────────────────────────── */}

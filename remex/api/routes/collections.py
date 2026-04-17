@@ -115,13 +115,9 @@ def rename_collection(
         raise HTTPException(status_code=404, detail=f"Collection '{collection}' not found")
 
     # Check new name isn't already taken
-    try:
-        client.get_collection(req.new_name)
+    existing = [c.name for c in client.list_collections()]
+    if req.new_name in existing:
         raise HTTPException(status_code=409, detail=f"Collection '{req.new_name}' already exists")
-    except HTTPException:
-        raise
-    except Exception:
-        pass  # new name is free
 
     # Copy all documents to the new collection
     all_data = old_col.get(include=["documents", "metadatas", "embeddings"])
