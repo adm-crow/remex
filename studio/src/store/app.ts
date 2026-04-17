@@ -41,13 +41,18 @@ export interface AppState {
   // Sidecar reconnect (not persisted)
   sidecarReconnectSeq: number;
   triggerSidecarReconnect: () => void;
-  // Ingest session state (not persisted)
+  // Files ingest session state (not persisted)
   ingestRunning: boolean;
   ingestProgress: ProgressItem[];
   ingestFilesDone: number;
   ingestFilesTotal: number;
   ingestStreamError: string | null;
   ingestDoneUnread: boolean;
+  // SQLite ingest session state (not persisted)
+  sqliteIngestRunning: boolean;
+  sqliteIngestRowsDone: number;
+  sqliteIngestRowsTotal: number;
+  sqliteIngestStreamError: string | null;
   // Ingest result (persisted)
   lastIngestResult: LastIngestResult | null;
   // Collection metadata (persisted)
@@ -76,6 +81,11 @@ export interface AppState {
   setIngestStreamError: (err: string | null) => void;
   setLastIngestResult: (r: LastIngestResult | null) => void;
   setIngestDoneUnread: (v: boolean) => void;
+  resetSqliteIngestSession: () => void;
+  setSqliteIngestRunning: (v: boolean) => void;
+  setSqliteIngestRowsDone: (n: number) => void;
+  setSqliteIngestRowsTotal: (n: number) => void;
+  setSqliteIngestStreamError: (err: string | null) => void;
   setCollectionType: (dbPath: string, collection: string, type: "files" | "sqlite") => void;
   removeCollectionType: (dbPath: string, collection: string) => void;
   setIncompleteCollection: (dbPath: string, collection: string) => void;
@@ -106,6 +116,10 @@ export const useAppStore = create<AppState>()(
       ingestFilesTotal: 0,
       ingestStreamError: null,
       ingestDoneUnread: false,
+      sqliteIngestRunning: false,
+      sqliteIngestRowsDone: 0,
+      sqliteIngestRowsTotal: 0,
+      sqliteIngestStreamError: null,
       lastIngestResult: null,
       collectionTypes: {},
       incompleteCollections: {},
@@ -169,6 +183,17 @@ export const useAppStore = create<AppState>()(
       setIngestStreamError: (err) => set({ ingestStreamError: err }),
       setLastIngestResult:  (r)   => set({ lastIngestResult: r }),
       setIngestDoneUnread:  (v)   => set({ ingestDoneUnread: v }),
+      resetSqliteIngestSession: () => set({
+        sqliteIngestRunning:     false,
+        sqliteIngestRowsDone:    0,
+        sqliteIngestRowsTotal:   0,
+        sqliteIngestStreamError: null,
+      }),
+      setSqliteIngestRunning:     (v)   => set({ sqliteIngestRunning: v }),
+      setSqliteIngestRowsDone:    (n)   => set({ sqliteIngestRowsDone: n }),
+      setSqliteIngestRowsTotal:   (n)   => set({ sqliteIngestRowsTotal: n }),
+      setSqliteIngestStreamError: (err) => set({ sqliteIngestStreamError: err }),
+
       setCollectionType: (dbPath, collection, type) =>
         set((s) => ({
           collectionTypes: {

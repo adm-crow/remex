@@ -32,7 +32,22 @@ export function SQLiteTab() {
     apiUrl, currentDb, currentCollection,
     setCollectionType, setLastIngestResult, setIngestDoneUnread,
     setIncompleteCollection, clearIncompleteCollection,
+    sqliteIngestRunning, sqliteIngestRowsDone, sqliteIngestRowsTotal,
+    sqliteIngestStreamError,
+    resetSqliteIngestSession, setSqliteIngestRunning,
+    setSqliteIngestRowsDone, setSqliteIngestRowsTotal,
+    setSqliteIngestStreamError,
   } = useAppStore();
+
+  // Reset session state when navigating away after a completed ingest
+  useEffect(() => {
+    return () => {
+      if (!useAppStore.getState().sqliteIngestRunning) {
+        resetSqliteIngestSession();
+        setLastIngestResult(null);
+      }
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [sqlitePath,      setSqlitePath]      = useState("");
   const [tables,          setTables]          = useState<string[]>([]);
@@ -45,12 +60,8 @@ export function SQLiteTab() {
   const [idColumn,        setIdColumn]        = useState("id");
   const [rowTemplate,     setRowTemplate]     = useState("");
   const [embeddingModel,  setEmbeddingModel]  = useState("all-MiniLM-L6-v2");
-  const [isRunning,       setIsRunning]       = useState(false);
   const [result,          setResult]          = useState<IngestResultResponse | null>(null);
-  const [runError,        setRunError]        = useState<string | null>(null);
   const [duration,        setDuration]        = useState<string | null>(null);
-  const [rowsDone,        setRowsDone]        = useState(0);
-  const [rowsTotal,       setRowsTotal]       = useState(0);
   const [eta,             setEta]             = useState<string | null>(null);
   const [showDoneAlert,   setShowDoneAlert]   = useState(false);
   const [wasCancelled,    setWasCancelled]    = useState(false);
@@ -68,21 +79,21 @@ export function SQLiteTab() {
 
   // ETA ticker — recalculates every second while running.
   useEffect(() => {
-    if (!isRunning || rowsDone === 0 || rowsTotal === 0) {
-      if (!isRunning) setEta(null);
+    if (!sqliteIngestRunning || sqliteIngestRowsDone === 0 || sqliteIngestRowsTotal === 0) {
+      if (!sqliteIngestRunning) setEta(null);
       return;
     }
     function update() {
       if (!startTimeRef.current) return;
       const elapsed = Date.now() - startTimeRef.current;
-      const msPerRow = elapsed / rowsDone;
-      const remainingMs = msPerRow * (rowsTotal - rowsDone);
+      const msPerRow = elapsed / sqliteIngestRowsDone;
+      const remainingMs = msPerRow * (sqliteIngestRowsTotal - sqliteIngestRowsDone);
       setEta(remainingMs < 2000 ? "< 2s" : formatDuration(remainingMs));
     }
     update();
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [isRunning, rowsDone, rowsTotal]);
+  }, [sqliteIngestRunning, sqliteIngestRowsDone, sqliteIngestRowsTotal]);
 
   async function loadTables(path: string) {
     loadAbortRef.current?.abort();
@@ -129,8 +140,6 @@ export function SQLiteTab() {
   async function ingestOneTable(
     table: string,
     signal: AbortSignal,
-    t0: number,
-    startedAt: string,
     /** Offset added to progress so multi-table totals are cumulative. */
     rowOffset: number,
   ): Promise<IngestResultResponse | null> {
@@ -150,13 +159,13 @@ export function SQLiteTab() {
       signal,
     )) {
       if (event.type === "progress") {
-        setRowsDone(rowOffset + event.files_done);
+        setSqliteIngestRowsDone(rowOffset + event.files_done);
         rowsDoneRef.current = rowOffset + event.files_done;
-        setRowsTotal(rowOffset + event.files_total);
+        setSqliteIngestRowsTotal(rowOffset + event.files_total);
       } else if (event.type === "done") {
         tableResult = event.result;
       } else if (event.type === "error") {
-        setRunError(event.detail);
+        setSqliteIngestStreamError(event.detail);
       }
     }
     return tableResult;
@@ -168,12 +177,10 @@ export function SQLiteTab() {
     const tablesToIngest = selectedTable === ALL_TABLES ? tables : [selectedTable];
     if (tablesToIngest.length === 0) return;
 
-    setIsRunning(true);
+    resetSqliteIngestSession();
+    setSqliteIngestRunning(true);
     setResult(null);
-    setRunError(null);
     setDuration(null);
-    setRowsDone(0);
-    setRowsTotal(0);
     rowsDoneRef.current = 0;
     setEta(null);
     setShowDoneAlert(false);
@@ -194,7 +201,7 @@ export function SQLiteTab() {
       let rowOffset = 0;
       for (const table of tablesToIngest) {
         const tableResult = await ingestOneTable(
-          table, runAbortRef.current.signal, t0, startedAt, rowOffset,
+          table, runAbortRef.current.signal, rowOffset,
         );
         if (tableResult) {
           totalFound    += tableResult.sources_found;
@@ -245,14 +252,14 @@ export function SQLiteTab() {
           if (currentDb) setIncompleteCollection(currentDb, effectiveCollection);
         }
       } else {
-        setRunError(e instanceof Error ? e.message : String(e));
+        setSqliteIngestStreamError(e instanceof Error ? e.message : String(e));
       }
     } finally {
-      setIsRunning(false);
+      setSqliteIngestRunning(false);
     }
   }
 
-  const canRun = !isRunning && !!sqlitePath && !!selectedTable && !!effectiveCollection;
+  const canRun = !sqliteIngestRunning && !!sqlitePath && !!selectedTable && !!effectiveCollection;
 
   return (
     <div className="flex flex-col h-full p-4 gap-3 overflow-y-auto">
@@ -399,9 +406,9 @@ export function SQLiteTab() {
       <div className="flex gap-2">
         <Button onClick={handleRun} disabled={!canRun} aria-label="Run ingest" className="flex-1">
           <Play className="w-4 h-4 mr-2" />
-          {isRunning ? "Ingesting…" : "Start ingest"}
+          {sqliteIngestRunning ? "Ingesting…" : "Start ingest"}
         </Button>
-        {isRunning && (
+        {sqliteIngestRunning && (
           <Button
             type="button"
             variant="destructive"
@@ -415,25 +422,27 @@ export function SQLiteTab() {
       </div>
 
       {/* Progress bar */}
-      {isRunning && (
+      {(sqliteIngestRunning || (sqliteIngestRowsTotal > 0 && !sqliteIngestStreamError)) && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{rowsTotal === 0 ? "Loading…" : "Ingesting…"}</span>
+            <span>{sqliteIngestRunning ? "Ingesting…" : "Done"}</span>
             <span className="tabular-nums">
-              {rowsTotal === 0 ? "" : `${rowsDone} / ${rowsTotal}`}
+              {sqliteIngestRowsTotal === 0
+                ? "Loading model…"
+                : `${sqliteIngestRowsDone} / ${sqliteIngestRowsTotal}`}
             </span>
           </div>
           <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-            {rowsTotal > 0 ? (
+            {sqliteIngestRowsTotal > 0 ? (
               <div
                 className="h-full rounded-full bg-primary transition-all duration-300"
-                style={{ width: `${Math.round((rowsDone / rowsTotal) * 100)}%` }}
+                style={{ width: `${Math.round((sqliteIngestRowsDone / sqliteIngestRowsTotal) * 100)}%` }}
               />
             ) : (
               <div className="h-full rounded-full bg-primary animate-indeterminate" />
             )}
           </div>
-          {isRunning && eta && (
+          {sqliteIngestRunning && eta && (
             <p className="text-xs text-muted-foreground text-right tabular-nums">
               ~{eta} remaining
             </p>
@@ -442,13 +451,13 @@ export function SQLiteTab() {
       )}
 
       {/* Error */}
-      {runError && (
+      {sqliteIngestStreamError && (
         <div
           className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
           role="alert"
         >
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <span>{runError}</span>
+          <span>{sqliteIngestStreamError}</span>
         </div>
       )}
 
@@ -463,7 +472,7 @@ export function SQLiteTab() {
             <div className="space-y-0.5">
               <p className="text-sm font-medium">Incomplete</p>
               <p className="text-xs opacity-80">
-                Ingestion was stopped early — {rowsDone} row{rowsDone !== 1 ? "s" : ""} ingested.
+                Ingestion was stopped early — {sqliteIngestRowsDone} row{sqliteIngestRowsDone !== 1 ? "s" : ""} ingested.
                 The collection is partially populated.
               </p>
             </div>
