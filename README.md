@@ -4,7 +4,7 @@
 
   # remex
 
-  **Search your documents with AI — privately, offline, on your machine.**
+  **Your private knowledge base — fully offline, never leaves your machine.**
 
   <br/>
 
@@ -20,7 +20,7 @@
 
 ---
 
-remex is a local-first knowledge base for your documents. Point it at any folder — PDFs, notes, code, spreadsheets — and it becomes instantly searchable using natural language. Ask questions and get answers backed by the exact sources in your files, with no data ever leaving your machine.
+Remex is a local-first knowledge base for your documents. Point it at any folder — PDFs, notes, code, spreadsheets — and it becomes instantly searchable using natural language. Ask questions and get answers backed by the exact sources in your files, with no data ever leaving your machine.
 
 It runs entirely offline, requires no cloud account, and works with any AI provider you already have — Anthropic, OpenAI, or a local Ollama instance.
 
@@ -44,12 +44,14 @@ A native Windows desktop app to ingest, search, and query your documents with AI
 |:---|:---|
 | **Fully offline** | No data leaves your machine — local embeddings, local storage |
 | **12 file formats** | `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.html` `.pptx` `.xlsx` `.epub` `.odt` `.jsonl` |
-| **SQLite ingest** | Embed database rows alongside files in the same collection |
+| **SQLite ingest** | Embed rows from any table — or all tables at once — alongside your files |
 | **Incremental ingest** | SHA-256 hash check — unchanged files are skipped automatically |
+| **Batch embedding** | Chunks are embedded in batches for fast ingestion of large directories |
 | **AI answers** | Auto-detects Anthropic, OpenAI, or a local Ollama instance |
 | **Multi-collection search** | Query across collections, results merged by relevance score |
-| **Source filtering** | Narrow results by file or table within a collection |
+| **Source filtering** | Narrow query results to a specific file or table |
 | **Export results** | Copy or export query results for use elsewhere |
+| **Collections manager** | Rename, delete, and inspect your knowledge bases from the UI |
 
 ---
 

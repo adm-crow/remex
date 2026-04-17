@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import {
   Sun, Moon, Palette, Bot, Eye, EyeOff,
-  Server, FolderOpen, ChevronRight, ExternalLink,
+  Server, FolderOpen, ChevronRight, ExternalLink, BookOpen,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,7 @@ export function SettingsPane() {
     aiProvider, setAiProvider,
     aiModel, setAiModel,
     aiApiKey, setAiApiKey,
+    setOnboardingDone,
   } = useAppStore();
 
   const [localApiUrl, setLocalApiUrl] = useState(apiUrl);
@@ -218,6 +219,21 @@ export function SettingsPane() {
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </button>
+            <div className="h-px bg-border mx-4" />
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+              onClick={() => setOnboardingDone(false)}
+              aria-label="Show welcome guide"
+            >
+              <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Show welcome guide</p>
+                <p className="text-xs text-muted-foreground">
+                  Replay the getting-started walkthrough
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
           </Card>
 
         </div>
@@ -309,7 +325,7 @@ export function SettingsPane() {
           variant="ghost"
           size="sm"
           className="h-6 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground"
-          onClick={() => open("https://pypi.org/project/remex/#history")}
+          onClick={() => open("https://github.com/adm-crow/remex/releases")}
           aria-label="Check for updates"
         >
           <ExternalLink className="w-3 h-3" />
