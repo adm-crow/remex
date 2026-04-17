@@ -34,7 +34,9 @@ export function CollectionSwitcher() {
           autoFocus
           onKeyDown={(e) => {
             if (e.key === "Enter" && newName.trim()) {
-              setCurrentCollection(newName.trim());
+              const name = newName.trim();
+              if (collections.includes(name)) return; // already exists
+              setCurrentCollection(name);
               setIsNew(false);
               setNewName("");
             }

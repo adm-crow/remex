@@ -68,6 +68,7 @@ export function SQLiteTab() {
 
   const loadAbortRef  = useRef<AbortController | null>(null);
   const runAbortRef   = useRef<AbortController | null>(null);
+  const abortedRef    = useRef(false);
   const startTimeRef  = useRef<number | null>(null);
   // Tracks live progress outside React state so the cancel handler (a stale closure) reads the correct value.
   const rowsDoneRef   = useRef(0);
@@ -182,6 +183,7 @@ export function SQLiteTab() {
     setResult(null);
     setDuration(null);
     rowsDoneRef.current = 0;
+    abortedRef.current = false;
     setEta(null);
     setShowDoneAlert(false);
     setWasCancelled(false);
@@ -214,6 +216,7 @@ export function SQLiteTab() {
       }
 
       // Build merged result
+      if (abortedRef.current) return; // guard against late events
       const merged: IngestResultResponse = {
         sources_found: totalFound,
         sources_ingested: totalIngested,
@@ -246,6 +249,7 @@ export function SQLiteTab() {
         setIngestDoneUnread(true);
       }
     } catch (e) {
+      abortedRef.current = true;
       if (e instanceof DOMException && e.name === "AbortError") {
         if (rowsDoneRef.current > 0) {
           setWasCancelled(true);

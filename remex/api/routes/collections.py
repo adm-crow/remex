@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from fastapi import APIRouter, HTTPException, Query
 from remex.core import collection_stats, delete_source, list_collections, purge, reset, source_chunk_counts
@@ -25,6 +26,10 @@ def get_collections(db_path: str = Query(default="./remex_db")) -> list[str]:
 def list_sqlite_tables(
     path: str = Query(..., description="Absolute path to the SQLite file"),
 ) -> SQLiteTablesResponse:
+    if not os.path.isabs(path):
+        raise HTTPException(status_code=400, detail="Path must be absolute")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=400, detail="File does not exist")
     conn = None
     try:
         conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
@@ -123,7 +128,7 @@ def rename_collection(
     all_data = old_col.get(include=["documents", "metadatas", "embeddings"])
     new_col = client.create_collection(req.new_name, metadata=old_col.metadata or {})
     if all_data["ids"]:
-        new_col.add(
+        new_col.upsert(
             ids=all_data["ids"],
             documents=all_data["documents"],
             metadatas=all_data["metadatas"],

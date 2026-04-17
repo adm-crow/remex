@@ -48,7 +48,7 @@ export function FilesTab() {
         setLastIngestResult(null);
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — cleanup depends on store actions that are stable singleton refs
 
   const [sourcePath,     setSourcePath]     = useState("");
   const [collectionName, setCollectionName] = useState(currentCollection ?? "");
@@ -61,6 +61,7 @@ export function FilesTab() {
   const [wasCancelled,   setWasCancelled]   = useState(false);
   const [eta,            setEta]            = useState<string | null>(null);
   const abortRef    = useRef<AbortController | null>(null);
+  const abortedRef  = useRef(false);
   const startTimeRef = useRef<number | null>(null);
   const { isDragging } = useDragDrop((path) => setSourcePath(path));
 
@@ -102,6 +103,7 @@ export function FilesTab() {
     resetIngestSession();
     setIngestRunning(true);
     abortRef.current = new AbortController();
+    abortedRef.current = false;
     startTimeRef.current = Date.now();
     const startedAt = new Date().toISOString();
 
@@ -128,6 +130,7 @@ export function FilesTab() {
             chunks_stored: event.chunks_stored,
           });
         } else if (event.type === "done") {
+          if (abortedRef.current) continue; // ignore late events after abort
           if (event.result.sources_ingested > 0) {
             setCollectionType(currentDb, effectiveCollection, "files");
             clearIncompleteCollection(currentDb, effectiveCollection);
@@ -158,6 +161,7 @@ export function FilesTab() {
         }
       }
     } catch (e) {
+      abortedRef.current = true;
       if (e instanceof DOMException && e.name === "AbortError") {
         if (useAppStore.getState().ingestFilesDone > 0) {
           setWasCancelled(true);

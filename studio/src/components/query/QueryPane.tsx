@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter, Download } from "lucide-react";
+import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter, Download, CheckCircle2 } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
@@ -74,6 +74,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   );
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
 
   // Keep selection in sync when the user switches collections from the sidebar.
   // Also reset source filter so stale where-filters aren't applied to new collection.
@@ -190,6 +191,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
 
     try {
       await invoke("write_text_file", { path, content });
+      setExportDone(true);
+      setTimeout(() => setExportDone(false), 3000);
     } catch (e) {
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -574,8 +577,10 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                     onClick={() => void handleExport()}
                     aria-label="Export results"
                   >
-                    <Download className="w-3 h-3" />
-                    Export
+                    {exportDone
+                      ? <><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Exported</>
+                      : <><Download className="w-3 h-3" /> Export</>
+                    }
                   </Button>
                 </div>
                 <div className="flex flex-col gap-2">

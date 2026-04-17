@@ -501,7 +501,7 @@ def init_cmd(path: str) -> None:
         gitignore = root / ".gitignore"
         entry = "remex_db/"
         if gitignore.exists():
-            if entry not in gitignore.read_text():
+            if entry not in gitignore.read_text().splitlines():
                 with gitignore.open("a", encoding="utf-8") as f:
                     f.write(f"\n# remex\n{entry}\n")
                 click.echo(f"  updated  .gitignore  ({entry})")

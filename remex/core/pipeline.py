@@ -84,6 +84,7 @@ def _make_id_abs(file_path: Path, chunk_index: int) -> str:
 
 
 _STREAM_BATCH = 100  # max chunks per ChromaDB upsert call during streaming
+_STREAMING_THRESHOLD = 50 * 1024 * 1024  # 50 MiB — files above this use streaming extraction
 
 
 def _ingest_file_streaming(
@@ -162,7 +163,7 @@ def ingest(
     incremental: bool = False,
     chunking: str = "word",
     verbose: bool = True,
-    streaming_threshold: int = 50 * 1024 * 1024,
+    streaming_threshold: int = _STREAMING_THRESHOLD,
     on_progress: Callable[[IngestProgress], None] | None = None,
 ) -> IngestResult:
     """
@@ -260,7 +261,7 @@ def ingest(
                         chunk_size, overlap, min_chunk_size, chunking,
                         doc_meta, incremental, current_hash,
                     )
-                except Exception as e:
+                except (OSError, ValueError, RuntimeError) as e:
                     if verbose:
                         logger.warning("[skip] %s: %s", file_path.name, e)
                     _status = "error"
@@ -284,7 +285,7 @@ def ingest(
             else:
                 try:
                     text = extract(file_path)
-                except Exception as e:
+                except (OSError, ValueError, RuntimeError) as e:
                     if verbose:
                         logger.warning("[skip] %s: %s", file_path.name, e)
                     _status = "error"
@@ -696,7 +697,7 @@ def ingest_many(
     chunking: str = "word",
     verbose: bool = True,
     incremental: bool = False,
-    streaming_threshold: int = 50 * 1024 * 1024,
+    streaming_threshold: int = _STREAMING_THRESHOLD,
     on_progress: Callable[[IngestProgress], None] | None = None,
 ) -> IngestResult:
     """
@@ -788,7 +789,7 @@ def ingest_many(
                         doc_meta, incremental, current_hash,
                         id_fn=lambda j, fp=file_path: _make_id_abs(fp, j),
                     )
-                except Exception as e:
+                except (OSError, ValueError, RuntimeError) as e:
                     if verbose:
                         logger.warning("[skip] %s: %s", file_path.name, e)
                     _skip_reason = f"extract_error: {e}"
@@ -882,7 +883,7 @@ async def ingest_async(
     incremental: bool = False,
     chunking: str = "word",
     verbose: bool = True,
-    streaming_threshold: int = 50 * 1024 * 1024,
+    streaming_threshold: int = _STREAMING_THRESHOLD,
     on_progress: Callable[[IngestProgress], None] | None = None,
 ) -> IngestResult:
     """Async wrapper around :func:`ingest`. Runs in a thread pool so the event

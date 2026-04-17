@@ -83,7 +83,12 @@ export function useMultiQueryResults(
       .flatMap((r) => r.data ?? [])
       .sort((a, b) => b.score - a.score),
     isLoading: results.some((r) => r.isLoading),
-    error: results.find((r) => r.error)?.error ?? null, // first error wins; others are dropped
+    error: (() => {
+      const errors = results.filter((r) => r.error).map((r) => r.error!);
+      if (errors.length === 0) return null;
+      if (errors.length === 1) return errors[0];
+      return new Error(`${errors.length} collections failed: ${errors.map((e) => e.message).join("; ")}`);
+    })(),
   };
 }
 
@@ -103,7 +108,6 @@ export function useChat(
       text,
       options?.provider,
       options?.model,
-      options?.api_key,
     ],
     queryFn: () =>
       api.chat(apiUrl, dbPath, collection, {

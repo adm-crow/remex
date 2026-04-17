@@ -24,7 +24,7 @@ export function useKeyboardShortcuts({
         return;
       }
       if (e.ctrlKey && e.shiftKey) {
-        switch (e.key) {
+        switch (e.key.toUpperCase()) {
           case "Q":
             e.preventDefault();
             onViewChange("query");

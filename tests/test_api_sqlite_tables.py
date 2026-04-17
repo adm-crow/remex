@@ -30,10 +30,17 @@ def test_list_tables_empty_db(client, tmp_path):
     assert response.json() == {"tables": []}
 
 
-def test_list_tables_bad_path(client):
-    response = client.get("/collections/sqlite/tables?path=/nonexistent/missing.db")
+def test_list_tables_bad_path(client, tmp_path):
+    missing = tmp_path / "nonexistent" / "missing.db"
+    response = client.get(f"/collections/sqlite/tables?path={missing}")
     assert response.status_code == 400
-    assert "Cannot read SQLite file" in response.json()["detail"]
+    assert "File does not exist" in response.json()["detail"]
+
+
+def test_list_tables_relative_path_rejected(client):
+    response = client.get("/collections/sqlite/tables?path=relative/path.db")
+    assert response.status_code == 400
+    assert "Path must be absolute" in response.json()["detail"]
 
 
 def test_list_tables_corrupt_file(client, tmp_path):
