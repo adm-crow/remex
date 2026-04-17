@@ -206,7 +206,7 @@ def ingest(
     # Batch upserts: accumulate chunks across files and flush when the batch
     # is large enough.  This lets the SentenceTransformer embed many chunks in
     # a single forward pass (much faster than one upsert per file).
-    BATCH_LIMIT = 64
+    BATCH_LIMIT = 256
     batch_docs: list[str] = []
     batch_ids: list[str] = []
     batch_metas: list[dict[str, Any]] = []
