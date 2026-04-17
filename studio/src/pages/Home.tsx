@@ -61,35 +61,23 @@ export function Home() {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         {/* Blob 1 — indigo/violet, top-left */}
         <div
-          className="absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full opacity-30 dark:opacity-20 animate-aurora-1"
-          style={{
-            background: "radial-gradient(circle, oklch(0.60 0.22 280) 0%, transparent 70%)",
-            filter: "blur(72px)",
-          }}
+          className="aurora-blob-1 absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full opacity-40 dark:opacity-55 animate-aurora-1"
+          style={{ filter: "blur(50px)" }}
         />
         {/* Blob 2 — cyan/blue, top-right */}
         <div
-          className="absolute -top-16 -right-40 w-[480px] h-[480px] rounded-full opacity-25 dark:opacity-15 animate-aurora-2"
-          style={{
-            background: "radial-gradient(circle, oklch(0.65 0.20 220) 0%, transparent 70%)",
-            filter: "blur(80px)",
-          }}
+          className="aurora-blob-2 absolute -top-16 -right-40 w-[480px] h-[480px] rounded-full opacity-35 dark:opacity-50 animate-aurora-2"
+          style={{ filter: "blur(55px)" }}
         />
         {/* Blob 3 — violet/pink, bottom-right */}
         <div
-          className="absolute -bottom-24 -right-24 w-[440px] h-[440px] rounded-full opacity-25 dark:opacity-15 animate-aurora-3"
-          style={{
-            background: "radial-gradient(circle, oklch(0.62 0.24 320) 0%, transparent 70%)",
-            filter: "blur(88px)",
-          }}
+          className="aurora-blob-3 absolute -bottom-24 -right-24 w-[440px] h-[440px] rounded-full opacity-35 dark:opacity-50 animate-aurora-3"
+          style={{ filter: "blur(55px)" }}
         />
         {/* Blob 4 — teal, bottom-left */}
         <div
-          className="absolute -bottom-16 -left-16 w-[380px] h-[380px] rounded-full opacity-20 dark:opacity-10 animate-aurora-4"
-          style={{
-            background: "radial-gradient(circle, oklch(0.68 0.18 195) 0%, transparent 70%)",
-            filter: "blur(80px)",
-          }}
+          className="aurora-blob-4 absolute -bottom-16 -left-16 w-[380px] h-[380px] rounded-full opacity-30 dark:opacity-45 animate-aurora-4"
+          style={{ filter: "blur(50px)" }}
         />
       </div>
 

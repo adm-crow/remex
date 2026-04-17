@@ -51,10 +51,10 @@
 
     --animate-pane-in: pane-in 0.18s ease-out;
     --animate-pulse-dot: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-    --animate-aurora-1: aurora-1 18s ease-in-out infinite;
-    --animate-aurora-2: aurora-2 22s ease-in-out infinite;
-    --animate-aurora-3: aurora-3 26s ease-in-out infinite;
-    --animate-aurora-4: aurora-4 20s ease-in-out infinite;
+    --animate-aurora-1: aurora-1 7s  ease-in-out infinite;
+    --animate-aurora-2: aurora-2 9s  ease-in-out infinite;
+    --animate-aurora-3: aurora-3 11s ease-in-out infinite;
+    --animate-aurora-4: aurora-4 8s  ease-in-out infinite;
 }
 
 /* ── Keyframes ───────────────────────────────────────────────────────────── */
@@ -71,24 +71,50 @@
 
 /* Aurora mesh blobs */
 @keyframes aurora-1 {
-  0%, 100% { transform: translate(0%, 0%)   scale(1);    }
-  30%       { transform: translate(4%, -6%) scale(1.06); }
-  65%       { transform: translate(-3%, 4%) scale(0.96); }
+  0%, 100% { transform: translate(0px,    0px)   scale(1);    }
+  30%       { transform: translate(90px,  -120px) scale(1.10); }
+  65%       { transform: translate(-70px,  80px)  scale(0.92); }
 }
 @keyframes aurora-2 {
-  0%, 100% { transform: translate(0%, 0%)    scale(1);    }
-  35%       { transform: translate(-5%, 3%)  scale(1.04); }
-  70%       { transform: translate(4%, -4%)  scale(1.08); }
+  0%, 100% { transform: translate(0px,    0px)    scale(1);    }
+  35%       { transform: translate(-100px, 60px)  scale(1.08); }
+  70%       { transform: translate(80px,  -90px)  scale(1.12); }
 }
 @keyframes aurora-3 {
-  0%, 100% { transform: translate(0%, 0%)   scale(1);    }
-  40%       { transform: translate(3%, 6%)  scale(1.05); }
-  75%       { transform: translate(-4%, -2%) scale(0.97); }
+  0%, 100% { transform: translate(0px,    0px)    scale(1);    }
+  40%       { transform: translate(70px,   110px) scale(1.09); }
+  75%       { transform: translate(-90px, -50px)  scale(0.93); }
 }
 @keyframes aurora-4 {
-  0%, 100% { transform: translate(0%, 0%)   scale(1);    }
-  45%       { transform: translate(-3%, -5%) scale(1.03); }
-  80%       { transform: translate(5%, 3%)  scale(1.06); }
+  0%, 100% { transform: translate(0px,    0px)    scale(1);    }
+  45%       { transform: translate(-80px, -100px) scale(1.07); }
+  80%       { transform: translate(100px,  60px)  scale(1.10); }
+}
+
+/* Aurora blob colours — richer in dark mode */
+.aurora-blob-1 {
+  background: radial-gradient(circle, oklch(0.58 0.26 278) 0%, transparent 65%);
+}
+.aurora-blob-2 {
+  background: radial-gradient(circle, oklch(0.60 0.22 218) 0%, transparent 65%);
+}
+.aurora-blob-3 {
+  background: radial-gradient(circle, oklch(0.57 0.28 322) 0%, transparent 65%);
+}
+.aurora-blob-4 {
+  background: radial-gradient(circle, oklch(0.62 0.22 192) 0%, transparent 65%);
+}
+.dark .aurora-blob-1 {
+  background: radial-gradient(circle, oklch(0.74 0.32 278) 0%, transparent 65%);
+}
+.dark .aurora-blob-2 {
+  background: radial-gradient(circle, oklch(0.76 0.28 218) 0%, transparent 65%);
+}
+.dark .aurora-blob-3 {
+  background: radial-gradient(circle, oklch(0.73 0.34 322) 0%, transparent 65%);
+}
+.dark .aurora-blob-4 {
+  background: radial-gradient(circle, oklch(0.78 0.26 192) 0%, transparent 65%);
 }
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
