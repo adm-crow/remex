@@ -51,6 +51,10 @@
 
     --animate-pane-in: pane-in 0.18s ease-out;
     --animate-pulse-dot: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    --animate-aurora-1: aurora-1 18s ease-in-out infinite;
+    --animate-aurora-2: aurora-2 22s ease-in-out infinite;
+    --animate-aurora-3: aurora-3 26s ease-in-out infinite;
+    --animate-aurora-4: aurora-4 20s ease-in-out infinite;
 }
 
 /* ── Keyframes ───────────────────────────────────────────────────────────── */
