@@ -22,12 +22,12 @@ import type { Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
 
 const THEME_OPTIONS: { value: Theme; label: string; color: string }[] = [
-  { value: "default", label: "Indigo",  color: "#4F69C6" },
+  { value: "default", label: "Indigo",  color: "#00416A" },
   { value: "violet",  label: "Purple",  color: "#AC4AC3" },
-  { value: "rose",    label: "Pink",    color: "#D74894" },
-  { value: "coral",   label: "Coral",   color: "#ED7464" },
+  { value: "rose",    label: "Pink",    color: "#FF66FF" },
+  { value: "coral",   label: "Coral",   color: "#FF7F50" },
   { value: "green",   label: "Green",   color: "#1CAC78" },
-  { value: "yellow",  label: "Yellow",  color: "#D9B451" },
+  { value: "yellow",  label: "Yellow",  color: "#EAAD04" },
   { value: "lime",    label: "Lime",    color: "#7EBD01" },
   { value: "slate",   label: "Slate",   color: "#516572" },
 ];
