@@ -57,28 +57,14 @@ export function Home() {
   return (
     <div className="relative flex flex-col h-screen overflow-hidden px-8">
 
-      {/* ── Aurora background ────────────────────────────────────────────── */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* Blob 1 — indigo/violet, top-left */}
-        <div
-          className="aurora-blob-1 absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full opacity-40 dark:opacity-55 animate-aurora-1"
-          style={{ filter: "blur(50px)" }}
-        />
-        {/* Blob 2 — cyan/blue, top-right */}
-        <div
-          className="aurora-blob-2 absolute -top-16 -right-40 w-[480px] h-[480px] rounded-full opacity-35 dark:opacity-50 animate-aurora-2"
-          style={{ filter: "blur(55px)" }}
-        />
-        {/* Blob 3 — violet/pink, bottom-right */}
-        <div
-          className="aurora-blob-3 absolute -bottom-24 -right-24 w-[440px] h-[440px] rounded-full opacity-35 dark:opacity-50 animate-aurora-3"
-          style={{ filter: "blur(55px)" }}
-        />
-        {/* Blob 4 — teal, bottom-left */}
-        <div
-          className="aurora-blob-4 absolute -bottom-16 -left-16 w-[380px] h-[380px] rounded-full opacity-30 dark:opacity-45 animate-aurora-4"
-          style={{ filter: "blur(50px)" }}
-        />
+      {/* ── Dot grid background ──────────────────────────────────────────── */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        {/* Dot matrix — breathes in/out */}
+        <div className="dotgrid-bg animate-grid-fade absolute inset-0" />
+        {/* Central radial glow — pulses outward */}
+        <div className="dotgrid-pulse animate-grid-pulse absolute inset-0" />
+        {/* Vignette — fades grid into background at edges */}
+        <div className="dotgrid-vignette absolute inset-0" />
       </div>
 
       {/* ── Main content — centered in upper portion ───────────────────── */}

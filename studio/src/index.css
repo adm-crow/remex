@@ -55,6 +55,8 @@
     --animate-aurora-2: aurora-2 9s  ease-in-out infinite;
     --animate-aurora-3: aurora-3 11s ease-in-out infinite;
     --animate-aurora-4: aurora-4 8s  ease-in-out infinite;
+    --animate-grid-fade:  grid-fade  4s ease-in-out infinite alternate;
+    --animate-grid-pulse: grid-pulse 3s ease-in-out infinite;
 }
 
 /* ── Keyframes ───────────────────────────────────────────────────────────── */
@@ -89,6 +91,46 @@
   0%, 100% { transform: translate(0px,    0px)    scale(1);    }
   45%       { transform: translate(-80px, -100px) scale(1.07); }
   80%       { transform: translate(100px,  60px)  scale(1.10); }
+}
+
+/* Dot grid keyframes */
+@keyframes grid-fade {
+  from { opacity: 0.45; }
+  to   { opacity: 1; }
+}
+@keyframes grid-pulse {
+  0%, 100% { transform: scale(1);    opacity: 0.5; }
+  50%       { transform: scale(1.4); opacity: 1;   }
+}
+
+/* Dot grid layers — light / dark */
+.dotgrid-bg {
+  background-image: radial-gradient(circle, rgba(99,102,241,0.40) 1.5px, transparent 1.5px);
+  background-size: 28px 28px;
+}
+.dark .dotgrid-bg {
+  background-image: radial-gradient(circle, rgba(99,102,241,0.70) 1.5px, transparent 1.5px);
+}
+.dotgrid-pulse {
+  background: radial-gradient(ellipse 55% 45% at 50% 50%,
+    rgba(99,102,241,0.10) 0%, transparent 70%);
+}
+.dark .dotgrid-pulse {
+  background: radial-gradient(ellipse 55% 45% at 50% 50%,
+    rgba(99,102,241,0.20) 0%, transparent 70%);
+}
+/* Vignette fades the grid into the page background at the edges */
+.dotgrid-vignette {
+  background: radial-gradient(ellipse 72% 62% at 50% 50%,
+    transparent 28%,
+    rgba(250,250,253,0.65) 62%,
+    rgba(250,250,253,0.97) 100%);
+}
+.dark .dotgrid-vignette {
+  background: radial-gradient(ellipse 72% 62% at 50% 50%,
+    transparent 28%,
+    rgba(13,13,20,0.65) 62%,
+    rgba(13,13,20,0.97) 100%);
 }
 
 /* Aurora blob colours — richer in dark mode */
