@@ -95,7 +95,7 @@
 
 /* Dot grid keyframes */
 @keyframes grid-fade {
-  from { opacity: 0.45; }
+  from { opacity: 0.65; }
   to   { opacity: 1; }
 }
 @keyframes grid-pulse {
@@ -105,7 +105,7 @@
 
 /* Dot grid layers — light / dark */
 .dotgrid-bg {
-  background-image: radial-gradient(circle, rgba(99,102,241,0.40) 1.5px, transparent 1.5px);
+  background-image: radial-gradient(circle, rgba(99,102,241,0.65) 1.5px, transparent 1.5px);
   background-size: 28px 28px;
 }
 .dark .dotgrid-bg {
@@ -113,7 +113,7 @@
 }
 .dotgrid-pulse {
   background: radial-gradient(ellipse 55% 45% at 50% 50%,
-    rgba(99,102,241,0.10) 0%, transparent 70%);
+    rgba(99,102,241,0.18) 0%, transparent 70%);
 }
 .dark .dotgrid-pulse {
   background: radial-gradient(ellipse 55% 45% at 50% 50%,
