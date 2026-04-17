@@ -55,10 +55,50 @@ export function Home() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden px-8">
+    <div className="relative flex flex-col h-screen overflow-hidden px-8">
+
+      {/* ── Aurora background ────────────────────────────────────────────── */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        {/* Blob 1 — indigo/violet, top-left */}
+        <div
+          className="absolute -top-32 -left-32 w-[520px] h-[520px] rounded-full opacity-30 dark:opacity-20"
+          style={{
+            background: "radial-gradient(circle, oklch(0.60 0.22 280) 0%, transparent 70%)",
+            filter: "blur(72px)",
+            animation: "aurora-1 18s ease-in-out infinite",
+          }}
+        />
+        {/* Blob 2 — cyan/blue, top-right */}
+        <div
+          className="absolute -top-16 -right-40 w-[480px] h-[480px] rounded-full opacity-25 dark:opacity-15"
+          style={{
+            background: "radial-gradient(circle, oklch(0.65 0.20 220) 0%, transparent 70%)",
+            filter: "blur(80px)",
+            animation: "aurora-2 22s ease-in-out infinite",
+          }}
+        />
+        {/* Blob 3 — violet/pink, bottom-right */}
+        <div
+          className="absolute -bottom-24 -right-24 w-[440px] h-[440px] rounded-full opacity-25 dark:opacity-15"
+          style={{
+            background: "radial-gradient(circle, oklch(0.62 0.24 320) 0%, transparent 70%)",
+            filter: "blur(88px)",
+            animation: "aurora-3 26s ease-in-out infinite",
+          }}
+        />
+        {/* Blob 4 — teal, bottom-left */}
+        <div
+          className="absolute -bottom-16 -left-16 w-[380px] h-[380px] rounded-full opacity-20 dark:opacity-10"
+          style={{
+            background: "radial-gradient(circle, oklch(0.68 0.18 195) 0%, transparent 70%)",
+            filter: "blur(80px)",
+            animation: "aurora-4 20s ease-in-out infinite",
+          }}
+        />
+      </div>
 
       {/* ── Main content — centered in upper portion ───────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-10 min-h-0">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-10 min-h-0">
 
         {/* ── Brand ───────────────────────────────────────────────────── */}
         <div className="flex flex-col items-center gap-3 text-center">
@@ -70,8 +110,8 @@ export function Home() {
           />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Remex Studio</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Search your documents with AI — privately, offline, on your machine.
+            <p className="text-sm text-muted-foreground mt-1 max-w-xs">
+              Your private knowledge base — fully offline, never leaves your machine.
             </p>
           </div>
         </div>
@@ -81,7 +121,7 @@ export function Home() {
           {FEATURES.map(({ icon: Icon, label, desc }) => (
             <div
               key={label}
-              className="flex flex-col items-center gap-1.5 rounded-xl border bg-card px-3 py-3 text-center"
+              className="flex flex-col items-center gap-1.5 rounded-xl border bg-card/80 backdrop-blur-sm px-3 py-3 text-center"
             >
               <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <Icon className="w-3.5 h-3.5 text-primary" />
@@ -101,7 +141,7 @@ export function Home() {
       </div>
 
       {/* ── Recent projects — reserved slot at bottom, scrollable ──────── */}
-      <div className="shrink-0 h-48 flex flex-col justify-end pb-5">
+      <div className="relative z-10 shrink-0 h-48 flex flex-col justify-end pb-5">
         {recentProjects.length > 0 && (
           <div className="w-full max-w-sm mx-auto space-y-2 overflow-y-auto max-h-full">
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest px-1">
@@ -112,7 +152,7 @@ export function Home() {
                 <div
                   key={p.path}
                   className={cn(
-                    "group flex items-center gap-2 rounded-lg border bg-card",
+                    "group flex items-center gap-2 rounded-lg border bg-card/80 backdrop-blur-sm",
                     "hover:border-primary/30 hover:bg-accent/40 transition-all duration-150"
                   )}
                 >
@@ -154,4 +194,3 @@ export function Home() {
     </div>
   );
 }
-
