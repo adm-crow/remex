@@ -18,7 +18,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { EmbeddingModelField } from "./EmbeddingModelField";
 import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
-import type { ProgressItem } from "@/store/app";
 import { formatDuration } from "@/lib/formatDuration";
 
 const STATUS_VARIANT = {
