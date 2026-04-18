@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { FormEvent } from "react";
 import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter, Download, CheckCircle2 } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -75,6 +75,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [exportDone, setExportDone] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Keep selection in sync when the user switches collections from the sidebar.
   // Also reset source filter so stale where-filters aren't applied to new collection.
@@ -100,12 +101,11 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     apiUrl, currentDb ?? "", selectedCollections[0] ?? currentCollection ?? ""
   );
 
-  const whereFilter: Record<string, unknown> | undefined =
-    selectedSources.length === 1
-      ? { source: { "$eq": selectedSources[0] } }
-      : selectedSources.length > 1
-      ? { source: { "$in": selectedSources } }
-      : undefined;
+  const whereFilter = useMemo<Record<string, unknown> | undefined>(() => {
+    if (selectedSources.length === 1) return { source: { "$eq": selectedSources[0] } };
+    if (selectedSources.length > 1) return { source: { "$in": selectedSources } };
+    return undefined;
+  }, [selectedSources]);
 
   const multiResult = useMultiQueryResults(
     apiUrl, currentDb ?? "", selectedCollections, submitted,
@@ -192,9 +192,10 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     try {
       await invoke("write_text_file", { path, content });
       setExportDone(true);
+      setExportError(null);
       setTimeout(() => setExportDone(false), 3000);
     } catch (e) {
-      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+      setExportError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -428,6 +429,19 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           </div>
         )}
       </div>
+
+      {/* ── Export error ─────────────────────────────────────────────────── */}
+      {exportError && (
+        <div
+          className="mx-6 mt-3 shrink-0 text-destructive text-sm p-3 border border-destructive/30 rounded-md bg-destructive/5 flex items-center justify-between gap-2"
+          role="alert"
+        >
+          <span>Export failed: {exportError}</span>
+          <button type="button" onClick={() => setExportError(null)} className="shrink-0 opacity-70 hover:opacity-100">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ── Error ────────────────────────────────────────────────────────── */}
       {!!submitted && error && (

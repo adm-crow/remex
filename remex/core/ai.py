@@ -23,19 +23,36 @@ _SYSTEM_PROMPT = (
 )
 
 
+import time as _time
+
+_ollama_cache: tuple[float, bool] | None = None
+_OLLAMA_CACHE_TTL = 30.0  # seconds
+
+
+def _ollama_available() -> bool:
+    """Check whether Ollama is running locally, with a 30-second cache."""
+    global _ollama_cache
+    now = _time.monotonic()
+    if _ollama_cache is not None and now - _ollama_cache[0] < _OLLAMA_CACHE_TTL:
+        return _ollama_cache[1]
+    try:
+        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        with urllib.request.urlopen(req, timeout=2):
+            result = True
+    except (urllib.error.URLError, OSError):
+        result = False
+    _ollama_cache = (now, result)
+    return result
+
+
 def detect_provider() -> Optional[str]:
     """Return the first available provider based on env vars / local services."""
     if os.getenv("ANTHROPIC_API_KEY"):
         return "anthropic"
     if os.getenv("OPENAI_API_KEY"):
         return "openai"
-    # Ollama: no key needed, just needs a local server
-    try:
-        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
-        with urllib.request.urlopen(req, timeout=2):
-            return "ollama"
-    except (urllib.error.URLError, OSError):
-        pass
+    if _ollama_available():
+        return "ollama"
     return None
 
 

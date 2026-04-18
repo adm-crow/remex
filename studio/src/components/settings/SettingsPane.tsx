@@ -156,6 +156,8 @@ export function SettingsPane() {
                         : "border-border hover:bg-muted/50"
                     )}
                     title={opt.label}
+                    aria-label={opt.label}
+                    aria-pressed={theme === opt.value}
                   >
                     <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
                     <span className={cn(

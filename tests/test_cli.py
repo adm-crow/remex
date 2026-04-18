@@ -450,4 +450,4 @@ def test_cli_serve_missing_api_dep():
 def test_cli_studio_placeholder():
     result = CliRunner().invoke(cli, ["studio"])
     assert result.exit_code == 0
-    assert "not yet available" in result.output.lower()
+    assert "github.com/adm-crow/remex" in result.output.lower()

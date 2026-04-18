@@ -16,10 +16,11 @@ interface RenameCollectionDialogProps {
   onClose: () => void;
   onRename: (newName: string) => void;
   isLoading?: boolean;
+  error?: string | null;
 }
 
 export function RenameCollectionDialog({
-  open, currentName, onClose, onRename, isLoading,
+  open, currentName, onClose, onRename, isLoading, error,
 }: RenameCollectionDialogProps) {
   const [value, setValue] = useState(currentName);
 
@@ -38,6 +39,9 @@ export function RenameCollectionDialog({
           <DialogTitle>Rename collection</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3 pt-1">
+          {error && (
+            <p className="text-xs text-destructive" role="alert">{error}</p>
+          )}
           <div className="space-y-1">
             <Label htmlFor="new-name" className="text-xs text-muted-foreground">
               New name

@@ -65,7 +65,10 @@ def get_stats(
 def get_sources(
     collection: str, db_path: str = Query(default="./remex_db")
 ) -> list[SourceItem]:
-    counts = source_chunk_counts(db_path=db_path, collection_name=collection)
+    try:
+        counts = source_chunk_counts(db_path=db_path, collection_name=collection)
+    except CollectionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return [
         SourceItem(source=src, chunk_count=count)
         for src, count in sorted(counts.items())

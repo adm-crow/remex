@@ -316,7 +316,14 @@ export function FilesTab() {
                 : `${ingestFilesDone} / ${ingestFilesTotal}`}
             </span>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-1.5 w-full rounded-full bg-muted overflow-hidden"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={ingestFilesTotal || 1}
+            aria-valuenow={ingestFilesDone}
+            aria-label="Ingest progress"
+          >
             <div
               className="h-full rounded-full bg-primary transition-all duration-300"
               style={{

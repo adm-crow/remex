@@ -108,6 +108,7 @@ export function useChat(
       text,
       options?.provider,
       options?.model,
+      !!options?.api_key, // presence change (key added/removed) busts cache without exposing value
     ],
     queryFn: () =>
       api.chat(apiUrl, dbPath, collection, {
@@ -145,6 +146,7 @@ export function useMultiChat(
       JSON.stringify(collections.slice().sort()), // stable key regardless of order
       text,
       options?.provider, options?.model,
+      !!options?.api_key, // presence change busts cache without exposing value
     ],
     queryFn: () =>
       api.multiChat(apiUrl, dbPath, {

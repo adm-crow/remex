@@ -292,6 +292,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
         currentName={name}
         onClose={() => setRenameOpen(false)}
         isLoading={renameMutation.isPending}
+        error={renameMutation.error?.message ?? null}
         onRename={(newName) => {
           renameMutation.mutate(
             { collection: name, newName },
@@ -305,14 +306,10 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
                   setCollectionType(dbPath, data.new_name, collectionType);
                 }
                 removeCollectionType(dbPath, data.old_name);
-                // Migrate incomplete flag to new name
                 if (isIncomplete) {
                   clearIncompleteCollection(dbPath, data.old_name);
                   setIncompleteCollection(dbPath, data.new_name);
                 }
-              },
-              onError: (err) => {
-                alert(err.message);
               },
             }
           );

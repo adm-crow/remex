@@ -607,5 +607,5 @@ def serve_cmd(host: str, port: int, reload: bool) -> None:
 
 @cli.command(name="studio")
 def studio_cmd() -> None:
-    """Launch the remex Studio GUI."""
-    click.echo("Studio not yet available. Install the Tauri app separately.")
+    """Open the Remex Studio download page."""
+    click.echo("Download Remex Studio from: https://github.com/adm-crow/remex/releases")

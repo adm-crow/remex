@@ -65,7 +65,7 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
             context=context,
             provider=provider,
             model=resolved_model,
-            api_key=req.api_key or None,
+            api_key=req.api_key if req.api_key else None,
         )
     except (ValueError, ImportError) as e:
         # Missing API key, unknown provider, or SDK not installed — user config error.
@@ -132,7 +132,7 @@ async def multi_chat(req: MultiChatRequest) -> MultiChatResponse:
             context=context,
             provider=provider,
             model=resolved_model,
-            api_key=req.api_key or None,
+            api_key=req.api_key if req.api_key else None,
         )
     except (ValueError, ImportError) as e:
         raise HTTPException(status_code=422, detail=str(e))
