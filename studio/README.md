@@ -13,6 +13,16 @@ Desktop GUI for [remex](https://github.com/adm-crow/remex) — built with Tauri 
 | Data fetching | TanStack Query v5 |
 | Tests | Vitest + React Testing Library |
 
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) 22+
+- [Rust](https://rustup.rs/) stable (required to build the native app)
+- Python with `remex[api]` installed — needed in development so the sidecar is available:
+  ```bash
+  pip install remex[api]
+  ```
+  In production builds, Remex Studio spawns the sidecar automatically.
+
 ## Development
 
 Requires the `remex[api]` sidecar to be running, or Remex Studio will spawn it automatically.
