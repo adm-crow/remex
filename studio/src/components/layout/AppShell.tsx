@@ -26,8 +26,9 @@ const DEFAULT_SIDEBAR = 208; // 52 * 4
 export function AppShell() {
   const [activeView, setActiveView] = useState<View>("query");
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
+  const shortcutsOpen = useAppStore((s) => s.shortcutsOpen);
+  const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
   const ingestDoneUnread = useAppStore((s) => s.ingestDoneUnread);
   const setIngestDoneUnread = useAppStore((s) => s.setIngestDoneUnread);

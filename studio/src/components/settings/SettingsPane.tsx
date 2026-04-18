@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import {
   Sun, Moon, Palette, Bot, Eye, EyeOff,
-  Server, FolderOpen, ChevronRight, ExternalLink, BookOpen,
+  Server, FolderOpen, ChevronRight, ExternalLink, BookOpen, Keyboard,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,7 @@ export function SettingsPane() {
     aiModel, setAiModel,
     aiApiKey, setAiApiKey,
     setOnboardingDone,
+    setShortcutsOpen,
   } = useAppStore();
 
   const [localApiUrl, setLocalApiUrl] = useState(apiUrl);
@@ -232,6 +233,21 @@ export function SettingsPane() {
                 <p className="text-sm font-medium">Show welcome guide</p>
                 <p className="text-xs text-muted-foreground">
                   Replay the getting-started walkthrough
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+            <div className="h-px bg-border mx-4" />
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+              onClick={() => setShortcutsOpen(true)}
+              aria-label="Show keyboard shortcuts"
+            >
+              <Keyboard className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Keyboard shortcuts</p>
+                <p className="text-xs text-muted-foreground">
+                  View all keyboard shortcuts
                 </p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />

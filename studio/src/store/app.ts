@@ -93,6 +93,9 @@ export interface AppState {
   // Onboarding
   onboardingDone: boolean;
   setOnboardingDone: (v: boolean) => void;
+  // Keyboard shortcuts modal (not persisted)
+  shortcutsOpen: boolean;
+  setShortcutsOpen: (v: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -124,6 +127,7 @@ export const useAppStore = create<AppState>()(
       collectionTypes: {},
       incompleteCollections: {},
       onboardingDone: false,
+      shortcutsOpen: false,
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -221,6 +225,7 @@ export const useAppStore = create<AppState>()(
           return { incompleteCollections: next };
         }),
       setOnboardingDone: (v) => set({ onboardingDone: v }),
+      setShortcutsOpen:  (v) => set({ shortcutsOpen: v }),
     }),
     {
       name: "remex-studio",
