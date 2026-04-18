@@ -17,7 +17,7 @@
 
   <br/>
 
-  <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio" width="720" />
+  <img src="docs/screenshots/remex_studio.png" alt="Remex Studio" width="720" />
 
 </div>
 
