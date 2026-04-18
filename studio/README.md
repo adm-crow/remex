@@ -17,9 +17,9 @@ Desktop GUI for [remex](https://github.com/adm-crow/remex) — built with Tauri 
 
 - [Node.js](https://nodejs.org/) 22+
 - [Rust](https://rustup.rs/) stable (required to build the native app)
-- Python with `remex[api]` installed — needed in development so the sidecar is available:
+- Python with `remex-cli[api]` installed — needed in development so the sidecar is available:
   ```bash
-  pip install remex[api]
+  pip install remex-cli[api]
   ```
   In production builds, Remex Studio spawns the sidecar automatically.
 

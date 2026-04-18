@@ -1,5 +1,5 @@
 [project]
-name = "remex"
+name = "remex-cli"
 version = "1.0.0"
 description = "Local-first RAG library — ingest files and SQLite, query semantically, pipe results into any AI agent"
 readme = "README.md"

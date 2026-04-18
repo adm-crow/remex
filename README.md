@@ -74,8 +74,8 @@ A native desktop app (Windows · macOS · Linux) to ingest, search, and query yo
 ## Python CLI
 
 ```bash
-pip install remex          # core — ingest + query
-pip install remex[api]     # adds the FastAPI sidecar (used by Studio)
+pip install remex-cli          # core — ingest + query
+pip install remex-cli[api]     # adds the FastAPI sidecar (used by Studio)
 ```
 
 ### Quick start
