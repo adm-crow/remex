@@ -18,6 +18,39 @@
 
   <img src="docs/screenshots/remex_studio.png" alt="Remex Studio" width="720" />
 
+  <br/><br/>
+
+  <table>
+    <tr>
+      <td align="center">
+        <a href="docs/screenshots/remex_query.png">
+          <img src="docs/screenshots/remex_query.png" width="360" alt="Semantic search" />
+        </a><br/>
+        <em>Semantic search</em>
+      </td>
+      <td align="center">
+        <a href="docs/screenshots/remex_ai_answer.png">
+          <img src="docs/screenshots/remex_ai_answer.png" width="360" alt="AI answer" />
+        </a><br/>
+        <em>AI answer</em>
+      </td>
+    </tr>
+    <tr>
+      <td align="center">
+        <a href="docs/screenshots/remex_ingest.png">
+          <img src="docs/screenshots/remex_ingest.png" width="360" alt="File ingestion" />
+        </a><br/>
+        <em>File ingestion</em>
+      </td>
+      <td align="center">
+        <a href="docs/screenshots/remex_collection.png">
+          <img src="docs/screenshots/remex_collection.png" width="360" alt="Collections manager" />
+        </a><br/>
+        <em>Collections manager</em>
+      </td>
+    </tr>
+  </table>
+
 </div>
 
 ---
