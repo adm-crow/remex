@@ -10,6 +10,7 @@ import { useAppStore } from "@/store/app";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { formatDuration } from "@/lib/formatDuration";
 import { OnboardingModal } from "./OnboardingModal";
+import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 
 const PANE_MAP: Record<View, ComponentType> = {
   query:       QueryPane,
@@ -25,6 +26,7 @@ const DEFAULT_SIDEBAR = 208; // 52 * 4
 export function AppShell() {
   const [activeView, setActiveView] = useState<View>("query");
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
   const ingestDoneUnread = useAppStore((s) => s.ingestDoneUnread);
@@ -42,7 +44,8 @@ export function AppShell() {
     [] // focusSearchRef is a stable ref; no deps needed
   );
 
-  useKeyboardShortcuts({ onViewChange: setActiveView, focusSearch });
+  const openShortcuts = useCallback(() => setShortcutsOpen(true), []);
+  useKeyboardShortcuts({ onViewChange: setActiveView, focusSearch, onShowShortcuts: openShortcuts });
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -151,6 +154,7 @@ export function AppShell() {
         )}
       </main>
       <OnboardingModal />
+      <KeyboardShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );
 }

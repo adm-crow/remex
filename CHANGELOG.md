@@ -4,6 +4,57 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [Unreleased]
+
+### Added
+- Keyboard shortcuts cheat sheet modal (`?` key)
+- CI: Rust/Clippy/test job + GitHub Releases workflow via `tauri-action`
+
+---
+
+## [0.4.0] — 2026-04-18
+
+### Added — Studio v1.0
+
+**Query pane**
+- Multi-collection AI Answer via `POST /collections/multi-chat` — queries all selected collections, merges results by score, generates a single AI-synthesised answer
+- Filter results by source document — collapsible chip strip, passes `where` filter to ChromaDB
+- Export results to JSON, CSV, or Markdown via native save dialog
+- Collection pills show chunk count + embedding model in tooltip
+- Empty states for no-project / no-collections / no-results scenarios
+
+**Ingest pane**
+- Stop button cancels in-progress ingest stream (FilesTab + SQLiteTab)
+- Incremental mode toggle in Advanced settings (skip unchanged files by SHA-256 hash)
+- Skipped-file reasons persisted in last-ingest result and shown in post-ingest toast
+
+**Collections pane**
+- Collection rename — `PATCH /collections/{name}/rename` + inline rename dialog with pencil button
+
+**Settings pane**
+- App version display (reads from Tauri `getVersion()`)
+
+**Shell / UX**
+- First-run onboarding modal (persisted `onboardingDone` flag, never shown again)
+- Per-theme background tints + dot-grid pattern follows active theme
+- Animated dot-grid homepage replaces aurora mesh
+
+### Fixed
+- API key removed from React Query cache keys (security)
+- CSP hardened: `unsafe-inline` removed, `connect-src` narrowed to sidecar port only
+- SQLite path validation: rejects relative paths and non-existent files before opening
+- `write_text_file` Tauri command validates path extension
+- Abort race condition in SSE `done` event (FilesTab + SQLiteTab)
+- Keyboard shortcut `e.key` case-insensitive matching across platforms
+- Duplicate collection name prevention in CollectionSwitcher
+- Rename endpoint uses `.upsert()` for idempotency
+- Generic `except Exception` catches narrowed to specific types in pipeline
+
+### Performance
+- Embedding batch size raised from 64 → 256
+
+---
+
 ## [0.3.0] — 2026-04-12
 
 ### Added
