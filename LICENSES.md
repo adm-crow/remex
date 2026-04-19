@@ -11,4 +11,4 @@ Remex is an open-core project. Different parts of the repo use different license
 
 FSL (Functional Source License) is a source-available license designed for companies that want to keep their source open while protecting against fork-and-commercialize competitors. You can read, modify, build, and use the Studio source for your own projects. You cannot ship a commercial product that competes with Remex Studio. Two years after each release, that release's source converts to MIT.
 
-For commercial licensing questions: support@remex.app.
+For commercial licensing questions: support@getremex.com.

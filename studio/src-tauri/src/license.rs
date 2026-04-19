@@ -214,7 +214,7 @@ fn is_uuid(s: &str) -> bool {
 fn user_facing(e: ApiError) -> String {
     match e {
         ApiError::Rejected(msg) => msg,
-        ApiError::WrongProduct  => "This key isn't for Remex. Check your purchase confirmation email or contact support@remex.app.".into(),
+        ApiError::WrongProduct  => "This key isn't for Remex. Check your purchase confirmation email or contact support@getremex.com.".into(),
         ApiError::Network(_)    => "Can't reach Lemon Squeezy right now. License activation needs a one-time internet connection. Try again in a moment.".into(),
         ApiError::BadShape(msg) => format!("Unexpected response from Lemon Squeezy: {msg}"),
     }

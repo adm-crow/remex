@@ -17,7 +17,7 @@ All notable changes to `remex` are documented here.
   - Watch-folder auto-ingest
   - Unlimited searchable query history
   - Eight extra accent themes + Pro badge
-  - Priority email support (`support@remex.app`, 48-hour business-day SLA)
+  - Priority email support (`support@getremex.com`, 48-hour business-day SLA)
 - Lemon Squeezy-backed license activation (`Settings → License`)
 
 ### Changed
