@@ -8,6 +8,17 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.2.1] — 2026-04-19
+
+### Changed
+- Settings pane: moved "Keyboard shortcuts" and "Report a bug / Request a feature" into their own card under AI Agent on the right column
+
+### Removed
+- Unused shadcn UI components (`card.tsx`, `separator.tsx`, `textarea.tsx`) that had zero imports
+- Historical planning/design docs under `docs/superpowers/` — features they describe already shipped
+
+---
+
 ## [1.2.0] — 2026-04-19
 
 ### Added
