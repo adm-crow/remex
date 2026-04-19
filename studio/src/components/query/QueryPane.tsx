@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
-import { useAppStore } from "@/store/app";
+import { useAppStore, useIsPro } from "@/store/app";
 import { ResultCard } from "./ResultCard";
 
 function CollectionPill({
@@ -62,6 +62,15 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
           queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory } =
     useAppStore();
+
+  const isPro = useIsPro();
+  const [historyFilter, setHistoryFilter] = useState("");
+  const visibleHistory = useMemo(() => {
+    if (!isPro) return queryHistory.slice(0, 20);
+    const q = historyFilter.trim().toLowerCase();
+    if (!q) return queryHistory;
+    return queryHistory.filter((h) => h.toLowerCase().includes(q));
+  }, [isPro, queryHistory, historyFilter]);
 
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState("");
@@ -252,11 +261,22 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         {/* Query history chips */}
         {queryHistory.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
+            {isPro && queryHistory.length > 20 && (
+              <div className="w-full">
+                <Input
+                  value={historyFilter}
+                  onChange={(e) => setHistoryFilter(e.target.value)}
+                  placeholder="Search your query history…"
+                  className="h-7 text-xs"
+                  aria-label="Search query history"
+                />
+              </div>
+            )}
             <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
               <Clock className="w-3 h-3" />
               Recent
             </span>
-            {queryHistory.map((q) => (
+            {visibleHistory.map((q) => (
               <span
                 key={q}
                 className="group flex items-center gap-0.5 text-xs pl-2 pr-1 py-0.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted transition-colors"

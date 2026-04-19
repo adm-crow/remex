@@ -429,3 +429,33 @@ describe("QueryPane", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("QueryPane — query history Pro behaviour", () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
+      queryHistory: Array.from({ length: 30 }, (_, i) => `q${i}`),
+      currentDb: null,
+    } as any);
+  });
+
+  it("Pro shows more than 20 history entries", () => {
+    renderWithProviders(<QueryPane />);
+    expect(screen.getByText("q25")).toBeInTheDocument();
+  });
+
+  it("free caps visible history at 20", () => {
+    useAppStore.setState({
+      license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
+    } as any);
+    renderWithProviders(<QueryPane />);
+    expect(screen.queryByText("q25")).not.toBeInTheDocument();
+  });
+
+  it("Pro filter input narrows history by substring", () => {
+    renderWithProviders(<QueryPane />);
+    fireEvent.change(screen.getByLabelText(/Search query history/), { target: { value: "q29" } });
+    expect(screen.getByText("q29")).toBeInTheDocument();
+    expect(screen.queryByText("q28")).not.toBeInTheDocument();
+  });
+});
