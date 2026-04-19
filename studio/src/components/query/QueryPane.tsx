@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
 import { useAppStore, useIsPro } from "@/store/app";
+import { toBibTeX, toRIS, toCSLJson, toObsidianVault } from "@/lib/exports";
+import { join } from "@tauri-apps/api/path";
 import { ResultCard } from "./ResultCard";
 
 function CollectionPill({
@@ -60,7 +62,8 @@ interface QueryPaneProps {
 
 export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
-          queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory } =
+          queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory,
+          openUpgradeModal } =
     useAppStore();
 
   const isPro = useIsPro();
@@ -171,22 +174,54 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     const path = await save({
       defaultPath: "remex-results.json",
       filters: [
-        { name: "JSON",     extensions: ["json"] },
-        { name: "CSV",      extensions: ["csv"]  },
-        { name: "Markdown", extensions: ["md"]   },
+        { name: "JSON",      extensions: ["json"] },
+        { name: "CSV",       extensions: ["csv"]  },
+        { name: "Markdown",  extensions: ["md"]   },
+        ...(isPro ? [
+          { name: "BibTeX",   extensions: ["bib"] },
+          { name: "RIS",      extensions: ["ris"] },
+          { name: "CSL-JSON", extensions: ["json"] },
+          { name: "Obsidian Vault (folder)", extensions: [""] },
+        ] : []),
       ],
     });
     if (!path) return;
 
-    let content: string;
-    if (path.endsWith(".csv")) {
+    const ext = path.split(".").pop()?.toLowerCase();
+    let content: string | null = null;
+
+    if (ext === "bib") {
+      if (!isPro) { openUpgradeModal("export"); return; }
+      content = toBibTeX(results, submitted);
+    } else if (ext === "ris") {
+      if (!isPro) { openUpgradeModal("export"); return; }
+      content = toRIS(results, submitted);
+    } else if (ext === "json" && isPro && /csl/i.test(path)) {
+      content = toCSLJson(results, submitted);
+    } else if (!ext) {
+      // Obsidian vault: path is the folder the user chose.
+      if (!isPro) { openUpgradeModal("export"); return; }
+      const files = toObsidianVault(results, submitted);
+      try {
+        for (const [rel, fileContent] of Object.entries(files)) {
+          const target = await join(path, rel);
+          await invoke("write_text_file", { path: target, content: fileContent });
+        }
+        setExportDone(true);
+        setExportError(null);
+        setTimeout(() => setExportDone(false), 3000);
+      } catch (e) {
+        setExportError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    } else if (ext === "csv") {
       const header = "score,source,chunk,text\n";
       const rows = results.map(
         (r) =>
           `${r.score},"${r.source.replace(/"/g, '""')}",${r.chunk},"${r.text.replace(/"/g, '""').replace(/\n/g, " ")}"`
       );
       content = header + rows.join("\n");
-    } else if (path.endsWith(".md")) {
+    } else if (ext === "md") {
       content = `# Remex Query Results\n\n**Query:** ${submitted}\n\n`;
       content += results
         .map(
