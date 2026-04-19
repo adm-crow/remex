@@ -61,3 +61,33 @@ describe("SettingsPane", () => {
     });
   });
 });
+
+describe("SettingsPane — Pro theme gating", () => {
+  beforeEach(() => {
+    useAppStore.setState({
+      license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
+      theme: "default",
+      upgradeModalOpen: false,
+      upgradeModalContext: null,
+    } as any);
+  });
+
+  it("clicking a Pro theme as free opens the upgrade modal with theme context", async () => {
+    renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByLabelText("Midnight"));
+    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
+    expect(useAppStore.getState().upgradeModalContext).toBe("theme");
+    expect(useAppStore.getState().theme).toBe("default");
+    await waitFor(() => {}); // drain async queue (getVersion useEffect)
+  });
+
+  it("clicking a Pro theme as Pro sets the theme", async () => {
+    useAppStore.setState({
+      license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
+    } as any);
+    renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByLabelText("Midnight"));
+    expect(useAppStore.getState().theme).toBe("midnight");
+    await waitFor(() => {}); // drain async queue (getVersion useEffect)
+  });
+});

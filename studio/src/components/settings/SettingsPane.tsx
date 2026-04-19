@@ -17,12 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppStore } from "@/store/app";
+import { useAppStore, useIsPro } from "@/store/app";
 import type { Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
 import { LicenseCard } from "@/components/license/LicenseCard";
+import { ProBadge } from "@/components/license/ProBadge";
 
-const THEME_OPTIONS: { value: Theme; label: string; color: string }[] = [
+type ThemeOpt = { value: Theme; label: string; color: string; pro?: boolean };
+
+const THEME_OPTIONS: ThemeOpt[] = [
   { value: "default", label: "Indigo",  color: "#4050A8" },
   { value: "violet",  label: "Purple",  color: "#8535B0" },
   { value: "rose",    label: "Pink",    color: "#D030B5" },
@@ -31,6 +34,14 @@ const THEME_OPTIONS: { value: Theme; label: string; color: string }[] = [
   { value: "yellow",  label: "Yellow",  color: "#EAAD04" },
   { value: "lime",    label: "Lime",    color: "#7EBD01" },
   { value: "slate",   label: "Slate",   color: "#516572" },
+  { value: "midnight", label: "Midnight", color: "#323C97", pro: true },
+  { value: "forest",   label: "Forest",   color: "#297A53", pro: true },
+  { value: "ocean",    label: "Ocean",    color: "#046D9E", pro: true },
+  { value: "sunset",   label: "Sunset",   color: "#E26327", pro: true },
+  { value: "rosegold", label: "Rosegold", color: "#C64B70", pro: true },
+  { value: "teal",     label: "Teal",     color: "#0D8F8E", pro: true },
+  { value: "amethyst", label: "Amethyst", color: "#7B2EC4", pro: true },
+  { value: "graphite", label: "Graphite", color: "#52575F", pro: true },
 ];
 
 const AUTO_PROVIDER = "__auto__";
@@ -88,6 +99,9 @@ export function SettingsPane() {
     setOnboardingDone,
     setShortcutsOpen,
   } = useAppStore();
+
+  const isPro = useIsPro();
+  const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
 
   const [localApiUrl, setLocalApiUrl] = useState(apiUrl);
   const [localModel,  setLocalModel]  = useState(aiModel);
@@ -147,29 +161,35 @@ export function SettingsPane() {
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">Accent colour</p>
               <div className="grid grid-cols-4 gap-1.5">
-                {THEME_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setTheme(opt.value)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
-                      theme === opt.value
-                        ? "border-primary bg-accent"
-                        : "border-border hover:bg-muted/50"
-                    )}
-                    title={opt.label}
-                    aria-label={opt.label}
-                    aria-pressed={theme === opt.value}
-                  >
-                    <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
-                    <span className={cn(
-                      "text-[10px] font-medium leading-none",
-                      theme === opt.value ? "text-primary" : "text-muted-foreground"
-                    )}>
-                      {opt.label}
-                    </span>
-                  </button>
-                ))}
+                {THEME_OPTIONS.map((opt) => {
+                  const locked = opt.pro && !isPro;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => {
+                        if (locked) { openUpgradeModal("theme"); return; }
+                        setTheme(opt.value);
+                      }}
+                      className={cn(
+                        "relative flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
+                        theme === opt.value ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
+                        locked && "opacity-70"
+                      )}
+                      title={opt.label}
+                      aria-label={opt.label}
+                      aria-pressed={theme === opt.value}
+                    >
+                      <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                      <span className={cn(
+                        "text-[10px] font-medium leading-none",
+                        theme === opt.value ? "text-primary" : "text-muted-foreground"
+                      )}>
+                        {opt.label}
+                      </span>
+                      {locked && <ProBadge className="absolute -top-1 -right-1" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </Card>
