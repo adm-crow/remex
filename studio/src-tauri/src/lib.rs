@@ -5,6 +5,8 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Manager, RunEvent, State};
 
+pub mod license;
+
 pub struct SidecarState(pub Mutex<Option<Child>>);
 
 #[tauri::command]
