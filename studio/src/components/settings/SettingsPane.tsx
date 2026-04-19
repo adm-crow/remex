@@ -20,6 +20,7 @@ import {
 import { useAppStore } from "@/store/app";
 import type { Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
+import { LicenseCard } from "@/components/license/LicenseCard";
 
 const THEME_OPTIONS: { value: Theme; label: string; color: string }[] = [
   { value: "default", label: "Indigo",  color: "#4050A8" },
@@ -313,6 +314,9 @@ export function SettingsPane() {
               </Button>
             </form>
           </Card>
+
+          {/* License */}
+          <LicenseCard />
 
           {/* Help & feedback */}
           <Card className="p-0 space-y-0 overflow-hidden">
