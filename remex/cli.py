@@ -601,7 +601,7 @@ def serve_cmd(host: str, port: int, reload: bool) -> None:
     try:
         import uvicorn
     except ImportError:
-        raise click.ClickException("Run: pip install remex[api]")
+        raise click.ClickException("Run: pip install remex-cli[api]")
     uvicorn.run("remex.api.main:app", host=host, port=port, reload=reload)
 
 

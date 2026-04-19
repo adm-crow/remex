@@ -69,7 +69,7 @@ def extract_html(path: Path) -> str:
     try:
         from bs4 import BeautifulSoup
     except ImportError:
-        raise ImportError("Install beautifulsoup4: pip install remex[formats]")
+        raise ImportError("Install beautifulsoup4: pip install remex-cli[formats]")
     soup = BeautifulSoup(path.read_text(encoding="utf-8", errors="ignore"), "html.parser")
     for tag in soup(["script", "style", "nav", "footer", "head"]):
         tag.decompose()
@@ -80,7 +80,7 @@ def extract_pptx(path: Path) -> str:
     try:
         from pptx import Presentation
     except ImportError:
-        raise ImportError("Install python-pptx: pip install remex[formats]")
+        raise ImportError("Install python-pptx: pip install remex-cli[formats]")
     prs = Presentation(str(path))
     texts = []
     for slide in prs.slides:
@@ -94,7 +94,7 @@ def extract_xlsx(path: Path) -> str:
     try:
         import openpyxl
     except ImportError:
-        raise ImportError("Install openpyxl: pip install remex[formats]")
+        raise ImportError("Install openpyxl: pip install remex-cli[formats]")
     wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
     parts = []
     for sheet in wb.worksheets:
@@ -113,7 +113,7 @@ def extract_epub(path: Path) -> str:
         from bs4 import BeautifulSoup
     except ImportError:
         raise ImportError(
-            "Install ebooklib and beautifulsoup4: pip install remex[formats]"
+            "Install ebooklib and beautifulsoup4: pip install remex-cli[formats]"
         )
     book = epub.read_epub(str(path))
     texts = []
@@ -130,7 +130,7 @@ def extract_odt(path: Path) -> str:
         from odf.opendocument import load
         from odf.text import P
     except ImportError:
-        raise ImportError("Install odfpy: pip install remex[formats]")
+        raise ImportError("Install odfpy: pip install remex-cli[formats]")
     doc = load(str(path))
     parts = []
     for para in doc.getElementsByType(P):

@@ -7,7 +7,7 @@ Thanks for your interest in contributing. This document covers both the Python l
 ## Repository layout
 
 ```
-remex/               Python library + CLI (remex, remex[api])
+remex/               Python library + CLI (remex-cli, remex-cli[api])
   remex/core/        Core ingest/query pipeline
   remex/api/         FastAPI sidecar (served by remex serve)
   remex/cli.py       Click CLI entry point

@@ -25,7 +25,7 @@ Desktop GUI for [remex](https://github.com/adm-crow/remex) — built with Tauri 
 
 ## Development
 
-Requires the `remex[api]` sidecar to be running, or Remex Studio will spawn it automatically.
+Requires the `remex-cli[api]` sidecar to be running, or Remex Studio will spawn it automatically.
 
 ```bash
 # Install dependencies

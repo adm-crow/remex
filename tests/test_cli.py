@@ -442,7 +442,7 @@ def test_cli_serve_missing_api_dep():
     with patch.dict(sys.modules, {"uvicorn": None}):
         result = CliRunner().invoke(cli, ["serve"])
     assert result.exit_code != 0
-    assert "pip install remex[api]" in result.output
+    assert "pip install remex-cli[api]" in result.output
 
 
 # --- remex studio ---
