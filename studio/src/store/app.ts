@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { licenseApi, type LicenseStatus, type Tier } from "@/lib/licenseApi";
 
 export interface RecentProject {
   path: string;
@@ -96,6 +97,17 @@ export interface AppState {
   // Keyboard shortcuts modal (not persisted)
   shortcutsOpen: boolean;
   setShortcutsOpen: (v: boolean) => void;
+  // License (persisted subset)
+  license: {
+    tier: Tier;
+    email: string | null;
+    activatedAt: number | null;
+    lastValidatedAt: number | null;
+  };
+  activateLicense:      (key: string) => Promise<{ ok: boolean; error?: string }>;
+  deactivateLicense:    ()            => Promise<void>;
+  revalidateLicense:    ()            => Promise<void>;
+  refreshLicenseStatus: ()            => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -128,6 +140,7 @@ export const useAppStore = create<AppState>()(
       incompleteCollections: {},
       onboardingDone: false,
       shortcutsOpen: false,
+      license: { tier: "free" as Tier, email: null, activatedAt: null, lastValidatedAt: null },
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -226,6 +239,41 @@ export const useAppStore = create<AppState>()(
         }),
       setOnboardingDone: (v) => set({ onboardingDone: v }),
       setShortcutsOpen:  (v) => set({ shortcutsOpen: v }),
+
+      activateLicense: async (key) => {
+        try {
+          const s: LicenseStatus = await licenseApi.activate(key);
+          set({ license: {
+            tier: s.tier, email: s.email,
+            activatedAt: s.activated_at, lastValidatedAt: s.last_validated_at,
+          }});
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : String(e) };
+        }
+      },
+      deactivateLicense: async () => {
+        try { await licenseApi.deactivate(); } catch { /* best-effort */ }
+        set({ license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null } });
+      },
+      revalidateLicense: async () => {
+        try {
+          const s = await licenseApi.revalidate();
+          set({ license: {
+            tier: s.tier, email: s.email,
+            activatedAt: s.activated_at, lastValidatedAt: s.last_validated_at,
+          }});
+        } catch { /* soft-fail: keep current slice */ }
+      },
+      refreshLicenseStatus: async () => {
+        try {
+          const s = await licenseApi.status();
+          set({ license: {
+            tier: s.tier, email: s.email,
+            activatedAt: s.activated_at, lastValidatedAt: s.last_validated_at,
+          }});
+        } catch { /* ignore */ }
+      },
     }),
     {
       name: "remex-studio",
@@ -243,7 +291,10 @@ export const useAppStore = create<AppState>()(
         collectionTypes:       state.collectionTypes,
         incompleteCollections: state.incompleteCollections,
         onboardingDone:        state.onboardingDone,
+        // license intentionally NOT persisted — rehydrated from disk via Tauri at startup.
       }),
     }
   )
 );
+
+export const useIsPro = () => useAppStore((s) => s.license.tier === "pro");

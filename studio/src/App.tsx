@@ -30,6 +30,19 @@ export function App() {
     }
   }, [darkMode, theme]);
 
+  useEffect(() => {
+    const store = useAppStore.getState();
+    void (async () => {
+      await store.refreshLicenseStatus();
+      try {
+        const { licenseApi } = await import("@/lib/licenseApi");
+        if (await licenseApi.shouldRevalidate()) {
+          await store.revalidateLicense();
+        }
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {currentDb ? <AppShell /> : <Home />}
