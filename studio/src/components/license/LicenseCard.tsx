@@ -7,8 +7,8 @@ import { useAppStore } from "@/store/app";
 import { cn } from "@/lib/utils";
 import { ProBadge } from "./ProBadge";
 
-function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("rounded-xl border bg-card p-3 space-y-2.5", className)}>{children}</div>;
+function Card({ children, className, id }: { children: React.ReactNode; className?: string; id?: string }) {
+  return <div id={id} className={cn("rounded-xl border bg-card p-3 space-y-2.5", className)}>{children}</div>;
 }
 
 function relative(ts: number | null): string {
