@@ -7,7 +7,7 @@ import { useAppStore } from "@/store/app";
 // One SKU. Price changes ship in a Studio release (see spec §Pricing).
 const PRO_PRICE_USD = 39; // founders price; raise at 200 sales OR 90 days
 const CHECKOUT_URL =
-  "https://remex.lemonsqueezy.com/buy/REPLACE_ME?checkout%5Bcustom%5D%5Bsource%5D=studio-in-app";
+  "https://getremex.lemonsqueezy.com/checkout/buy/6ade10f8-4f82-4f77-b139-c8b798629cae?checkout%5Bcustom%5D%5Bsource%5D=studio-in-app";
 
 const BULLETS_BY_CONTEXT: Record<string, string[]> = {
   generic: [

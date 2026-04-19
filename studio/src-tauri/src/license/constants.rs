@@ -7,7 +7,7 @@
 
 pub const LS_API_BASE: &str = "https://api.lemonsqueezy.com/v1";
 pub const CHECKOUT_URL: &str =
-    "https://remex.lemonsqueezy.com/buy/REPLACE_ME?checkout%5Bcustom%5D%5Bsource%5D=studio-in-app";
-pub const EXPECTED_PRODUCT_ID: u64 = 0; // set in Task 14
+    "https://getremex.lemonsqueezy.com/checkout/buy/6ade10f8-4f82-4f77-b139-c8b798629cae?checkout%5Bcustom%5D%5Bsource%5D=studio-in-app";
+pub const EXPECTED_PRODUCT_ID: u64 = 987515;
 pub const REVALIDATE_INTERVAL_SECS: u64 = 14 * 24 * 60 * 60; // 14 days
 pub const HTTP_TIMEOUT_SECS: u64 = 10;

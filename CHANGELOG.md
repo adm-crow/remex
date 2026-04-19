@@ -8,7 +8,7 @@ All notable changes to `remex` are documented here.
 
 ---
 
-## [1.3.0] — YYYY-MM-DD
+## [1.3.0] — 2026-04-19
 
 ### Added
 - **Remex Pro** — commercial tier, $39 founders / $49 regular, one-time purchase

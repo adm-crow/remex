@@ -140,7 +140,8 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/licenses/activate"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(activate_ok_body(0)))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_json(activate_ok_body(987515)))
             .mount(&server).await;
 
         let client = Client::with_base(server.uri());
@@ -168,20 +169,16 @@ mod tests {
         assert!(matches!(err, ApiError::Rejected(msg) if msg.contains("limit")));
     }
 
-    // This test only covers the WrongProduct branch by using a hard-coded
-    // non-zero product_id and asserting that equality succeeds. We cannot
-    // exercise the mismatch branch from a unit test because EXPECTED_PRODUCT_ID
-    // is a compile-time constant. Phase 1 dogfood covers the mismatch path end-to-end.
     #[tokio::test]
-    async fn activate_accepts_matching_product_id_when_zero() {
+    async fn activate_wrong_product_id_returns_error() {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/licenses/activate"))
             .respond_with(ResponseTemplate::new(200).set_body_json(activate_ok_body(999)))
             .mount(&server).await;
         let client = Client::with_base(server.uri());
-        // EXPECTED_PRODUCT_ID == 0 means "don't check" in dev; assertion is that this passes.
-        client.activate(KEY, "host").await.unwrap();
+        let err = client.activate(KEY, "host").await.unwrap_err();
+        assert!(matches!(err, ApiError::WrongProduct));
     }
 
     #[tokio::test]
