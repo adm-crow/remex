@@ -8,6 +8,25 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.3.0] — YYYY-MM-DD
+
+### Added
+- **Remex Pro** — commercial tier, $39 founders / $49 regular, one-time purchase
+  - Pro embedding models: `bge-large-en-v1.5`, `e5-large-v2`, `nomic-embed-text-v1.5`
+  - Advanced exports: BibTeX, RIS, CSL-JSON, Obsidian vault
+  - Watch-folder auto-ingest
+  - Unlimited searchable query history
+  - Eight extra accent themes + Pro badge
+  - Priority email support (`support@remex.app`, 48-hour business-day SLA)
+- Lemon Squeezy-backed license activation (`Settings → License`)
+
+### Changed
+- **Studio license** — `studio/` subtree relicensed to FSL-1.1-MIT starting this release.
+  Pre-1.3.0 releases remain Apache-2.0 forever. See [`LICENSES.md`](LICENSES.md).
+- Python CLI and library (`remex-cli` on PyPI) remain **Apache-2.0 indefinitely** — no change.
+
+---
+
 ## [1.2.1] — 2026-04-19
 
 ### Changed
