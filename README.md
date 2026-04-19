@@ -8,10 +8,12 @@
 
   <br/>
 
-  [![License](https://img.shields.io/badge/License-Apache%202.0-5C6BC0?style=for-the-badge)](LICENSE)
-  [![CI](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?branch=main&style=for-the-badge&logo=github&logoColor=white&label=CI)](https://github.com/adm-crow/remex/actions)
-  [![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
-
+![GitHub Release](https://img.shields.io/github/v/release/adm-crow/remex)
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?style=flat&logo=github&label=CI)
+![GitHub License](https://img.shields.io/github/license/adm-crow/remex?style=flat)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
+![Python](https://img.shields.io/badge/Python-FFD43B?style=flat&logo=python&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
   <br/>
 
   <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio" width="820" />
