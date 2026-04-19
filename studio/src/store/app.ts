@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { invoke } from "@tauri-apps/api/core";
 import { licenseApi, type LicenseStatus, type Tier } from "@/lib/licenseApi";
 
 export interface RecentProject {
@@ -115,6 +116,10 @@ export interface AppState {
   deactivateLicense:    ()            => Promise<void>;
   revalidateLicense:    ()            => Promise<void>;
   refreshLicenseStatus: ()            => Promise<void>;
+  // Watch folders (Pro, persisted)
+  watchFolders: string[];
+  addWatchFolder:    (path: string) => Promise<void>;
+  removeWatchFolder: (path: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppState>()(
@@ -150,6 +155,7 @@ export const useAppStore = create<AppState>()(
       upgradeModalOpen: false,
       upgradeModalContext: null,
       license: { tier: "free" as Tier, email: null, activatedAt: null, lastValidatedAt: null },
+      watchFolders: [],
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -288,6 +294,14 @@ export const useAppStore = create<AppState>()(
           }});
         } catch { /* ignore */ }
       },
+      addWatchFolder: async (path) => {
+        await invoke("watch_start", { folder: path });
+        set((s) => ({ watchFolders: Array.from(new Set([...s.watchFolders, path])) }));
+      },
+      removeWatchFolder: async (path) => {
+        await invoke("watch_stop", { folder: path });
+        set((s) => ({ watchFolders: s.watchFolders.filter((p) => p !== path) }));
+      },
     }),
     {
       name: "remex-studio",
@@ -305,6 +319,7 @@ export const useAppStore = create<AppState>()(
         collectionTypes:       state.collectionTypes,
         incompleteCollections: state.incompleteCollections,
         onboardingDone:        state.onboardingDone,
+        watchFolders:          state.watchFolders,
         // license intentionally NOT persisted — rehydrated from disk via Tauri at startup.
       }),
     }

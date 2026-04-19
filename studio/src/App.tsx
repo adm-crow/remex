@@ -41,6 +41,13 @@ export function App() {
           await store.revalidateLicense();
         }
       } catch { /* ignore */ }
+      const s = useAppStore.getState();
+      if (s.license.tier === "pro") {
+        const { invoke } = await import("@tauri-apps/api/core");
+        for (const p of s.watchFolders) {
+          try { await invoke("watch_start", { folder: p }); } catch { /* ignore */ }
+        }
+      }
     })();
   }, []);
 

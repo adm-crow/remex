@@ -22,6 +22,7 @@ import type { Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
 import { LicenseCard } from "@/components/license/LicenseCard";
 import { ProBadge } from "@/components/license/ProBadge";
+import { WatchFoldersCard } from "./WatchFoldersCard";
 
 type ThemeOpt = { value: Theme; label: string; color: string; pro?: boolean };
 
@@ -259,6 +260,8 @@ export function SettingsPane() {
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
             </button>
           </Card>
+
+          <WatchFoldersCard />
 
         </div>
 
