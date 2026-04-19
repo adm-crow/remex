@@ -31,8 +31,8 @@ sentence = ["nltk"]
 formats  = ["python-pptx", "openpyxl", "beautifulsoup4", "ebooklib", "odfpy"]
 ai       = ["anthropic", "openai"]
 api      = ["fastapi", "uvicorn[standard]"]
-studio   = ["remex[api]"]
-all      = ["remex[sentence,formats,ai,api]"]
+studio   = ["remex-cli[api]"]
+all      = ["remex-cli[sentence,formats,ai,api]"]
 
 [project.scripts]
 remex = "remex.cli:cli"

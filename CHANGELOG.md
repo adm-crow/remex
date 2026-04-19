@@ -6,9 +6,24 @@ All notable changes to `remex` are documented here.
 
 ## [Unreleased]
 
+---
+
+## [1.2.0] — 2026-04-19
+
 ### Added
 - Keyboard shortcuts cheat sheet modal (`?` key)
+- "Report a bug / Request a feature" link in Settings pane (opens GitHub issues)
 - CI: Rust/Clippy/test job + GitHub Releases workflow via `tauri-action`
+- PyPI publish workflow via OIDC Trusted Publisher (skips already-published versions on re-runs)
+
+### Changed
+- Package renamed on PyPI from `remex` to `remex-cli` (import path still `remex`)
+- Unified version across Python, Tauri, npm, and Cargo manifests at 1.2.0
+
+### Fixed
+- Sidecar error message in Studio references the correct `remex-cli[api]` package name
+- `pyproject.toml` self-extras (`studio`, `all`) use the renamed `remex-cli` distribution
+- `remex.core.__version__` synced to the released version (was stuck at 0.2.0 and exposed by `/health` and `/info` endpoints)
 
 ---
 

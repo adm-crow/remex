@@ -1,4 +1,4 @@
-__version__ = "0.2.0"
+__version__ = "1.2.0"
 
 from .ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
 from .config import load_config, save_config
