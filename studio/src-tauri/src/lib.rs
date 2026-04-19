@@ -88,7 +88,14 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![spawn_sidecar, kill_sidecar, is_sidecar_alive, write_text_file])
+        .invoke_handler(tauri::generate_handler![
+            spawn_sidecar, kill_sidecar, is_sidecar_alive, write_text_file,
+            license::license_activate,
+            license::license_status,
+            license::license_deactivate,
+            license::license_revalidate,
+            license::license_should_revalidate,
+        ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let icon = tauri::image::Image::from_bytes(
