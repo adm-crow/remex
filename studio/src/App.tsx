@@ -4,6 +4,7 @@ import { useAppStore } from "@/store/app";
 import { Home } from "@/pages/Home";
 import { AppShell } from "@/components/layout/AppShell";
 import { useSidecar } from "@/hooks/useSidecar";
+import { UpgradeModal } from "@/components/license/UpgradeModal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,6 +47,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {currentDb ? <AppShell /> : <Home />}
+      <UpgradeModal />
     </QueryClientProvider>
   );
 }

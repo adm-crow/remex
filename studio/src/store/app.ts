@@ -97,6 +97,11 @@ export interface AppState {
   // Keyboard shortcuts modal (not persisted)
   shortcutsOpen: boolean;
   setShortcutsOpen: (v: boolean) => void;
+  // Upgrade modal (not persisted)
+  upgradeModalOpen: boolean;
+  upgradeModalContext: string | null;
+  openUpgradeModal:  (context?: string) => void;
+  closeUpgradeModal: () => void;
   // License (persisted subset)
   license: {
     tier: Tier;
@@ -140,6 +145,8 @@ export const useAppStore = create<AppState>()(
       incompleteCollections: {},
       onboardingDone: false,
       shortcutsOpen: false,
+      upgradeModalOpen: false,
+      upgradeModalContext: null,
       license: { tier: "free" as Tier, email: null, activatedAt: null, lastValidatedAt: null },
 
       setCurrentDb: (db) => set({ currentDb: db }),
@@ -239,6 +246,8 @@ export const useAppStore = create<AppState>()(
         }),
       setOnboardingDone: (v) => set({ onboardingDone: v }),
       setShortcutsOpen:  (v) => set({ shortcutsOpen: v }),
+      openUpgradeModal:  (context = "generic") => set({ upgradeModalOpen: true,  upgradeModalContext: context }),
+      closeUpgradeModal: ()                    => set({ upgradeModalOpen: false, upgradeModalContext: null }),
 
       activateLicense: async (key) => {
         try {
