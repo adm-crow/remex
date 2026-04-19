@@ -5,6 +5,9 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Manager, RunEvent, State};
 
+pub mod license;
+pub mod watch;
+
 pub struct SidecarState(pub Mutex<Option<Child>>);
 
 #[tauri::command]
@@ -66,8 +69,8 @@ fn write_text_file(path: String, content: String) -> Result<(), String> {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-    if !matches!(ext.as_str(), "json" | "csv" | "md") {
-        return Err("Only .json, .csv, and .md files are supported".to_string());
+    if !matches!(ext.as_str(), "json" | "csv" | "md" | "bib" | "ris") {
+        return Err("Only .json, .csv, .md, .bib, and .ris files are supported".to_string());
     }
     fs::write(&path, content).map_err(|e| format!("Failed to write file: {e}"))
 }
@@ -86,7 +89,18 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
-        .invoke_handler(tauri::generate_handler![spawn_sidecar, kill_sidecar, is_sidecar_alive, write_text_file])
+        .manage(watch::WatchState::new())
+        .invoke_handler(tauri::generate_handler![
+            spawn_sidecar, kill_sidecar, is_sidecar_alive, write_text_file,
+            license::license_activate,
+            license::license_status,
+            license::license_deactivate,
+            license::license_revalidate,
+            license::license_should_revalidate,
+            watch::watch_start,
+            watch::watch_stop,
+            watch::watch_list,
+        ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {
                 let icon = tauri::image::Image::from_bytes(

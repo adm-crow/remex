@@ -2,7 +2,8 @@ import { Search, Upload, Database, Settings, RotateCcw } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CollectionSwitcher } from "./CollectionSwitcher";
-import { useAppStore } from "@/store/app";
+import { useAppStore, useIsPro } from "@/store/app";
+import { ProBadge } from "@/components/license/ProBadge";
 
 export type View = "query" | "ingest" | "collections" | "settings";
 
@@ -21,6 +22,7 @@ const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
   const { currentDb, sidecarStatus, setIngestDoneUnread, triggerSidecarReconnect } = useAppStore();
+  const isPro = useIsPro();
 
   return (
     <aside
@@ -29,8 +31,9 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
     >
       {/* ── Brand ───────────────────────────────────────────────────────── */}
       <div className="px-4 pt-5 pb-4 shrink-0">
-        <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground">
+        <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground flex items-center">
           Remex Studio
+          {isPro && <ProBadge className="ml-2" />}
         </p>
         {currentDb && (
           <p

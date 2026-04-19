@@ -47,3 +47,7 @@ npm run tauri build
 ## IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
+## License
+
+`studio/` is licensed under [FSL-1.1-MIT](./LICENSE) starting with v1.3.0. Earlier Studio releases remain Apache-2.0 — see [`../LICENSES.md`](../LICENSES.md) for the full licensing map.

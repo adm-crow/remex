@@ -12,7 +12,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
-import { useAppStore } from "@/store/app";
+import { useAppStore, useIsPro } from "@/store/app";
+import { toBibTeX, toRIS, toCSLJson, toObsidianVault } from "@/lib/exports";
+import { join } from "@tauri-apps/api/path";
 import { ResultCard } from "./ResultCard";
 
 function CollectionPill({
@@ -60,8 +62,18 @@ interface QueryPaneProps {
 
 export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
-          queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory } =
+          queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory,
+          openUpgradeModal } =
     useAppStore();
+
+  const isPro = useIsPro();
+  const [historyFilter, setHistoryFilter] = useState("");
+  const visibleHistory = useMemo(() => {
+    if (!isPro) return queryHistory.slice(0, 20);
+    const q = historyFilter.trim().toLowerCase();
+    if (!q) return queryHistory;
+    return queryHistory.filter((h) => h.toLowerCase().includes(q));
+  }, [isPro, queryHistory, historyFilter]);
 
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState("");
@@ -162,22 +174,54 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     const path = await save({
       defaultPath: "remex-results.json",
       filters: [
-        { name: "JSON",     extensions: ["json"] },
-        { name: "CSV",      extensions: ["csv"]  },
-        { name: "Markdown", extensions: ["md"]   },
+        { name: "JSON",      extensions: ["json"] },
+        { name: "CSV",       extensions: ["csv"]  },
+        { name: "Markdown",  extensions: ["md"]   },
+        ...(isPro ? [
+          { name: "BibTeX",   extensions: ["bib"] },
+          { name: "RIS",      extensions: ["ris"] },
+          { name: "CSL-JSON", extensions: ["json"] },
+          { name: "Obsidian Vault (folder)", extensions: [""] },
+        ] : []),
       ],
     });
     if (!path) return;
 
-    let content: string;
-    if (path.endsWith(".csv")) {
+    const ext = path.split(".").pop()?.toLowerCase();
+    let content: string | null = null;
+
+    if (ext === "bib") {
+      if (!isPro) { openUpgradeModal("export"); return; }
+      content = toBibTeX(results, submitted);
+    } else if (ext === "ris") {
+      if (!isPro) { openUpgradeModal("export"); return; }
+      content = toRIS(results, submitted);
+    } else if (ext === "json" && isPro && /csl/i.test(path)) {
+      content = toCSLJson(results, submitted);
+    } else if (!ext) {
+      // Obsidian vault: path is the folder the user chose.
+      if (!isPro) { openUpgradeModal("export"); return; }
+      const files = toObsidianVault(results, submitted);
+      try {
+        for (const [rel, fileContent] of Object.entries(files)) {
+          const target = await join(path, rel);
+          await invoke("write_text_file", { path: target, content: fileContent });
+        }
+        setExportDone(true);
+        setExportError(null);
+        setTimeout(() => setExportDone(false), 3000);
+      } catch (e) {
+        setExportError(e instanceof Error ? e.message : String(e));
+      }
+      return;
+    } else if (ext === "csv") {
       const header = "score,source,chunk,text\n";
       const rows = results.map(
         (r) =>
           `${r.score},"${r.source.replace(/"/g, '""')}",${r.chunk},"${r.text.replace(/"/g, '""').replace(/\n/g, " ")}"`
       );
       content = header + rows.join("\n");
-    } else if (path.endsWith(".md")) {
+    } else if (ext === "md") {
       content = `# Remex Query Results\n\n**Query:** ${submitted}\n\n`;
       content += results
         .map(
@@ -252,11 +296,22 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         {/* Query history chips */}
         {queryHistory.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
+            {isPro && queryHistory.length > 20 && (
+              <div className="w-full">
+                <Input
+                  value={historyFilter}
+                  onChange={(e) => setHistoryFilter(e.target.value)}
+                  placeholder="Search your query history…"
+                  className="h-7 text-xs"
+                  aria-label="Search query history"
+                />
+              </div>
+            )}
             <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
               <Clock className="w-3 h-3" />
               Recent
             </span>
-            {queryHistory.map((q) => (
+            {visibleHistory.map((q) => (
               <span
                 key={q}
                 className="group flex items-center gap-0.5 text-xs pl-2 pr-1 py-0.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted transition-colors"

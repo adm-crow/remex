@@ -1,26 +1,29 @@
 import { ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppStore, useIsPro } from "@/store/app";
+import { ProBadge } from "@/components/license/ProBadge";
+import { cn } from "@/lib/utils";
 
-const PRESETS = [
-  {
-    tag: "Light",
-    tagColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-    model: "all-MiniLM-L6-v2",
-    desc: "22 MB · fast, good for most cases",
-  },
-  {
-    tag: "Large",
-    tagColor: "bg-primary/15 text-primary",
-    model: "BAAI/bge-large-en-v1.5",
-    desc: "1.3 GB · best English accuracy",
-  },
-  {
-    tag: "Multilingual",
-    tagColor: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-    model: "paraphrase-multilingual-MiniLM-L12-v2",
-    desc: "470 MB · 50+ languages",
-  },
+type Preset = {
+  tag: string;
+  tagColor: string;
+  model: string;
+  desc: string;
+  pro?: boolean;
+};
+
+const PRESETS: Preset[] = [
+  { tag: "Light",        tagColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+    model: "all-MiniLM-L6-v2",                           desc: "22 MB · fast, good for most cases" },
+  { tag: "Large",        tagColor: "bg-primary/15 text-primary",
+    model: "BAAI/bge-large-en-v1.5",                     desc: "1.3 GB · best English accuracy",  pro: true },
+  { tag: "Multilingual", tagColor: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+    model: "paraphrase-multilingual-MiniLM-L12-v2",      desc: "470 MB · 50+ languages" },
+  { tag: "E5 Large",     tagColor: "bg-primary/15 text-primary",
+    model: "intfloat/e5-large-v2",                       desc: "1.3 GB · strong retrieval benchmark", pro: true },
+  { tag: "Nomic",        tagColor: "bg-primary/15 text-primary",
+    model: "nomic-ai/nomic-embed-text-v1.5",             desc: "547 MB · long context window",     pro: true },
 ];
 
 const LINKS = [
@@ -36,6 +39,9 @@ interface EmbeddingModelFieldProps {
 }
 
 export function EmbeddingModelField({ value, onChange, inputId = "embedding-model" }: EmbeddingModelFieldProps) {
+  const isPro = useIsPro();
+  const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
+
   return (
     <div className="space-y-1">
       <Label htmlFor={inputId} className="text-xs">Embedding model</Label>
@@ -47,20 +53,30 @@ export function EmbeddingModelField({ value, onChange, inputId = "embedding-mode
       />
       <div className="pt-1 space-y-1.5">
         <div className="flex flex-wrap gap-1.5">
-          {PRESETS.map(({ tag, tagColor, model, desc }) => (
-            <button
-              key={model}
-              type="button"
-              className="flex items-center gap-1.5 rounded-full border bg-muted/30 pl-1.5 pr-2.5 py-0.5 hover:bg-muted/60 transition-colors"
-              onClick={() => onChange(model)}
-              title={desc}
-            >
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${tagColor}`}>
-                {tag}
-              </span>
-              <span className="font-mono text-[10px] truncate max-w-[120px]">{model}</span>
-            </button>
-          ))}
+          {PRESETS.map(({ tag, tagColor, model, desc, pro }) => {
+            const locked = pro && !isPro;
+            return (
+              <button
+                key={model}
+                type="button"
+                className={cn(
+                  "flex items-center gap-1.5 rounded-full border pl-1.5 pr-2.5 py-0.5 transition-colors",
+                  locked ? "bg-muted/20 opacity-70 cursor-pointer" : "bg-muted/30 hover:bg-muted/60"
+                )}
+                onClick={() => {
+                  if (locked) { openUpgradeModal("embedding-model"); return; }
+                  onChange(model);
+                }}
+                title={desc}
+              >
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${tagColor}`}>
+                  {tag}
+                </span>
+                <span className="text-[11px] text-muted-foreground font-mono truncate">{model.split("/").pop()}</span>
+                {locked && <ProBadge className="ml-1" />}
+              </button>
+            );
+          })}
         </div>
         <div className="flex flex-row flex-wrap gap-x-3 gap-y-1">
           {LINKS.map(({ label, href }) => (
