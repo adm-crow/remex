@@ -16,12 +16,12 @@ describe("WatchFoldersCard", () => {
   it("renders locked teaser when user is free", () => {
     render(<WatchFoldersCard />);
     expect(screen.getByText(/Watch folders/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Unlock with Pro/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Unlock watch folders with Pro/ })).toBeInTheDocument();
   });
 
-  it("opens upgrade modal when free user clicks unlock", () => {
+  it("opens upgrade modal when free user clicks the card", () => {
     render(<WatchFoldersCard />);
-    fireEvent.click(screen.getByRole("button", { name: /Unlock with Pro/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Unlock watch folders with Pro/ }));
     expect(useAppStore.getState().upgradeModalOpen).toBe(true);
     expect(useAppStore.getState().upgradeModalContext).toBe("watch-folder");
   });
@@ -33,6 +33,6 @@ describe("WatchFoldersCard", () => {
     render(<WatchFoldersCard />);
     expect(screen.getByText(/Watch folders/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Add folder/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Unlock with Pro/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Unlock/ })).not.toBeInTheDocument();
   });
 });

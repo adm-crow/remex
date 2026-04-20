@@ -105,6 +105,11 @@ export interface AppState {
   upgradeModalContext: string | null;
   openUpgradeModal:  (context?: string) => void;
   closeUpgradeModal: () => void;
+  // License-entry prompt signal (not persisted) — incremented when the user
+  // clicks "I already have a key" in the upgrade modal. AppShell switches to
+  // Settings; LicenseCard reveals its paste input and focuses it.
+  licensePromptSeq: number;
+  requestLicensePrompt: () => void;
   // License (persisted subset)
   license: {
     tier: Tier;
@@ -154,6 +159,7 @@ export const useAppStore = create<AppState>()(
       shortcutsOpen: false,
       upgradeModalOpen: false,
       upgradeModalContext: null,
+      licensePromptSeq: 0,
       license: { tier: "free" as Tier, email: null, activatedAt: null, lastValidatedAt: null },
       watchFolders: [],
 
@@ -259,6 +265,7 @@ export const useAppStore = create<AppState>()(
       setShortcutsOpen:  (v) => set({ shortcutsOpen: v }),
       openUpgradeModal:  (context = "generic") => set({ upgradeModalOpen: true,  upgradeModalContext: context }),
       closeUpgradeModal: ()                    => set({ upgradeModalOpen: false, upgradeModalContext: null }),
+      requestLicensePrompt: ()                 => set((s) => ({ licensePromptSeq: s.licensePromptSeq + 1 })),
 
       activateLicense: async (key) => {
         try {

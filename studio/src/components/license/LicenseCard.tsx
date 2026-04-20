@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Crown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,9 +7,14 @@ import { useAppStore } from "@/store/app";
 import { cn } from "@/lib/utils";
 import { ProBadge } from "./ProBadge";
 
-function Card({ children, className, id }: { children: React.ReactNode; className?: string; id?: string }) {
-  return <div id={id} className={cn("rounded-xl border bg-primary/10 border-primary/30 p-3 space-y-2.5", className)}>{children}</div>;
-}
+const Card = ({ children, className, id, cardRef }: {
+  children: React.ReactNode; className?: string; id?: string;
+  cardRef?: React.RefObject<HTMLDivElement | null>;
+}) => (
+  <div ref={cardRef} id={id} className={cn("rounded-xl border bg-primary/10 border-primary/30 p-3 space-y-2.5", className)}>
+    {children}
+  </div>
+);
 
 function relative(ts: number | null): string {
   if (!ts) return "—";
@@ -22,11 +27,22 @@ function relative(ts: number | null): string {
 }
 
 export function LicenseCard() {
-  const { license, activateLicense, deactivateLicense, revalidateLicense, openUpgradeModal } = useAppStore();
+  const { license, activateLicense, deactivateLicense, revalidateLicense, openUpgradeModal, licensePromptSeq } = useAppStore();
   const [paste, setPaste] = useState("");
   const [showPaste, setShowPaste] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const cardRef  = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (licensePromptSeq === 0 || license.tier === "pro") return;
+    setShowPaste(true);
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Defer focus until after the paste input mounts.
+    requestAnimationFrame(() => {
+      (document.getElementById("license-paste") as HTMLInputElement | null)?.focus();
+    });
+  }, [licensePromptSeq, license.tier]);
 
   async function handleActivate() {
     setBusy(true);
@@ -77,7 +93,7 @@ export function LicenseCard() {
   }
 
   return (
-    <Card id="license-card" className="space-y-2.5">
+    <Card id="license-card" cardRef={cardRef} className="space-y-2.5">
       <div className="flex items-center gap-2">
         <Crown className="w-3.5 h-3.5 text-primary" />
         <h2 className="font-semibold text-sm">Remex Pro</h2>

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import type { ComponentType } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import { Sidebar, type View } from "./Sidebar";
@@ -33,7 +33,13 @@ export function AppShell() {
   const ingestDoneUnread = useAppStore((s) => s.ingestDoneUnread);
   const setIngestDoneUnread = useAppStore((s) => s.setIngestDoneUnread);
   const lastIngestResult = useAppStore((s) => s.lastIngestResult);
+  const licensePromptSeq = useAppStore((s) => s.licensePromptSeq);
   const isDragging = useRef(false);
+
+  useEffect(() => {
+    if (licensePromptSeq === 0) return;
+    setActiveView("settings");
+  }, [licensePromptSeq]);
   const focusSearchRef = useRef<(() => void) | null>(null);
 
   const handleFocusReady = useCallback((fn: () => void) => {

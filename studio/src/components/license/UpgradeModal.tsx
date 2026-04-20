@@ -11,9 +11,12 @@ const CHECKOUT_URL =
 
 const BULLETS_BY_CONTEXT: Record<string, string[]> = {
   generic: [
-    "Bigger embedding models (bge-large, e5-large, nomic)",
+    "Pro embedding models (bge-large, e5-large, nomic)",
     "Advanced exports: BibTeX, RIS, CSL-JSON, Obsidian vault",
     "Watch-folder auto-ingest",
+    "Unlimited searchable query history",
+    "Eight extra accent themes + Pro badge",
+    "Priority email support (48 h SLA)",
   ],
   "embedding-model": [
     "Pro-size embedding models (bge-large, e5-large, nomic)",
@@ -38,7 +41,7 @@ const BULLETS_BY_CONTEXT: Record<string, string[]> = {
 };
 
 export function UpgradeModal() {
-  const { upgradeModalOpen, upgradeModalContext, closeUpgradeModal } = useAppStore();
+  const { upgradeModalOpen, upgradeModalContext, closeUpgradeModal, requestLicensePrompt } = useAppStore();
   const bullets = BULLETS_BY_CONTEXT[upgradeModalContext ?? "generic"] ?? BULLETS_BY_CONTEXT.generic;
 
   return (
@@ -69,8 +72,7 @@ export function UpgradeModal() {
           </Button>
           <Button variant="outline" onClick={() => {
             closeUpgradeModal();
-            // Scroll to the license card; Task 7 gives it id="license-card".
-            document.getElementById("license-card")?.scrollIntoView({ behavior: "smooth" });
+            requestLicensePrompt();
           }}>
             I already have a key
           </Button>
