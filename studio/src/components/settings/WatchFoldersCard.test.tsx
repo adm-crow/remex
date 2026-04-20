@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { WatchFoldersCard } from "./WatchFoldersCard";
 import { useAppStore } from "@/store/app";
 
@@ -8,19 +8,31 @@ describe("WatchFoldersCard", () => {
     useAppStore.setState({
       license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
       watchFolders: [],
+      upgradeModalOpen: false,
+      upgradeModalContext: null,
     });
   });
 
-  it("renders nothing when user is free", () => {
-    const { container } = render(<WatchFoldersCard />);
-    expect(container.firstChild).toBeNull();
+  it("renders locked teaser when user is free", () => {
+    render(<WatchFoldersCard />);
+    expect(screen.getByText(/Watch folders/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Unlock with Pro/ })).toBeInTheDocument();
   });
 
-  it("renders card when user is Pro", () => {
+  it("opens upgrade modal when free user clicks unlock", () => {
+    render(<WatchFoldersCard />);
+    fireEvent.click(screen.getByRole("button", { name: /Unlock with Pro/ }));
+    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
+    expect(useAppStore.getState().upgradeModalContext).toBe("watch-folder");
+  });
+
+  it("renders card with folder controls when user is Pro", () => {
     useAppStore.setState({
       license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
     });
     render(<WatchFoldersCard />);
     expect(screen.getByText(/Watch folders/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Add folder/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Unlock with Pro/ })).not.toBeInTheDocument();
   });
 });

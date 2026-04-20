@@ -33,7 +33,7 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
       <div className="px-4 pt-5 pb-4 shrink-0">
         <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground flex items-center">
           Remex Studio
-          {isPro && <ProBadge className="ml-2" />}
+          {isPro && <ProBadge size="md" className="ml-2" />}
         </p>
         {currentDb && (
           <p

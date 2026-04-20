@@ -174,7 +174,7 @@ export function SettingsPane() {
                       className={cn(
                         "relative flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
                         theme === opt.value ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
-                        locked && "bg-muted/60 opacity-80"
+                        locked && "bg-primary/5 border-primary/25 hover:bg-primary/10"
                       )}
                       title={opt.label}
                       aria-label={opt.label}

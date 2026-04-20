@@ -182,7 +182,16 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           { name: "RIS",      extensions: ["ris"] },
           { name: "CSL-JSON", extensions: ["json"] },
           { name: "Obsidian Vault (folder)", extensions: [""] },
-        ] : []),
+        ] : [
+          // Pro formats shown to free users to advertise the feature. The
+          // extension-based handler below intercepts .bib / .ris / no-ext and
+          // opens the upgrade modal. CSL-JSON is intentionally excluded — it
+          // shares `.json` with the free CSL-less export, so we can't detect
+          // the user's intent from the path alone.
+          { name: "BibTeX (Pro)",   extensions: ["bib"] },
+          { name: "RIS (Pro)",      extensions: ["ris"] },
+          { name: "Obsidian Vault — folder (Pro)", extensions: [""] },
+        ]),
       ],
     });
     if (!path) return;

@@ -61,7 +61,9 @@ export function EmbeddingModelField({ value, onChange, inputId = "embedding-mode
                 type="button"
                 className={cn(
                   "flex items-center gap-1.5 rounded-full border pl-1.5 pr-2.5 py-0.5 transition-colors",
-                  locked ? "bg-muted/20 opacity-70 cursor-pointer" : "bg-muted/30 hover:bg-muted/60"
+                  locked
+                    ? "bg-primary/5 border-primary/25 hover:bg-primary/10 cursor-pointer"
+                    : "bg-muted/30 hover:bg-muted/60"
                 )}
                 onClick={() => {
                   if (locked) { openUpgradeModal("embedding-model"); return; }
