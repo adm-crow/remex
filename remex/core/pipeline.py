@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import hashlib
 from pathlib import Path
 from typing import Any, Callable, cast
@@ -12,6 +13,29 @@ from .exceptions import CollectionNotFoundError, SourceNotFoundError
 from .extractors import extract, extract_metadata, extract_streaming, is_supported, supports_streaming
 from .logger import logger
 from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, QueryResult
+
+
+# Cache SentenceTransformerEmbeddingFunction instances by model name so the
+# model is loaded from disk only once per process, not on every ingest() call.
+_EF_CACHE: dict[str, Any] = {}
+
+_MAX_EXTRACT_WORKERS = 4  # threads for parallel file extraction (I/O-bound)
+
+
+def _get_ef(model_name: str) -> Any:
+    if model_name not in _EF_CACHE:
+        _EF_CACHE[model_name] = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name=model_name
+        )
+    return _EF_CACHE[model_name]
+
+
+def _extract_file_safe(file_path: Path) -> tuple[str | None, Exception | None]:
+    """Extract text from a file without raising. Returns (text, None) or (None, error)."""
+    try:
+        return extract(file_path), None
+    except Exception as exc:
+        return None, exc
 
 
 def _make_id(file_path: Path, source_dir: Path, chunk_index: int) -> str:
@@ -40,9 +64,7 @@ def _get_source_chunks(collection: Any, source_str: str) -> dict[str, Any]:
 def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True) -> Any:
     """Get or create a ChromaDB collection with the given embedding model."""
     client = chromadb.PersistentClient(path=db_path)
-    ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name=embedding_model
-    )
+    ef = _get_ef(embedding_model)
     if create:
         collection = client.get_or_create_collection(
             name=collection_name,
@@ -71,9 +93,7 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
         col.metadata.get("embedding_model")
         if isinstance(col.metadata, dict) else None
     ) or embedding_model
-    col._embedding_function = (  # type: ignore[attr-defined]
-        embedding_functions.SentenceTransformerEmbeddingFunction(model_name=stored_model)
-    )
+    col._embedding_function = _get_ef(stored_model)  # type: ignore[attr-defined]
     return col
 
 
@@ -204,6 +224,21 @@ def ingest(
 
     collection = _get_collection(db_path, collection_name, embedding_model)
 
+    # Pre-extract non-streaming files in parallel to overlap disk I/O.
+    _bulk_fps = [
+        fp for fp in files
+        if not (streaming_threshold > 0 and fp.stat().st_size > streaming_threshold
+                and supports_streaming(fp))
+    ]
+    pre_extracted: dict[Path, tuple[str | None, Exception | None]] = {}
+    if _bulk_fps:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(_MAX_EXTRACT_WORKERS, len(_bulk_fps))
+        ) as _ex:
+            _futs = {_ex.submit(_extract_file_safe, fp): fp for fp in _bulk_fps}
+            for _fut in concurrent.futures.as_completed(_futs):
+                pre_extracted[_futs[_fut]] = _fut.result()
+
     # Batch upserts: accumulate chunks across files and flush when the batch
     # is large enough.  This lets the SentenceTransformer embed many chunks in
     # a single forward pass (much faster than one upsert per file).
@@ -283,18 +318,18 @@ def ingest(
                     logger.info("  -> %d chunks stored (streamed)", n)
 
             else:
-                try:
-                    text = extract(file_path)
-                except (OSError, ValueError, RuntimeError) as e:
+                _text_result = pre_extracted.get(file_path) or _extract_file_safe(file_path)
+                text, _err = _text_result
+                if _err is not None:
                     if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, e)
+                        logger.warning("[skip] %s: %s", file_path.name, _err)
                     _status = "error"
-                    _skip_reason = f"extract_error: {e}"
+                    _skip_reason = f"extract_error: {_err}"
                     result.sources_skipped += 1
                     continue
 
                 chunks = chunk_text(
-                    text,
+                    text or "",
                     chunk_size=chunk_size,
                     overlap=overlap,
                     min_chunk_size=min_chunk_size,
@@ -736,6 +771,34 @@ def ingest_many(
 
     collection = _get_collection(db_path, collection_name, embedding_model)
 
+    # Pre-extract non-streaming files in parallel to overlap disk I/O.
+    _bulk_fps = [
+        fp for fp in file_paths
+        if fp.exists() and is_supported(fp)
+        and not (streaming_threshold > 0 and fp.stat().st_size > streaming_threshold
+                 and supports_streaming(fp))
+    ]
+    pre_extracted_many: dict[Path, tuple[str | None, Exception | None]] = {}
+    if _bulk_fps:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(_MAX_EXTRACT_WORKERS, len(_bulk_fps))
+        ) as _ex:
+            _futs = {_ex.submit(_extract_file_safe, fp): fp for fp in _bulk_fps}
+            for _fut in concurrent.futures.as_completed(_futs):
+                pre_extracted_many[_futs[_fut]] = _fut.result()
+
+    BATCH_LIMIT = 256
+    batch_docs: list[str] = []
+    batch_ids: list[str] = []
+    batch_metas: list[dict[str, Any]] = []
+
+    def _flush_many() -> None:
+        if batch_docs:
+            collection.upsert(documents=list(batch_docs), ids=list(batch_ids), metadatas=list(batch_metas))  # type: ignore[arg-type]
+            batch_docs.clear()
+            batch_ids.clear()
+            batch_metas.clear()
+
     for i, file_path in enumerate(file_paths, 1):
         _status: str = "skipped"
         _skip_reason: str = ""
@@ -810,17 +873,17 @@ def ingest_many(
                     logger.info("  -> %d chunks stored (streamed)", n)
 
             else:
-                try:
-                    text = extract(file_path)
-                except Exception as e:
+                _text_result = pre_extracted_many.get(file_path) or _extract_file_safe(file_path)
+                text, _err = _text_result
+                if _err is not None:
                     if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, e)
-                    _skip_reason = f"extract_error: {e}"
+                        logger.warning("[skip] %s: %s", file_path.name, _err)
+                    _skip_reason = f"extract_error: {_err}"
                     result.sources_skipped += 1
                     continue
 
                 chunks = chunk_text(
-                    text,
+                    text or "",
                     chunk_size=chunk_size,
                     overlap=overlap,
                     min_chunk_size=min_chunk_size,
@@ -843,7 +906,12 @@ def ingest_many(
                     for meta in metadatas:
                         meta["file_hash"] = current_hash
 
-                collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
+                batch_docs.extend(chunks)
+                batch_ids.extend(ids)
+                batch_metas.extend(metadatas)
+                if len(batch_docs) >= BATCH_LIMIT:
+                    _flush_many()
+
                 result.sources_ingested += 1
                 result.chunks_stored += len(chunks)
                 _status = "ingested"
@@ -861,6 +929,8 @@ def ingest_many(
                     status=_status,  # type: ignore[arg-type]
                     chunks_stored=result.chunks_stored,
                 ))
+
+    _flush_many()
 
     if verbose:
         logger.info(
