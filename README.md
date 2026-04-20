@@ -85,6 +85,21 @@ Native desktop app for Windows — ingest, search, and query your documents with
 
 ---
 
+## Remex Pro — 29€, one-time
+
+Free Remex Studio covers the full local-first workflow. **Remex Pro** unlocks power-user features for 29€ (one-time purchase, two machines):
+
+- **Pro embedding models** — `bge-large-en-v1.5`, `e5-large-v2`, `nomic-embed-text-v1.5`
+- **Advanced exports** — BibTeX, RIS, CSL-JSON, Obsidian vault
+- **Watch-folder auto-ingest** — keep collections in sync as files change
+- **Unlimited searchable query history** (free tier: last 20)
+- **Eight extra accent themes** + Pro badge in-app
+- **Priority email support** — 48-hour business-day SLA
+
+Activate in `Settings → License` inside Studio. Licenses are issued and validated via [Lemon Squeezy](https://lemonsqueezy.com/).
+
+---
+
 ## Python CLI
 
 ```bash
@@ -159,7 +174,11 @@ CLI flags always override `remex.toml`.
   <sub>
     <a href="CHANGELOG.md">Changelog</a> ·
     <a href="CONTRIBUTING.md">Contributing</a> ·
-    <a href="LICENSE">Apache 2.0</a> ·
+    <a href="LICENSES.md">Licensing</a> ·
     <a href="https://github.com/adm-crow/remex">GitHub</a>
+  </sub>
+  <br/>
+  <sub>
+    Python CLI: Apache-2.0 · Studio (v1.3.0+): FSL-1.1-MIT — see <a href="LICENSES.md">LICENSES.md</a>
   </sub>
 </div>

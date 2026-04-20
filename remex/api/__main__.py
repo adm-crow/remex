@@ -11,8 +11,6 @@ import argparse
 
 import uvicorn
 
-from remex.api.main import app
-
 _DEFAULT_PORT = 37421
 
 

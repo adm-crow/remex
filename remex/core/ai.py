@@ -2,6 +2,7 @@
 
 import json
 import os
+import time as _time
 import urllib.error
 import urllib.request
 from typing import Optional
@@ -21,9 +22,6 @@ _SYSTEM_PROMPT = (
     "If the answer is not in the context, say so clearly.\n\n"
     "CONTEXT:\n{context}"
 )
-
-
-import time as _time
 
 _ollama_cache: tuple[float, bool] | None = None
 _OLLAMA_CACHE_TTL = 30.0  # seconds

@@ -11,7 +11,7 @@ All notable changes to `remex` are documented here.
 ## [1.3.0] — 2026-04-19
 
 ### Added
-- **Remex Pro** — commercial tier, $39 founders / $49 regular, one-time purchase
+- **Remex Pro** — commercial tier, 29€, one-time purchase
   - Pro embedding models: `bge-large-en-v1.5`, `e5-large-v2`, `nomic-embed-text-v1.5`
   - Advanced exports: BibTeX, RIS, CSL-JSON, Obsidian vault
   - Watch-folder auto-ingest

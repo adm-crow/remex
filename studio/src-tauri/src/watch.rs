@@ -1,16 +1,20 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, State};
 
-pub struct WatchState(pub Mutex<HashMap<PathBuf, RecommendedWatcher>>);
+pub struct WatchState(pub Mutex<HashMap<PathBuf, WatcherEntry>>);
 
 impl WatchState {
     pub fn new() -> Self { Self(Mutex::new(HashMap::new())) }
+}
+
+impl Default for WatchState {
+    fn default() -> Self { Self::new() }
 }
 
 #[derive(Clone, Serialize)]
@@ -19,7 +23,19 @@ pub struct ChangedEvent {
     pub paths:  Vec<String>,
 }
 
+struct DebounceState {
+    pending:   Vec<String>,
+    last_emit: Instant,
+}
+
+pub struct WatcherEntry {
+    _watcher: RecommendedWatcher,
+    // Dropped with the entry → trailing-flush thread's Weak upgrade fails and the thread exits.
+    _state: Arc<Mutex<DebounceState>>,
+}
+
 const DEBOUNCE: Duration = Duration::from_secs(3);
+const FLUSH_POLL: Duration = Duration::from_millis(500);
 
 #[tauri::command]
 pub fn watch_start(app: AppHandle, state: State<WatchState>, folder: String) -> Result<(), String> {
@@ -29,31 +45,53 @@ pub fn watch_start(app: AppHandle, state: State<WatchState>, folder: String) -> 
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     if guard.contains_key(&folder_pb) { return Ok(()); }
 
-    let handle = app.clone();
-    let folder_for_cb = folder.clone();
-    let last_emit = std::sync::Arc::new(Mutex::new(Instant::now() - DEBOUNCE * 2));
-    let pending   = std::sync::Arc::new(Mutex::new(Vec::<String>::new()));
+    let debounce_state = Arc::new(Mutex::new(DebounceState {
+        pending:   Vec::new(),
+        last_emit: Instant::now() - DEBOUNCE * 2,
+    }));
+
+    let cb_state  = debounce_state.clone();
+    let cb_handle = app.clone();
+    let cb_folder = folder.clone();
 
     let mut watcher = recommended_watcher(move |res: Result<Event, notify::Error>| {
         let Ok(evt) = res else { return; };
         if !matches!(evt.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) { return; }
-        let mut buf = pending.lock().unwrap();
+        let mut s = cb_state.lock().unwrap();
         for p in evt.paths {
-            if let Some(s) = p.to_str() { buf.push(s.to_string()); }
+            if let Some(sp) = p.to_str() { s.pending.push(sp.to_string()); }
         }
-        let mut last = last_emit.lock().unwrap();
-        if last.elapsed() >= DEBOUNCE {
-            let paths: Vec<String> = std::mem::take(&mut *buf);
-            *last = Instant::now();
-            let _ = handle.emit("watch:changed", ChangedEvent {
-                folder: folder_for_cb.clone(),
+        if s.last_emit.elapsed() >= DEBOUNCE {
+            let paths: Vec<String> = std::mem::take(&mut s.pending);
+            s.last_emit = Instant::now();
+            drop(s);
+            let _ = cb_handle.emit("watch:changed", ChangedEvent {
+                folder: cb_folder.clone(),
                 paths,
             });
         }
     }).map_err(|e| e.to_string())?;
 
     watcher.watch(&folder_pb, RecursiveMode::Recursive).map_err(|e| e.to_string())?;
-    guard.insert(folder_pb, watcher);
+
+    let weak_state = Arc::downgrade(&debounce_state);
+    let thread_handle = app.clone();
+    let thread_folder = folder.clone();
+    std::thread::spawn(move || loop {
+        std::thread::sleep(FLUSH_POLL);
+        let Some(shared) = weak_state.upgrade() else { break; };
+        let mut s = shared.lock().unwrap();
+        if s.pending.is_empty() || s.last_emit.elapsed() < DEBOUNCE { continue; }
+        let paths: Vec<String> = std::mem::take(&mut s.pending);
+        s.last_emit = Instant::now();
+        drop(s);
+        let _ = thread_handle.emit("watch:changed", ChangedEvent {
+            folder: thread_folder.clone(),
+            paths,
+        });
+    });
+
+    guard.insert(folder_pb, WatcherEntry { _watcher: watcher, _state: debounce_state });
     Ok(())
 }
 

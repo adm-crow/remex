@@ -2,7 +2,7 @@ pub mod api;
 pub mod constants;
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 
@@ -39,7 +39,7 @@ pub fn now_secs() -> u64 {
 }
 
 /// Read `license.json` from `dir`. Returns `Ok(None)` if the file is absent.
-pub fn read_from(dir: &PathBuf) -> Result<Option<LicenseFile>, StoreError> {
+pub fn read_from(dir: &Path) -> Result<Option<LicenseFile>, StoreError> {
     let path = dir.join("license.json");
     match std::fs::read(&path) {
         Ok(bytes) => {
@@ -52,7 +52,7 @@ pub fn read_from(dir: &PathBuf) -> Result<Option<LicenseFile>, StoreError> {
 }
 
 /// Write `license.json` atomically: temp file + rename.
-pub fn write_to(dir: &PathBuf, lic: &LicenseFile) -> Result<(), StoreError> {
+pub fn write_to(dir: &Path, lic: &LicenseFile) -> Result<(), StoreError> {
     std::fs::create_dir_all(dir)?;
     let tmp = dir.join("license.json.tmp");
     let final_path = dir.join("license.json");
@@ -62,7 +62,7 @@ pub fn write_to(dir: &PathBuf, lic: &LicenseFile) -> Result<(), StoreError> {
     Ok(())
 }
 
-pub fn delete_from(dir: &PathBuf) -> Result<(), StoreError> {
+pub fn delete_from(dir: &Path) -> Result<(), StoreError> {
     let path = dir.join("license.json");
     match std::fs::remove_file(&path) {
         Ok(()) => Ok(()),
@@ -239,7 +239,7 @@ mod tests {
     #[test]
     fn read_returns_none_when_file_missing() {
         let tmp = TempDir::new().unwrap();
-        let got = read_from(&tmp.path().to_path_buf()).unwrap();
+        let got = read_from(tmp.path()).unwrap();
         assert!(got.is_none());
     }
 

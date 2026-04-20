@@ -66,6 +66,10 @@ pub struct Client {
     base_url: String,
 }
 
+impl Default for Client {
+    fn default() -> Self { Self::new() }
+}
+
 impl Client {
     pub fn new() -> Self { Self::with_base(LS_API_BASE.into()) }
 
