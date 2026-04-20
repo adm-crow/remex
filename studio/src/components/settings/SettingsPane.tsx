@@ -409,7 +409,7 @@ export function SettingsPane() {
                     id="ai-model"
                     value={localModel}
                     onChange={(e) => setLocalModel(e.target.value)}
-                    placeholder="claude-opus-4-6 · gpt-4o · llama3"
+                    placeholder="claude-sonnet-4-5 · gpt-4o · llama3"
                     aria-label="AI model"
                     className="font-mono text-xs h-8"
                   />

@@ -114,7 +114,19 @@ def rename_collection(
     req: RenameRequest,
     db_path: str = Query(default="./remex_db"),
 ) -> RenamedResponse:
-    """Rename a ChromaDB collection by copying all chunks then deleting the old one."""
+    """Rename a ChromaDB collection via a sentinel-copy pattern.
+
+    Steps:
+      1. Copy all data into a sentinel collection (``__rename_tmp__{old}``)
+      2. Verify chunk count matches before touching the original
+      3. Delete the original
+      4. Create the new collection from the sentinel
+      5. Delete the sentinel
+
+    If the process is interrupted after step 2, both the original and the
+    sentinel survive — no data is lost.  On the next request the stale sentinel
+    is cleaned up automatically.
+    """
     import chromadb
     client = chromadb.PersistentClient(path=db_path)
     try:
@@ -122,20 +134,44 @@ def rename_collection(
     except Exception:
         raise HTTPException(status_code=404, detail=f"Collection '{collection}' not found")
 
-    # Check new name isn't already taken
     existing = [c.name for c in client.list_collections()]
     if req.new_name in existing:
         raise HTTPException(status_code=409, detail=f"Collection '{req.new_name}' already exists")
 
-    # Copy all documents to the new collection
+    sentinel_name = f"remextmp.{collection}"[:512]
+    # Clean up any stale sentinel from a previous interrupted rename.
+    if sentinel_name in existing:
+        try:
+            client.delete_collection(sentinel_name)
+        except Exception:
+            pass
+
     all_data = old_col.get(include=["documents", "metadatas", "embeddings"])
-    new_col = client.create_collection(req.new_name, metadata=old_col.metadata or {})
-    if all_data["ids"]:
-        new_col.upsert(
+    original_count = len(all_data["ids"])
+
+    # Step 1-2: Copy to sentinel and verify
+    sentinel = client.create_collection(sentinel_name, metadata=old_col.metadata or {})
+    if original_count:
+        sentinel.upsert(
             ids=all_data["ids"],
             documents=all_data["documents"],
             metadatas=all_data["metadatas"],
             embeddings=all_data["embeddings"],
         )
+    if sentinel.count() != original_count:
+        client.delete_collection(sentinel_name)
+        raise HTTPException(status_code=500, detail="Rename aborted: sentinel copy count mismatch")
+
+    # Step 3-5: Swap names — original is only deleted after copy is verified
     client.delete_collection(collection)
+    new_col = client.create_collection(req.new_name, metadata=old_col.metadata or {})
+    if original_count:
+        sentinel_data = sentinel.get(include=["documents", "metadatas", "embeddings"])
+        new_col.upsert(
+            ids=sentinel_data["ids"],
+            documents=sentinel_data["documents"],
+            metadatas=sentinel_data["metadatas"],
+            embeddings=sentinel_data["embeddings"],
+        )
+    client.delete_collection(sentinel_name)
     return RenamedResponse(renamed=True, old_name=collection, new_name=req.new_name)

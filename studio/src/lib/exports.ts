@@ -59,12 +59,13 @@ export function toCSLJson(results: QueryResultItem[], query: string): string {
 /** Build an in-memory Obsidian vault: one index file plus one note per result. */
 export function toObsidianVault(results: QueryResultItem[], query: string): Record<string, string> {
   const safeQuery = query.replace(/[\\/:*?"<>|]+/g, "_").slice(0, 80);
-  const folder    = `Remex — ${safeQuery} — ${today()}`;
+  const date      = today();
+  const folder    = `Remex — ${safeQuery} — ${date}`;
   const files: Record<string, string> = {};
   files[`${folder}/README.md`] = [
     `# ${safeQuery}`,
     ``,
-    `Exported from Remex on ${today()}.`,
+    `Exported from Remex on ${date}.`,
     ``,
     `## Results`,
     ...results.map((r, i) => `- [[${citeKey(r.source, i)}]] — ${r.source}`),

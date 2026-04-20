@@ -18,7 +18,7 @@ export function WatchFoldersCard() {
       await fetch(`${apiUrl}/collections/${currentCollection}/ingest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ db_path: currentDb, path: evt.payload.folder, incremental: true }),
+        body: JSON.stringify({ db_path: currentDb, source_dir: evt.payload.folder, incremental: true }),
       }).catch((err) => console.error("[watch] auto-ingest failed:", err));
     });
     return () => { void unsub.then((fn) => fn()); };

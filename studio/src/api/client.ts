@@ -127,6 +127,59 @@ export type IngestStreamEvent =
   | IngestDoneEvent
   | IngestErrorEvent;
 
+// ---- SSE stream helpers ----
+
+const SSE_IDLE_TIMEOUT_MS = 60_000; // abort SSE stream after 60 s with no events
+
+/**
+ * Consume an SSE `ReadableStream` and yield parsed `IngestStreamEvent` objects.
+ * Aborts if no data arrives for `SSE_IDLE_TIMEOUT_MS` milliseconds.
+ */
+async function* readSseStream(
+  body: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): AsyncGenerator<IngestStreamEvent> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  const abort = new AbortController();
+  if (signal) signal.addEventListener("abort", () => abort.abort(signal.reason), { once: true });
+
+  const resetIdle = () => {
+    if (idleTimer !== null) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => abort.abort(new Error("SSE idle timeout")), SSE_IDLE_TIMEOUT_MS);
+  };
+
+  try {
+    resetIdle();
+    outer: while (true) {
+      if (abort.signal.aborted) throw abort.signal.reason;
+      const { done, value } = await reader.read();
+      if (done) break;
+      resetIdle();
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+      for (const part of parts) {
+        if (part.startsWith("data: ")) {
+          let event: IngestStreamEvent;
+          try {
+            event = JSON.parse(part.slice(6)) as IngestStreamEvent;
+          } catch {
+            continue;
+          }
+          yield event;
+          if (event.type === "done" || event.type === "error") break outer;
+        }
+      }
+    }
+  } finally {
+    if (idleTimer !== null) clearTimeout(idleTimer);
+    reader.cancel().catch(() => {});
+  }
+}
+
 // ---- Internal fetch helper ----
 
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
@@ -306,32 +359,7 @@ export const api = {
       }
       throw new Error(`${res.status}: ${message}`);
     }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    try {
-      outer: while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-        for (const part of parts) {
-          if (part.startsWith("data: ")) {
-            let event: IngestStreamEvent;
-            try {
-              event = JSON.parse(part.slice(6)) as IngestStreamEvent;
-            } catch {
-              continue; // skip malformed SSE event
-            }
-            yield event;
-            if (event.type === "done" || event.type === "error") break outer;
-          }
-        }
-      }
-    } finally {
-      reader.cancel().catch(() => {});
-    }
+    yield* readSseStream(res.body, signal);
   },
 
   renameCollection: (
@@ -378,31 +406,6 @@ export const api = {
       }
       throw new Error(`${res.status}: ${message}`);
     }
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    try {
-      outer: while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split("\n\n");
-        buffer = parts.pop() ?? "";
-        for (const part of parts) {
-          if (part.startsWith("data: ")) {
-            let event: IngestStreamEvent;
-            try {
-              event = JSON.parse(part.slice(6)) as IngestStreamEvent;
-            } catch {
-              continue; // skip malformed SSE event
-            }
-            yield event;
-            if (event.type === "done" || event.type === "error") break outer;
-          }
-        }
-      }
-    } finally {
-      reader.cancel().catch(() => {});
-    }
+    yield* readSseStream(res.body, signal);
   },
 };

@@ -1,6 +1,7 @@
 import asyncio
 import concurrent.futures
 import hashlib
+import threading
 from pathlib import Path
 from typing import Any, Callable, cast
 
@@ -18,15 +19,21 @@ from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, 
 # Cache SentenceTransformerEmbeddingFunction instances by model name so the
 # model is loaded from disk only once per process, not on every ingest() call.
 _EF_CACHE: dict[str, Any] = {}
+_EF_LOCK = threading.Lock()  # guards concurrent first-load across asyncio.to_thread workers
 
 _MAX_EXTRACT_WORKERS = 4  # threads for parallel file extraction (I/O-bound)
 
 
 def _get_ef(model_name: str) -> Any:
-    if model_name not in _EF_CACHE:
-        _EF_CACHE[model_name] = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name=model_name
-        )
+    # Fast path — no lock needed once cached.
+    if model_name in _EF_CACHE:
+        return _EF_CACHE[model_name]
+    with _EF_LOCK:
+        # Re-check inside the lock to prevent duplicate loads from concurrent threads.
+        if model_name not in _EF_CACHE:
+            _EF_CACHE[model_name] = embedding_functions.SentenceTransformerEmbeddingFunction(
+                model_name=model_name
+            )
     return _EF_CACHE[model_name]
 
 
@@ -87,14 +94,17 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
                 collection_name, stored_model, embedding_model,
             )
         return collection
-    col = client.get_collection(name=collection_name)
-    # Always use the model the collection was created with, not the caller's default.
+    # Read metadata first to determine the stored embedding model, then re-fetch
+    # the collection with the correct EF — avoids mutating a private attribute.
+    _meta_col = client.get_collection(name=collection_name)
     stored_model = (
-        col.metadata.get("embedding_model")
-        if isinstance(col.metadata, dict) else None
+        _meta_col.metadata.get("embedding_model")
+        if isinstance(_meta_col.metadata, dict) else None
     ) or embedding_model
-    col._embedding_function = _get_ef(stored_model)  # type: ignore[attr-defined]
-    return col
+    return client.get_collection(  # type: ignore[return-value]
+        name=collection_name,
+        embedding_function=_get_ef(stored_model),  # type: ignore[arg-type]
+    )
 
 
 def _make_id_abs(file_path: Path, chunk_index: int) -> str:
@@ -159,7 +169,7 @@ def _ingest_file_streaming(
             for ch in chunk_text(text[:safe_end], chunk_size=chunk_size, overlap=overlap,
                                   min_chunk_size=min_chunk_size, mode=mode):
                 _add(ch)
-            carry = text[max(0, safe_end - overlap):]
+            carry = text[safe_end:]
         else:
             carry = text  # accumulate until we have a workable window
 
@@ -170,6 +180,210 @@ def _ingest_file_streaming(
 
     _flush()
     return chunk_idx
+
+
+_BATCH_LIMIT = 256  # max chunks per ChromaDB upsert call (cross-file batching)
+
+
+def _parallel_extract(
+    file_paths: list[Path],
+    streaming_threshold: int,
+) -> dict[Path, tuple[str | None, Exception | None]]:
+    """Pre-extract non-streaming files concurrently to overlap disk I/O."""
+    bulk = [
+        fp for fp in file_paths
+        if not (streaming_threshold > 0 and fp.stat().st_size > streaming_threshold
+                and supports_streaming(fp))
+    ]
+    result: dict[Path, tuple[str | None, Exception | None]] = {}
+    if bulk:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(_MAX_EXTRACT_WORKERS, len(bulk))
+        ) as ex:
+            futs = {ex.submit(_extract_file_safe, fp): fp for fp in bulk}
+            for fut in concurrent.futures.as_completed(futs):
+                result[futs[fut]] = fut.result()
+    return result
+
+
+def _process_file_list(
+    file_paths: list[Path],
+    collection: Any,
+    result: IngestResult,
+    *,
+    make_source_str: Callable[[Path], str],
+    make_chunk_id: Callable[[Path, int], str],
+    streaming_source_dir: Callable[[Path], Path],
+    chunk_size: int,
+    overlap: int,
+    min_chunk_size: int,
+    chunking: str,
+    incremental: bool,
+    verbose: bool,
+    streaming_threshold: int,
+    on_progress: Callable[[IngestProgress], None] | None,
+    pre_extracted: dict[Path, tuple[str | None, Exception | None]],
+) -> None:
+    """Core per-file loop shared by :func:`ingest` and :func:`ingest_many`.
+
+    Iterates *file_paths*, handles incremental skipping, streaming vs. bulk
+    extraction, cross-file batch accumulation, and progress callbacks.
+    Mutates *result* in place.
+    """
+    batch_docs: list[str] = []
+    batch_ids: list[str] = []
+    batch_metas: list[dict[str, Any]] = []
+
+    def _flush() -> None:
+        if batch_docs:
+            collection.upsert(  # type: ignore[arg-type]
+                documents=list(batch_docs),
+                ids=list(batch_ids),
+                metadatas=list(batch_metas),
+            )
+            batch_docs.clear()
+            batch_ids.clear()
+            batch_metas.clear()
+
+    files_total = len(file_paths)
+    for files_done, file_path in enumerate(file_paths, 1):
+        _status: str = "skipped"
+        _skip_reason: str = ""
+        current_hash = ""
+
+        try:
+            if not file_path.exists():
+                if verbose:
+                    logger.warning("[skip] %s: file not found", file_path.name)
+                _skip_reason = "extract_error: file not found"
+                result.sources_skipped += 1
+                continue
+
+            if not is_supported(file_path):
+                if verbose:
+                    logger.warning("[skip] %s: unsupported format", file_path.name)
+                _skip_reason = "extract_error: unsupported format"
+                result.sources_skipped += 1
+                continue
+
+            source_str = make_source_str(file_path)
+
+            if incremental:
+                current_hash = _file_hash(file_path)
+                existing = _get_source_chunks(collection, source_str)
+                if existing["ids"]:
+                    stored_hash = existing["metadatas"][0].get("file_hash")
+                    if stored_hash == current_hash:
+                        if verbose:
+                            logger.info("Skipping (unchanged): %s", file_path.name)
+                        _skip_reason = "hash_match"
+                        result.sources_skipped += 1
+                        continue
+                    collection.delete(ids=existing["ids"])
+
+            if verbose:
+                logger.info("Ingesting: %s", file_path.name)
+
+            use_streaming = (
+                streaming_threshold > 0
+                and file_path.stat().st_size > streaming_threshold
+                and supports_streaming(file_path)
+            )
+
+            if use_streaming:
+                try:
+                    doc_meta = extract_metadata(file_path)
+                    # Flush batch before streaming — streaming does its own upserts.
+                    _flush()
+                    n = _ingest_file_streaming(
+                        file_path,
+                        streaming_source_dir(file_path),
+                        collection, source_str,
+                        chunk_size, overlap, min_chunk_size, chunking,
+                        doc_meta, incremental, current_hash,
+                        id_fn=lambda j, fp=file_path: make_chunk_id(fp, j),
+                    )
+                except (OSError, ValueError, RuntimeError) as e:
+                    if verbose:
+                        logger.warning("[skip] %s: %s", file_path.name, e)
+                    _status = "error"
+                    _skip_reason = f"extract_error: {e}"
+                    result.sources_skipped += 1
+                    continue
+
+                if n == 0:
+                    if verbose:
+                        logger.warning("[skip] %s: no text extracted", file_path.name)
+                    _skip_reason = "empty"
+                    result.sources_skipped += 1
+                    continue
+
+                result.sources_ingested += 1
+                result.chunks_stored += n
+                _status = "ingested"
+                if verbose:
+                    logger.info("  -> %d chunks stored (streamed)", n)
+
+            else:
+                _text_result = pre_extracted.get(file_path) or _extract_file_safe(file_path)
+                text, _err = _text_result
+                if _err is not None:
+                    if verbose:
+                        logger.warning("[skip] %s: %s", file_path.name, _err)
+                    _status = "error"
+                    _skip_reason = f"extract_error: {_err}"
+                    result.sources_skipped += 1
+                    continue
+
+                chunks = chunk_text(
+                    text or "",
+                    chunk_size=chunk_size,
+                    overlap=overlap,
+                    min_chunk_size=min_chunk_size,
+                    mode=chunking,
+                )
+                if not chunks:
+                    if verbose:
+                        logger.warning("[skip] %s: no text extracted", file_path.name)
+                    _skip_reason = "empty"
+                    result.sources_skipped += 1
+                    continue
+
+                ids = [make_chunk_id(file_path, i) for i in range(len(chunks))]
+                doc_meta = extract_metadata(file_path)
+                metadatas: list[dict[str, Any]] = [
+                    {"source_type": "file", "source": source_str, "chunk": i, **doc_meta}
+                    for i in range(len(chunks))
+                ]
+                if incremental:
+                    for meta in metadatas:
+                        meta["file_hash"] = current_hash
+
+                batch_docs.extend(chunks)
+                batch_ids.extend(ids)
+                batch_metas.extend(metadatas)
+                if len(batch_docs) >= _BATCH_LIMIT:
+                    _flush()
+
+                result.sources_ingested += 1
+                result.chunks_stored += len(chunks)
+                _status = "ingested"
+                if verbose:
+                    logger.info("  -> %d chunks stored", len(chunks))
+
+        finally:
+            if _skip_reason:
+                result.skipped_reasons.append(f"{file_path.name}: {_skip_reason}")
+            if on_progress:
+                on_progress(IngestProgress(
+                    filename=file_path.name,
+                    files_done=files_done,
+                    files_total=files_total,
+                    status=_status,  # type: ignore[arg-type]
+                    chunks_stored=result.chunks_stored,
+                ))
+
+    _flush()
 
 
 def ingest(
@@ -223,163 +437,23 @@ def ingest(
         return result
 
     collection = _get_collection(db_path, collection_name, embedding_model)
+    pre_extracted = _parallel_extract(files, streaming_threshold)
 
-    # Pre-extract non-streaming files in parallel to overlap disk I/O.
-    _bulk_fps = [
-        fp for fp in files
-        if not (streaming_threshold > 0 and fp.stat().st_size > streaming_threshold
-                and supports_streaming(fp))
-    ]
-    pre_extracted: dict[Path, tuple[str | None, Exception | None]] = {}
-    if _bulk_fps:
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(_MAX_EXTRACT_WORKERS, len(_bulk_fps))
-        ) as _ex:
-            _futs = {_ex.submit(_extract_file_safe, fp): fp for fp in _bulk_fps}
-            for _fut in concurrent.futures.as_completed(_futs):
-                pre_extracted[_futs[_fut]] = _fut.result()
-
-    # Batch upserts: accumulate chunks across files and flush when the batch
-    # is large enough.  This lets the SentenceTransformer embed many chunks in
-    # a single forward pass (much faster than one upsert per file).
-    BATCH_LIMIT = 256
-    batch_docs: list[str] = []
-    batch_ids: list[str] = []
-    batch_metas: list[dict[str, Any]] = []
-
-    def _flush() -> None:
-        if batch_docs:
-            collection.upsert(documents=list(batch_docs), ids=list(batch_ids), metadatas=list(batch_metas))  # type: ignore[arg-type]
-            batch_docs.clear()
-            batch_ids.clear()
-            batch_metas.clear()
-
-    files_done = 0
-    for file_path in files:
-        source_str = str(file_path.resolve())
-        current_hash = ""
-        _status: str = "skipped"
-        _skip_reason: str = ""
-
-        try:
-            if incremental:
-                current_hash = _file_hash(file_path)
-                existing = _get_source_chunks(collection, source_str)
-                if existing["ids"]:
-                    stored_hash = existing["metadatas"][0].get("file_hash")
-                    if stored_hash == current_hash:
-                        if verbose:
-                            logger.info("Skipping (unchanged): %s", file_path.name)
-                        _skip_reason = "hash_match"
-                        result.sources_skipped += 1
-                        continue
-                    # File changed — delete stale chunks before re-ingesting
-                    collection.delete(ids=existing["ids"])
-
-            if verbose:
-                logger.info("Ingesting: %s", file_path.name)
-
-            use_streaming = (
-                streaming_threshold > 0
-                and file_path.stat().st_size > streaming_threshold
-                and supports_streaming(file_path)
-            )
-
-            if use_streaming:
-                try:
-                    doc_meta = extract_metadata(file_path)
-                    # Flush batch before streaming to avoid mixing batched and
-                    # streamed chunks (streaming does its own upserts internally).
-                    _flush()
-                    n = _ingest_file_streaming(
-                        file_path, source, collection, source_str,
-                        chunk_size, overlap, min_chunk_size, chunking,
-                        doc_meta, incremental, current_hash,
-                    )
-                except (OSError, ValueError, RuntimeError) as e:
-                    if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, e)
-                    _status = "error"
-                    _skip_reason = f"extract_error: {e}"
-                    result.sources_skipped += 1
-                    continue
-
-                if n == 0:
-                    if verbose:
-                        logger.warning("[skip] %s: no text extracted", file_path.name)
-                    _skip_reason = "empty"
-                    result.sources_skipped += 1
-                    continue
-
-                result.sources_ingested += 1
-                result.chunks_stored += n
-                _status = "ingested"
-                if verbose:
-                    logger.info("  -> %d chunks stored (streamed)", n)
-
-            else:
-                _text_result = pre_extracted.get(file_path) or _extract_file_safe(file_path)
-                text, _err = _text_result
-                if _err is not None:
-                    if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, _err)
-                    _status = "error"
-                    _skip_reason = f"extract_error: {_err}"
-                    result.sources_skipped += 1
-                    continue
-
-                chunks = chunk_text(
-                    text or "",
-                    chunk_size=chunk_size,
-                    overlap=overlap,
-                    min_chunk_size=min_chunk_size,
-                    mode=chunking,
-                )
-                if not chunks:
-                    if verbose:
-                        logger.warning("[skip] %s: no text extracted", file_path.name)
-                    _skip_reason = "empty"
-                    result.sources_skipped += 1
-                    continue
-
-                ids = [_make_id(file_path, source, i) for i in range(len(chunks))]
-                doc_meta = extract_metadata(file_path)
-                metadatas = [
-                    {"source_type": "file", "source": source_str, "chunk": i, **doc_meta}
-                    for i in range(len(chunks))
-                ]
-                if incremental:
-                    for meta in metadatas:
-                        meta["file_hash"] = current_hash
-
-                # Accumulate into batch instead of upserting per file
-                batch_docs.extend(chunks)
-                batch_ids.extend(ids)
-                batch_metas.extend(metadatas)
-                if len(batch_docs) >= BATCH_LIMIT:
-                    _flush()
-
-                result.sources_ingested += 1
-                result.chunks_stored += len(chunks)
-                _status = "ingested"
-                if verbose:
-                    logger.info("  -> %d chunks stored", len(chunks))
-
-        finally:
-            files_done += 1
-            if _skip_reason:
-                result.skipped_reasons.append(f"{file_path.name}: {_skip_reason}")
-            if on_progress:
-                on_progress(IngestProgress(
-                    filename=file_path.name,
-                    files_done=files_done,
-                    files_total=len(files),
-                    status=_status,  # type: ignore[arg-type]
-                    chunks_stored=result.chunks_stored,
-                ))
-
-    # Flush any remaining chunks from the last batch
-    _flush()
+    _process_file_list(
+        files, collection, result,
+        make_source_str=lambda fp: str(fp.resolve()),
+        make_chunk_id=lambda fp, i: _make_id(fp, source, i),
+        streaming_source_dir=lambda _fp: source,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        min_chunk_size=min_chunk_size,
+        chunking=chunking,
+        incremental=incremental,
+        verbose=verbose,
+        streaming_threshold=streaming_threshold,
+        on_progress=on_progress,
+        pre_extracted=pre_extracted,
+    )
 
     if verbose:
         logger.info("Done. Collection '%s' in '%s'", collection_name, db_path)
@@ -622,6 +696,8 @@ def list_collections(db_path: str = "./remex_db") -> list[str]:
     try:
         client = chromadb.PersistentClient(path=db_path)
         return sorted(c.name for c in client.list_collections())
+    except (PermissionError, OSError):
+        raise
     except Exception:
         return []
 
@@ -770,167 +846,26 @@ def ingest_many(
         return result
 
     collection = _get_collection(db_path, collection_name, embedding_model)
+    pre_extracted = _parallel_extract(
+        [fp for fp in file_paths if fp.exists() and is_supported(fp)],
+        streaming_threshold,
+    )
 
-    # Pre-extract non-streaming files in parallel to overlap disk I/O.
-    _bulk_fps = [
-        fp for fp in file_paths
-        if fp.exists() and is_supported(fp)
-        and not (streaming_threshold > 0 and fp.stat().st_size > streaming_threshold
-                 and supports_streaming(fp))
-    ]
-    pre_extracted_many: dict[Path, tuple[str | None, Exception | None]] = {}
-    if _bulk_fps:
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=min(_MAX_EXTRACT_WORKERS, len(_bulk_fps))
-        ) as _ex:
-            _futs = {_ex.submit(_extract_file_safe, fp): fp for fp in _bulk_fps}
-            for _fut in concurrent.futures.as_completed(_futs):
-                pre_extracted_many[_futs[_fut]] = _fut.result()
-
-    BATCH_LIMIT = 256
-    batch_docs: list[str] = []
-    batch_ids: list[str] = []
-    batch_metas: list[dict[str, Any]] = []
-
-    def _flush_many() -> None:
-        if batch_docs:
-            collection.upsert(documents=list(batch_docs), ids=list(batch_ids), metadatas=list(batch_metas))  # type: ignore[arg-type]
-            batch_docs.clear()
-            batch_ids.clear()
-            batch_metas.clear()
-
-    for i, file_path in enumerate(file_paths, 1):
-        _status: str = "skipped"
-        _skip_reason: str = ""
-        current_hash = ""
-
-        try:
-            if not file_path.exists():
-                if verbose:
-                    logger.warning("[skip] %s: file not found", file_path.name)
-                _skip_reason = "extract_error: file not found"
-                result.sources_skipped += 1
-                continue
-
-            if not is_supported(file_path):
-                if verbose:
-                    logger.warning("[skip] %s: unsupported format", file_path.name)
-                _skip_reason = "extract_error: unsupported format"
-                result.sources_skipped += 1
-                continue
-
-            source_str = str(file_path)
-
-            if incremental:
-                current_hash = _file_hash(file_path)
-                existing = _get_source_chunks(collection, source_str)
-                if existing["ids"]:
-                    stored_hash = existing["metadatas"][0].get("file_hash")
-                    if stored_hash == current_hash:
-                        if verbose:
-                            logger.info("Skipping (unchanged): %s", file_path.name)
-                        _skip_reason = "hash_match"
-                        result.sources_skipped += 1
-                        continue
-                    collection.delete(ids=existing["ids"])
-
-            if verbose:
-                logger.info("Ingesting: %s", file_path.name)
-
-            use_streaming = (
-                streaming_threshold > 0
-                and file_path.stat().st_size > streaming_threshold
-                and supports_streaming(file_path)
-            )
-
-            if use_streaming:
-                try:
-                    doc_meta = extract_metadata(file_path)
-                    n = _ingest_file_streaming(
-                        file_path, file_path.parent, collection, source_str,
-                        chunk_size, overlap, min_chunk_size, chunking,
-                        doc_meta, incremental, current_hash,
-                        id_fn=lambda j, fp=file_path: _make_id_abs(fp, j),
-                    )
-                except (OSError, ValueError, RuntimeError) as e:
-                    if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, e)
-                    _skip_reason = f"extract_error: {e}"
-                    result.sources_skipped += 1
-                    continue
-
-                if n == 0:
-                    if verbose:
-                        logger.warning("[skip] %s: no text extracted", file_path.name)
-                    _skip_reason = "empty"
-                    result.sources_skipped += 1
-                    continue
-
-                result.sources_ingested += 1
-                result.chunks_stored += n
-                _status = "ingested"
-                if verbose:
-                    logger.info("  -> %d chunks stored (streamed)", n)
-
-            else:
-                _text_result = pre_extracted_many.get(file_path) or _extract_file_safe(file_path)
-                text, _err = _text_result
-                if _err is not None:
-                    if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, _err)
-                    _skip_reason = f"extract_error: {_err}"
-                    result.sources_skipped += 1
-                    continue
-
-                chunks = chunk_text(
-                    text or "",
-                    chunk_size=chunk_size,
-                    overlap=overlap,
-                    min_chunk_size=min_chunk_size,
-                    mode=chunking,
-                )
-                if not chunks:
-                    if verbose:
-                        logger.warning("[skip] %s: no text extracted", file_path.name)
-                    _skip_reason = "empty"
-                    result.sources_skipped += 1
-                    continue
-
-                ids = [_make_id_abs(file_path, j) for j in range(len(chunks))]
-                doc_meta = extract_metadata(file_path)
-                metadatas = [
-                    {"source_type": "file", "source": source_str, "chunk": j, **doc_meta}
-                    for j in range(len(chunks))
-                ]
-                if incremental:
-                    for meta in metadatas:
-                        meta["file_hash"] = current_hash
-
-                batch_docs.extend(chunks)
-                batch_ids.extend(ids)
-                batch_metas.extend(metadatas)
-                if len(batch_docs) >= BATCH_LIMIT:
-                    _flush_many()
-
-                result.sources_ingested += 1
-                result.chunks_stored += len(chunks)
-                _status = "ingested"
-                if verbose:
-                    logger.info("  -> %d chunks stored", len(chunks))
-
-        finally:
-            if _skip_reason:
-                result.skipped_reasons.append(f"{file_path.name}: {_skip_reason}")
-            if on_progress:
-                on_progress(IngestProgress(
-                    filename=file_path.name,
-                    files_done=i,
-                    files_total=len(file_paths),
-                    status=_status,  # type: ignore[arg-type]
-                    chunks_stored=result.chunks_stored,
-                ))
-
-    _flush_many()
+    _process_file_list(
+        file_paths, collection, result,
+        make_source_str=lambda fp: str(fp.resolve()),
+        make_chunk_id=_make_id_abs,
+        streaming_source_dir=lambda fp: fp.parent,
+        chunk_size=chunk_size,
+        overlap=overlap,
+        min_chunk_size=min_chunk_size,
+        chunking=chunking,
+        incremental=incremental,
+        verbose=verbose,
+        streaming_threshold=streaming_threshold,
+        on_progress=on_progress,
+        pre_extracted=pre_extracted,
+    )
 
     if verbose:
         logger.info(

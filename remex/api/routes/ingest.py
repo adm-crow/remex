@@ -101,6 +101,8 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
             pass  # Client disconnected — stream generator already exited.
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
+        except Exception as e:  # noqa: BLE001
+            await queue.put({"type": "error", "detail": f"Unexpected error: {e}"})
 
     async def _monitor_disconnect() -> None:
         """Polls every 100 ms and sets cancel_event the moment the client drops.
@@ -243,6 +245,8 @@ async def ingest_sqlite_stream(
             pass  # Client disconnected — stream generator already exited.
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
+        except Exception as e:  # noqa: BLE001
+            await queue.put({"type": "error", "detail": f"Unexpected error: {e}"})
 
     async def _monitor_disconnect() -> None:
         while True:

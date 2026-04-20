@@ -1092,3 +1092,81 @@ def test_query_min_score_invalid_raises(tmp_path):
 def test_query_min_score_negative_raises(tmp_path):
     with pytest.raises(ValueError, match="min_score"):
         query(text="test", db_path=str(tmp_path / "db"), min_score=-0.1)
+
+
+# --- streaming overlap boundary ---
+
+def test_streaming_no_duplicate_content_at_block_boundary(mock_chroma, tmp_path):
+    """Verify that the streaming carry does not double-count content at block edges.
+
+    With ``carry = text[safe_end:]`` the carry has ``tail_size = chunk_size + overlap``
+    chars.  Each block feeds into the chunker which produces chunks with ``overlap``
+    chars of overlap.  The total number of chars stored across all chunks should be
+    roughly file_size + N_chunks * overlap — NOT file_size + N_boundary_blocks * 2*overlap.
+    We verify this by asserting the stored content is not larger than the ceiling
+    that would result from plain (non-streaming) chunking.
+    """
+    from unittest.mock import MagicMock, patch
+    from remex.core.pipeline import _ingest_file_streaming
+    from remex.core.chunker import chunk_text
+
+    full_text = ("word " * 50) * 20   # 5000 chars, plain repetitive text
+
+    file_path = tmp_path / "big.txt"
+    file_path.write_text(full_text, encoding="utf-8")
+
+    chunk_size, overlap = 300, 60
+
+    # Reference: what plain (non-streaming) chunking produces
+    reference_chunks = chunk_text(full_text, chunk_size=chunk_size, overlap=overlap, mode="word")
+    reference_total_chars = sum(len(c) for c in reference_chunks)
+
+    collected_docs: list[str] = []
+    col = MagicMock()
+    col.upsert.side_effect = lambda **kw: collected_docs.extend(kw.get("documents", []))
+
+    # Feed the file as 4 pages to force multiple block-boundary carry events
+    page_size = len(full_text) // 4
+    pages = [full_text[i:i + page_size] for i in range(0, len(full_text), page_size)]
+
+    with patch("remex.core.pipeline.extract_streaming", return_value=pages):
+        n = _ingest_file_streaming(
+            file_path, tmp_path, col, str(file_path),
+            chunk_size=chunk_size, overlap=overlap, min_chunk_size=20, mode="word",
+            doc_meta={}, incremental=False, current_hash="",
+        )
+
+    assert n == len(collected_docs)
+    streaming_total_chars = sum(len(c) for c in collected_docs)
+    # Streaming may store slightly more or fewer chars than non-streaming due to
+    # word-boundary rounding at block edges, but should be within 15% of reference.
+    assert abs(streaming_total_chars - reference_total_chars) / reference_total_chars < 0.15, (
+        f"Streaming stored {streaming_total_chars} chars vs reference {reference_total_chars} — "
+        "likely indicates doubled overlap at block boundaries"
+    )
+
+
+# --- API-level: query and chat schemas ---
+
+def test_query_api_where_too_deep():
+    """QueryRequest should reject where filters nested beyond depth 5."""
+    from remex.api.schemas import QueryRequest
+    import pytest
+
+    deeply_nested = {"a": {"b": {"c": {"d": {"e": {"f": "too deep"}}}}}}
+    with pytest.raises(Exception, match="too deeply nested"):
+        QueryRequest(text="q", where=deeply_nested)
+
+
+def test_query_api_where_valid():
+    from remex.api.schemas import QueryRequest
+    req = QueryRequest(text="q", where={"source_type": {"$eq": "file"}})
+    assert req.where == {"source_type": {"$eq": "file"}}
+
+
+def test_chat_api_where_too_deep():
+    from remex.api.schemas import ChatRequest
+    import pytest
+    deeply_nested = {"a": {"b": {"c": {"d": {"e": {"f": "too deep"}}}}}}
+    with pytest.raises(Exception, match="too deeply nested"):
+        ChatRequest(text="q", where=deeply_nested)

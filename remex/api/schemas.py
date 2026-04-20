@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Literal, Optional
-from pydantic import BaseModel, Field, model_validator
+from typing import Any, Literal, Optional
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 def _validate_overlap(values):
@@ -12,6 +12,22 @@ def _validate_overlap(values):
             f"overlap ({values.overlap}) must be smaller than chunk_size ({values.chunk_size})"
         )
     return values
+
+
+def _check_where_depth(obj: Any, depth: int = 0) -> None:
+    """Prevent deeply nested or oversized ChromaDB filter expressions."""
+    if depth > 5:
+        raise ValueError("where filter is too deeply nested (max depth 5)")
+    if isinstance(obj, dict):
+        if len(obj) > 20:
+            raise ValueError("where filter has too many keys (max 20)")
+        for v in obj.values():
+            _check_where_depth(v, depth + 1)
+    elif isinstance(obj, list):
+        if len(obj) > 50:
+            raise ValueError("where filter list is too long (max 50 items)")
+        for item in obj:
+            _check_where_depth(item, depth + 1)
 
 
 # ---------------------------------------------------------------------------
@@ -53,8 +69,15 @@ class QueryRequest(BaseModel):
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1)
     embedding_model: str = "all-MiniLM-L6-v2"
-    where: Optional[dict] = None
+    where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+    @field_validator("where")
+    @classmethod
+    def validate_where(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        if v is not None:
+            _check_where_depth(v)
+        return v
 
 
 class ChatRequest(BaseModel):
@@ -62,11 +85,18 @@ class ChatRequest(BaseModel):
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1)
     embedding_model: str = "all-MiniLM-L6-v2"
-    where: Optional[dict] = None
+    where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+
+    @field_validator("where")
+    @classmethod
+    def validate_where(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        if v is not None:
+            _check_where_depth(v)
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -126,11 +156,18 @@ class MultiChatRequest(BaseModel):
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1)
     embedding_model: str = "all-MiniLM-L6-v2"
-    where: Optional[dict] = None
+    where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+
+    @field_validator("where")
+    @classmethod
+    def validate_where(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+        if v is not None:
+            _check_where_depth(v)
+        return v
 
 
 class MultiChatResponse(BaseModel):

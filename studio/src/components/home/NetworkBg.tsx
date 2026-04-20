@@ -11,18 +11,19 @@ interface Particle {
   vx: number; vy: number;
 }
 
+// Module-level singleton — avoids creating a new canvas element every 90 frames.
+const _colorCanvas = document.createElement("canvas");
+_colorCanvas.width = _colorCanvas.height = 1;
+const _colorCtx = _colorCanvas.getContext("2d");
+
 function resolvePrimaryRGB(): [number, number, number] {
-  // Read the raw CSS variable value (e.g. "oklch(0.42 0.10 265)")
+  if (!_colorCtx) return [80, 80, 200];
+  // Canvas2D resolves any CSS color syntax (including oklch) to sRGB pixel bytes.
   const value = getComputedStyle(document.documentElement)
     .getPropertyValue("--primary").trim();
-  // Canvas2D always resolves any CSS color syntax to sRGB pixel bytes
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 1;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return [80, 80, 200];
-  ctx.fillStyle = value;
-  ctx.fillRect(0, 0, 1, 1);
-  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  _colorCtx.fillStyle = value;
+  _colorCtx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = _colorCtx.getImageData(0, 0, 1, 1).data;
   return [r, g, b];
 }
 

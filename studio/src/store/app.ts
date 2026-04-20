@@ -286,13 +286,20 @@ export const useAppStore = create<AppState>()(
         }
       },
       deactivateLicense: async () => {
-        try { await licenseApi.deactivate(); } catch { /* best-effort */ }
+        // Reset local state immediately so the UI responds without waiting for the network call.
+        const { watchFolders } = get();
+        for (const path of watchFolders) {
+          await invoke("watch_stop", { folder: path }).catch(() => {});
+        }
         set({
-          license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
-          // Reset Pro-only settings so they don't persist after downgrade
-          homeBg: "dotgrid",
-          theme:  "default",
+          license:      { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
+          // Reset Pro-only settings so they don't persist after downgrade.
+          homeBg:       "dotgrid",
+          theme:        "default",
+          watchFolders: [],
         });
+        // Best-effort remote deactivation — fire-and-forget so UI isn't blocked.
+        licenseApi.deactivate().catch(() => {});
       },
       revalidateLicense: async () => {
         try {
@@ -331,7 +338,8 @@ export const useAppStore = create<AppState>()(
         theme:            state.theme,
         aiProvider:       state.aiProvider,
         aiModel:          state.aiModel,
-        aiApiKey:         state.aiApiKey,
+        // aiApiKey intentionally NOT persisted — re-entered each session to avoid
+        // storing credentials in plaintext localStorage.
         homeBg:           state.homeBg,
         lastIngestResult: state.lastIngestResult,
         collectionTypes:       state.collectionTypes,
