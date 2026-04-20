@@ -9,40 +9,18 @@ const PRO_PRICE = "29€";
 const CHECKOUT_URL =
   "https://getremex.lemonsqueezy.com/checkout/buy/6ade10f8-4f82-4f77-b139-c8b798629cae?checkout%5Bcustom%5D%5Bsource%5D=studio-in-app";
 
-const BULLETS_BY_CONTEXT: Record<string, string[]> = {
-  generic: [
-    "Pro embedding models (bge-large, e5-large, nomic)",
-    "Advanced exports: BibTeX, RIS, CSL-JSON, Obsidian vault",
-    "Watch-folder auto-ingest",
-    "Unlimited searchable query history",
-    "Eight extra accent themes + Pro badge",
-    "Priority email support (48 h SLA)",
-  ],
-  "embedding-model": [
-    "Pro-size embedding models (bge-large, e5-large, nomic)",
-    "Better retrieval quality on long-form documents",
-    "All other Pro features included",
-  ],
-  theme: [
-    "Eight additional accent colours",
-    "Pro badge in the sidebar",
-    "All other Pro features included",
-  ],
-  "watch-folder": [
-    "Watch-folder auto-ingest: Studio re-ingests changes automatically",
-    "Unlimited searchable query history",
-    "Advanced exports and bigger embedding models included",
-  ],
-  export: [
-    "Export to BibTeX, RIS, CSL-JSON, or an Obsidian vault folder",
-    "Unlimited searchable query history",
-    "All other Pro features included",
-  ],
-};
+const PRO_BULLETS = [
+  "Pro embedding models (bge-large, e5-large, nomic)",
+  "Advanced exports: BibTeX, RIS, CSL-JSON, Obsidian vault",
+  "Watch-folder auto-ingest",
+  "Unlimited searchable query history",
+  "Eight extra accent themes + Pro badge",
+  "Aurora & network homepage backgrounds",
+  "Priority email support (48 h SLA)",
+];
 
 export function UpgradeModal() {
-  const { upgradeModalOpen, upgradeModalContext, closeUpgradeModal, requestLicensePrompt } = useAppStore();
-  const bullets = BULLETS_BY_CONTEXT[upgradeModalContext ?? "generic"] ?? BULLETS_BY_CONTEXT.generic;
+  const { upgradeModalOpen, closeUpgradeModal, requestLicensePrompt } = useAppStore();
 
   return (
     <Dialog open={upgradeModalOpen} onOpenChange={(v) => !v && closeUpgradeModal()}>
@@ -58,7 +36,7 @@ export function UpgradeModal() {
         </DialogHeader>
 
         <ul className="space-y-2 py-2">
-          {bullets.map((b) => (
+          {PRO_BULLETS.map((b) => (
             <li key={b} className="flex gap-2 text-sm">
               <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
               <span>{b}</span>

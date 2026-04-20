@@ -12,10 +12,12 @@ describe("UpgradeModal", () => {
     vi.resetAllMocks();
   });
 
-  it("renders contextual bullets based on upgradeModalContext", () => {
+  it("always renders the full Pro feature list regardless of context", () => {
     useAppStore.setState({ upgradeModalOpen: true, upgradeModalContext: "embedding-model" });
     render(<UpgradeModal />);
-    expect(screen.getByText(/Pro-size embedding models/)).toBeInTheDocument();
+    expect(screen.getByText(/Pro embedding models/)).toBeInTheDocument();
+    expect(screen.getByText(/Watch-folder auto-ingest/)).toBeInTheDocument();
+    expect(screen.getByText(/Advanced exports/)).toBeInTheDocument();
   });
 
   it("Buy Pro button opens the checkout URL", () => {
