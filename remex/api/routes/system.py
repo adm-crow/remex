@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter
 from remex.core import __version__, SUPPORTED_EXTENSIONS, PROVIDERS, detect_provider
 from remex.api.schemas import HealthResponse, InfoResponse
@@ -11,10 +12,11 @@ def health() -> HealthResponse:
 
 
 @router.get("/info", response_model=InfoResponse)
-def info() -> InfoResponse:
+async def info() -> InfoResponse:
+    provider = await asyncio.to_thread(detect_provider)
     return InfoResponse(
         version=__version__,
         supported_extensions=sorted(SUPPORTED_EXTENSIONS),
         providers=list(PROVIDERS),
-        detected_provider=detect_provider(),
+        detected_provider=provider,
     )

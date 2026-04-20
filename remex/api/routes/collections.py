@@ -146,8 +146,17 @@ def rename_collection(
         except Exception:
             pass
 
+    original_count = old_col.count()
+    if original_count > 100_000:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Collection has {original_count:,} chunks — too large to rename in-memory "
+                "(limit: 100,000). Use the CLI to reset and re-ingest under the new name."
+            ),
+        )
+
     all_data = old_col.get(include=["documents", "metadatas", "embeddings"])
-    original_count = len(all_data["ids"])
 
     # Step 1-2: Copy to sentinel and verify
     sentinel = client.create_collection(sentinel_name, metadata=old_col.metadata or {})

@@ -15,7 +15,7 @@ export function WatchFoldersCard() {
     if (!isPro) return;
     const unsub = listen<{ folder: string; paths: string[] }>("watch:changed", async (evt) => {
       if (!currentDb || !currentCollection) return;
-      await fetch(`${apiUrl}/collections/${currentCollection}/ingest`, {
+      await fetch(`${apiUrl}/collections/${encodeURIComponent(currentCollection)}/ingest`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ db_path: currentDb, source_dir: evt.payload.folder, incremental: true }),

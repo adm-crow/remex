@@ -108,18 +108,24 @@ def ingest_sqlite(
         use_rowid = id_column not in available
         col_list = ", ".join(f'"{c.replace(chr(34), chr(34)*2)}"' for c in selected)
 
+        # COUNT(*) first so we can report sources_found without loading all rows.
+        count_cur = conn.cursor()
+        count_cur.execute(f'SELECT COUNT(*) FROM "{safe_table}"')
+        row_count: int = count_cur.fetchone()[0]
+
         if use_rowid:
             cursor.execute(f'SELECT rowid AS _remex_rowid, {col_list} FROM "{safe_table}"')
         else:
             cursor.execute(f'SELECT {col_list} FROM "{safe_table}"')
 
-        rows = cursor.fetchall()
-    finally:
+    except Exception:
         conn.close()
+        raise
 
-    result = IngestResult(sources_found=len(rows))
+    result = IngestResult(sources_found=row_count)
 
-    if not rows:
+    if row_count == 0:
+        conn.close()
         if verbose:
             logger.info("No records found in %s::%s", db_path, table)
         return result
@@ -132,81 +138,84 @@ def ingest_sqlite(
     collection = _get_collection(chroma_path, collection_name, embedding_model)
 
     if verbose:
-        logger.info("Ingesting: %s (%d records)", table, len(rows))
+        logger.info("Ingesting: %s (%d records)", table, row_count)
 
-    for rows_done, row in enumerate(rows, 1):
-        row_dict = dict(row)
-        row_id = None
-        _status = "skipped"
+    try:
+        for rows_done, row in enumerate(cursor, 1):
+            row_dict = dict(row)
+            row_id = None
+            _status = "skipped"
 
-        try:
-            # Extract row identity
-            if use_rowid:
-                row_id = row_dict.pop("_remex_rowid")
-            else:
-                row_id = row_dict.get(id_column)
-
-            # Only include selected columns in the text representation.
-            # Exclude the id_column in the default serialization — it's an
-            # identifier, not content, so a row whose only populated column is
-            # the ID has no ingestable text. Users who want the ID in the text
-            # can reference it explicitly via row_template.
-            text_dict = {
-                k: row_dict[k]
-                for k in selected
-                if k in row_dict and (row_template or k != id_column)
-            }
-            text = _row_to_text(text_dict, row_template)
-
-            chunks = chunk_text(
-                text,
-                chunk_size=chunk_size,
-                overlap=overlap,
-                min_chunk_size=min_chunk_size,
-                mode=chunking,
-            )
-            if not chunks:
-                # Row text is non-empty but shorter than min_chunk_size
-                # (common for compact DB rows). Store it as a single chunk
-                # rather than discarding — every row is a meaningful unit.
-                if text:
-                    chunks = [text]
+            try:
+                # Extract row identity
+                if use_rowid:
+                    row_id = row_dict.pop("_remex_rowid")
                 else:
-                    result.sources_skipped += 1
-                    continue
+                    row_id = row_dict.get(id_column)
 
-            ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(len(chunks))]
-            metadatas = [
-                {
-                    "source_type": "sqlite",
-                    "source": f"{Path(db_path).resolve()}::{table}",
-                    "row_id": str(row_id),
-                    "chunk": i,
+                # Only include selected columns in the text representation.
+                # Exclude the id_column in the default serialization — it's an
+                # identifier, not content, so a row whose only populated column is
+                # the ID has no ingestable text. Users who want the ID in the text
+                # can reference it explicitly via row_template.
+                text_dict = {
+                    k: row_dict[k]
+                    for k in selected
+                    if k in row_dict and (row_template or k != id_column)
                 }
-                for i in range(len(chunks))
-            ]
+                text = _row_to_text(text_dict, row_template)
 
-            collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
-            result.sources_ingested += 1
-            result.chunks_stored += len(chunks)
-            _status = "ingested"
+                chunks = chunk_text(
+                    text,
+                    chunk_size=chunk_size,
+                    overlap=overlap,
+                    min_chunk_size=min_chunk_size,
+                    mode=chunking,
+                )
+                if not chunks:
+                    # Row text is non-empty but shorter than min_chunk_size
+                    # (common for compact DB rows). Store it as a single chunk
+                    # rather than discarding — every row is a meaningful unit.
+                    if text:
+                        chunks = [text]
+                    else:
+                        result.sources_skipped += 1
+                        continue
 
-        except Exception as e:
-            if verbose:
-                logger.warning("[skip] %s[%s]: %s", table, row_id, e)
-            result.sources_skipped += 1
-            result.skipped_reasons.append(f"{table}[{row_id}]: extract_error: {e}")
-            _status = "error"
+                ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(len(chunks))]
+                metadatas = [
+                    {
+                        "source_type": "sqlite",
+                        "source": f"{Path(db_path).resolve()}::{table}",
+                        "row_id": str(row_id),
+                        "chunk": i,
+                    }
+                    for i in range(len(chunks))
+                ]
 
-        finally:
-            if on_progress:
-                on_progress(IngestProgress(
-                    filename=f"{table}[{row_id}]",
-                    files_done=rows_done,
-                    files_total=len(rows),
-                    status=_status,  # type: ignore[arg-type]
-                    chunks_stored=result.chunks_stored,
-                ))
+                collection.upsert(documents=chunks, ids=ids, metadatas=metadatas)  # type: ignore[arg-type]
+                result.sources_ingested += 1
+                result.chunks_stored += len(chunks)
+                _status = "ingested"
+
+            except Exception as e:
+                if verbose:
+                    logger.warning("[skip] %s[%s]: %s", table, row_id, e)
+                result.sources_skipped += 1
+                result.skipped_reasons.append(f"{table}[{row_id}]: extract_error: {e}")
+                _status = "error"
+
+            finally:
+                if on_progress:
+                    on_progress(IngestProgress(
+                        filename=f"{table}[{row_id}]",
+                        files_done=rows_done,
+                        files_total=row_count,
+                        status=_status,  # type: ignore[arg-type]
+                        chunks_stored=result.chunks_stored,
+                    ))
+    finally:
+        conn.close()
 
     if verbose:
         logger.info("  -> %d chunks stored", result.chunks_stored)

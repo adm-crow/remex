@@ -37,7 +37,7 @@ export function toRIS(results: QueryResultItem[], query: string): string {
       `TY  - GEN`,
       `TI  - ${title}`,
       `AB  - ${r.text.replace(/\n/g, " ").slice(0, 2000)}`,
-      `N1  - Remex semantic search; score ${r.score.toFixed(3)}; query "${query}"`,
+      `N1  - Remex semantic search; score ${r.score.toFixed(3)}; query "${query.replace(/\n/g, " ")}"`,
       `PY  - ${year}`,
       `UR  - ${r.source}`,
       `ER  - `,

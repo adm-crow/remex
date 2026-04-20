@@ -21,7 +21,20 @@ from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, 
 _EF_CACHE: dict[str, Any] = {}
 _EF_LOCK = threading.Lock()  # guards concurrent first-load across asyncio.to_thread workers
 
+# ChromaDB PersistentClient is reused per db_path to avoid re-opening the SQLite WAL on every call.
+_CLIENT_CACHE: dict[str, Any] = {}
+_CLIENT_LOCK = threading.Lock()
+
 _MAX_EXTRACT_WORKERS = 4  # threads for parallel file extraction (I/O-bound)
+
+
+def _get_client(db_path: str) -> Any:
+    if db_path in _CLIENT_CACHE:
+        return _CLIENT_CACHE[db_path]
+    with _CLIENT_LOCK:
+        if db_path not in _CLIENT_CACHE:
+            _CLIENT_CACHE[db_path] = chromadb.PersistentClient(path=db_path)
+    return _CLIENT_CACHE[db_path]
 
 
 def _get_ef(model_name: str) -> Any:
@@ -70,7 +83,7 @@ def _get_source_chunks(collection: Any, source_str: str) -> dict[str, Any]:
 
 def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True) -> Any:
     """Get or create a ChromaDB collection with the given embedding model."""
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     ef = _get_ef(embedding_model)
     if create:
         collection = client.get_or_create_collection(
@@ -324,9 +337,9 @@ def _process_file_list(
                     result.sources_skipped += 1
                     continue
 
+                _status = "ingested"
                 result.sources_ingested += 1
                 result.chunks_stored += n
-                _status = "ingested"
                 if verbose:
                     logger.info("  -> %d chunks stored (streamed)", n)
 
@@ -598,7 +611,7 @@ def purge(
     Returns a :class:`~remex.core.PurgeResult` with ``chunks_deleted`` and
     ``chunks_checked``.
     """
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     try:
         collection = client.get_collection(name=collection_name)
     except (ValueError, ChromaNotFoundError):
@@ -645,7 +658,7 @@ def reset(
             "reset() permanently deletes the collection. "
             "Pass confirm=True to proceed, or use the CLI (`remex reset --yes`)."
         )
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     try:
         client.delete_collection(name=collection_name)
         if verbose:
@@ -660,7 +673,7 @@ def sources(
     collection_name: str = "remex",
 ) -> list[str]:
     """Return a sorted list of unique source file paths stored in the collection."""
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     try:
         collection = client.get_collection(name=collection_name)
     except (ValueError, ChromaNotFoundError):
@@ -682,7 +695,7 @@ def source_chunk_counts(
     collection_name: str = "remex",
 ) -> dict[str, int]:
     """Return a mapping of source path → chunk count for the collection."""
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     try:
         collection = client.get_collection(name=collection_name)
     except (ValueError, ChromaNotFoundError):
@@ -706,7 +719,7 @@ def list_collections(db_path: str = "./remex_db") -> list[str]:
         db_path: ChromaDB persistence path.
     """
     try:
-        client = chromadb.PersistentClient(path=db_path)
+        client = _get_client(db_path)
         return sorted(c.name for c in client.list_collections())
     except (PermissionError, OSError):
         raise
@@ -731,7 +744,7 @@ def collection_stats(
     Raises:
         CollectionNotFoundError: If the collection does not exist.
     """
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     try:
         collection = client.get_collection(name=collection_name)
     except (ValueError, ChromaNotFoundError):
@@ -783,7 +796,7 @@ def delete_source(
     Raises:
         CollectionNotFoundError: If the collection does not exist.
     """
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     try:
         collection = client.get_collection(name=collection_name)
     except (ValueError, ChromaNotFoundError):

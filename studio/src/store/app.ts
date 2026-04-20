@@ -190,9 +190,8 @@ export const useAppStore = create<AppState>()(
       addQueryHistory: (text) => {
         const { license, queryHistory } = get();
         const filtered = queryHistory.filter((q) => q !== text);
-        const cap = license.tier === "pro" ? Number.POSITIVE_INFINITY : 20;
-        const next = [text, ...filtered];
-        set({ queryHistory: Number.isFinite(cap) ? next.slice(0, cap as number) : next });
+        const cap = license.tier === "pro" ? 1000 : 20;
+        set({ queryHistory: [text, ...filtered].slice(0, cap) });
       },
 
       removeQueryHistory: (text) => {

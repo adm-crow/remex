@@ -1,4 +1,6 @@
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -32,10 +34,11 @@ def create_app() -> FastAPI:
     async def _unhandled_exception_handler(
         request: Request, exc: Exception
     ) -> JSONResponse:
-        """Catch-all: ensures every error returns JSON with CORS headers."""
-        return JSONResponse(
-            status_code=500,
-            content={"detail": str(exc)},
+        """Catch-all: routes through FastAPI's HTTPException handler so that
+        CORSMiddleware can attach Access-Control-Allow-Origin to error responses."""
+        return await http_exception_handler(
+            request,
+            FastAPIHTTPException(status_code=500, detail=str(exc)),
         )
 
     app.include_router(system.router)

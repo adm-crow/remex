@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -47,6 +48,13 @@ class IngestRequest(BaseModel):
 
     _check_overlap = model_validator(mode="after")(_validate_overlap)
 
+    @field_validator("source_dir")
+    @classmethod
+    def must_be_absolute(cls, v: str) -> str:
+        if not os.path.isabs(v):
+            raise ValueError("source_dir must be an absolute path")
+        return v
+
 
 class IngestSQLiteRequest(BaseModel):
     sqlite_path: str
@@ -63,9 +71,16 @@ class IngestSQLiteRequest(BaseModel):
 
     _check_overlap = model_validator(mode="after")(_validate_overlap)
 
+    @field_validator("sqlite_path")
+    @classmethod
+    def sqlite_must_be_absolute(cls, v: str) -> str:
+        if not os.path.isabs(v):
+            raise ValueError("sqlite_path must be an absolute path")
+        return v
+
 
 class QueryRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1)
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1)
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -81,7 +96,7 @@ class QueryRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1)
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1)
     embedding_model: str = "all-MiniLM-L6-v2"
@@ -151,7 +166,7 @@ class ChatResponse(BaseModel):
 
 
 class MultiChatRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1)
     collections: list[str]
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1)
