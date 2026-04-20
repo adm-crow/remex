@@ -36,7 +36,7 @@ const THEME_OPTIONS: ThemeOpt[] = [
   { value: "lime",    label: "Lime",    color: "#7EBD01" },
   { value: "slate",   label: "Slate",   color: "#516572" },
   { value: "midnight", label: "Midnight", color: "#323C97", pro: true },
-  { value: "forest",   label: "Forest",   color: "#297A53", pro: true },
+  { value: "forest",   label: "Forest",   color: "#1a6b35", pro: true },
   { value: "ocean",    label: "Ocean",    color: "#046D9E", pro: true },
   { value: "sunset",   label: "Sunset",   color: "#E26327", pro: true },
   { value: "rosegold", label: "Rosegold", color: "#C64B70", pro: true },
