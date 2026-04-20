@@ -180,16 +180,14 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         ...(isPro ? [
           { name: "BibTeX",   extensions: ["bib"] },
           { name: "RIS",      extensions: ["ris"] },
-          { name: "CSL-JSON", extensions: ["json"] },
+          { name: "CSL-JSON", extensions: ["csl"] },
           { name: "Obsidian Vault (folder)", extensions: [""] },
         ] : [
-          // Pro formats shown to free users to advertise the feature. The
-          // extension-based handler below intercepts .bib / .ris / no-ext and
-          // opens the upgrade modal. CSL-JSON is intentionally excluded — it
-          // shares `.json` with the free CSL-less export, so we can't detect
-          // the user's intent from the path alone.
+          // Pro formats shown to free users. .csl is unambiguous (no collision
+          // with the free .json export), so the gate below can rely on extension alone.
           { name: "BibTeX (Pro)",   extensions: ["bib"] },
           { name: "RIS (Pro)",      extensions: ["ris"] },
+          { name: "CSL-JSON (Pro)", extensions: ["csl"] },
           { name: "Obsidian Vault — folder (Pro)", extensions: [""] },
         ]),
       ],
@@ -205,7 +203,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     } else if (ext === "ris") {
       if (!isPro) { openUpgradeModal("export"); return; }
       content = toRIS(results, submitted);
-    } else if (ext === "json" && isPro && /csl/i.test(path)) {
+    } else if (ext === "csl") {
+      if (!isPro) { openUpgradeModal("export"); return; }
       content = toCSLJson(results, submitted);
     } else if (!ext) {
       // Obsidian vault: path is the folder the user chose.

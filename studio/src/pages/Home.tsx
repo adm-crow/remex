@@ -1,7 +1,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { X, FolderOpen, Search, Upload, Database, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppStore } from "@/store/app";
+import { useAppStore, useIsPro } from "@/store/app";
 import { cn } from "@/lib/utils";
 import { AuroraBg } from "@/components/home/AuroraBg";
 import { NetworkBg } from "@/components/home/NetworkBg";
@@ -38,6 +38,7 @@ export function Home() {
     setCurrentCollection,
     homeBg,
   } = useAppStore();
+  const isPro = useIsPro();
 
   async function handleOpen() {
     const selected = await open({
@@ -68,8 +69,8 @@ export function Home() {
           <div className="dotgrid-vignette absolute inset-0" />
         </div>
       )}
-      {homeBg === "aurora"  && <AuroraBg />}
-      {homeBg === "network" && <NetworkBg />}
+      {homeBg === "aurora"  && isPro && <AuroraBg />}
+      {homeBg === "network" && isPro && <NetworkBg />}
 
       {/* ── Main content — centered in upper portion ───────────────────── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-10 min-h-0">

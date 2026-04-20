@@ -3,6 +3,7 @@ import { Crown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useAppStore } from "@/store/app";
 import { cn } from "@/lib/utils";
 import { ProBadge } from "./ProBadge";
@@ -32,7 +33,8 @@ export function LicenseCard() {
   const [showPaste, setShowPaste] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const cardRef  = useRef<HTMLDivElement | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (licensePromptSeq === 0 || license.tier === "pro") return;
@@ -58,10 +60,10 @@ export function LicenseCard() {
   }
 
   async function handleDeactivate() {
-    if (!confirm("Deactivate Remex Pro on this machine? You can reactivate any time with the same key.")) return;
     setBusy(true);
     await deactivateLicense();
     setBusy(false);
+    setConfirmOpen(false);
   }
 
   if (license.tier === "pro") {
@@ -84,10 +86,27 @@ export function LicenseCard() {
             Check license now
           </Button>
           <Button size="sm" variant="ghost" className="text-destructive"
-                  onClick={() => void handleDeactivate()} disabled={busy}>
+                  onClick={() => setConfirmOpen(true)} disabled={busy}>
             Deactivate this machine
           </Button>
         </div>
+
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Deactivate on this machine?</DialogTitle>
+              <DialogDescription>
+                Your Pro features will be disabled. You can reactivate any time with the same key.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex gap-2 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+              <Button variant="destructive" className="flex-1" onClick={() => void handleDeactivate()} disabled={busy}>
+                Deactivate
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </Card>
     );
   }

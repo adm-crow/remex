@@ -2342,12 +2342,14 @@ studio = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "anthropic" },
     { name = "beautifulsoup4" },
     { name = "ebooklib" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "nltk" },
     { name = "odfpy" },
+    { name = "openai" },
     { name = "openpyxl" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -2379,12 +2381,14 @@ provides-extras = ["sentence", "formats", "ai", "api", "studio", "all"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anthropic" },
     { name = "beautifulsoup4" },
     { name = "ebooklib" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "nltk" },
     { name = "odfpy" },
+    { name = "openai" },
     { name = "openpyxl" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-asyncio", specifier = ">=0.21" },

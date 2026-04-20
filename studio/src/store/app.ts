@@ -287,7 +287,12 @@ export const useAppStore = create<AppState>()(
       },
       deactivateLicense: async () => {
         try { await licenseApi.deactivate(); } catch { /* best-effort */ }
-        set({ license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null } });
+        set({
+          license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
+          // Reset Pro-only settings so they don't persist after downgrade
+          homeBg: "dotgrid",
+          theme:  "default",
+        });
       },
       revalidateLicense: async () => {
         try {

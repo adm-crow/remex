@@ -5,7 +5,9 @@ use std::time::{Duration, Instant};
 
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
+
+use crate::license::{read_from, Tier};
 
 pub struct WatchState(pub Mutex<HashMap<PathBuf, WatcherEntry>>);
 
@@ -39,6 +41,16 @@ const FLUSH_POLL: Duration = Duration::from_millis(500);
 
 #[tauri::command]
 pub fn watch_start(app: AppHandle, state: State<WatchState>, folder: String) -> Result<(), String> {
+    // Server-side Pro gate — read license from disk to prevent DevTools bypass
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let tier = read_from(&data_dir)
+        .map_err(|e| e.to_string())?
+        .map(|f| if f.status == "active" { Tier::Pro } else { Tier::Free })
+        .unwrap_or(Tier::Free);
+    if tier != Tier::Pro {
+        return Err("Pro license required for watch folders".into());
+    }
+
     let folder_pb = PathBuf::from(&folder);
     if !folder_pb.exists() { return Err("Folder does not exist".into()); }
 
@@ -57,7 +69,7 @@ pub fn watch_start(app: AppHandle, state: State<WatchState>, folder: String) -> 
     let mut watcher = recommended_watcher(move |res: Result<Event, notify::Error>| {
         let Ok(evt) = res else { return; };
         if !matches!(evt.kind, EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)) { return; }
-        let mut s = cb_state.lock().unwrap();
+        let mut s = cb_state.lock().unwrap_or_else(|e| e.into_inner());
         for p in evt.paths {
             if let Some(sp) = p.to_str() { s.pending.push(sp.to_string()); }
         }
@@ -80,7 +92,7 @@ pub fn watch_start(app: AppHandle, state: State<WatchState>, folder: String) -> 
     std::thread::spawn(move || loop {
         std::thread::sleep(FLUSH_POLL);
         let Some(shared) = weak_state.upgrade() else { break; };
-        let mut s = shared.lock().unwrap();
+        let mut s = shared.lock().unwrap_or_else(|e| e.into_inner());
         if s.pending.is_empty() || s.last_emit.elapsed() < DEBOUNCE { continue; }
         let paths: Vec<String> = std::mem::take(&mut s.pending);
         s.last_emit = Instant::now();

@@ -120,6 +120,10 @@ export function SettingsPane() {
   }, [licensePromptSeq]);
   const [localModel,  setLocalModel]  = useState(aiModel);
   const [localApiKey, setLocalApiKey] = useState(aiApiKey);
+
+  // Sync form fields if store values change externally (e.g. license deactivation reset)
+  useEffect(() => { setLocalModel(aiModel); },   [aiModel]);
+  useEffect(() => { setLocalApiKey(aiApiKey); }, [aiApiKey]);
   const [showKey,     setShowKey]     = useState(false);
   const [appVersion,  setAppVersion]  = useState<string>("");
 

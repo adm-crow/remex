@@ -14,7 +14,7 @@ export function AuroraBg() {
         style={{ width: 580, height: 580, bottom: "-12%", left: "18%" }}
       />
       <div
-        className="aurora-blob-4 animate-aurora-4 absolute rounded-full blur-[90px] opacity-40 dark:opacity-28"
+        className="aurora-blob-4 animate-aurora-4 absolute rounded-full blur-[90px] opacity-40 dark:opacity-30"
         style={{ width: 460, height: 460, bottom: "5%", right: "8%" }}
       />
     </div>

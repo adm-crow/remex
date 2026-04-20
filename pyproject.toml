@@ -59,6 +59,8 @@ dev = [
     "fastapi",
     "uvicorn[standard]",
     "httpx",
+    "anthropic",
+    "openai",
 ]
 
 [tool.pytest.ini_options]
