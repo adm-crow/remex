@@ -257,9 +257,9 @@ export function SettingsPane() {
                         pro: true,
                         preview: (
                           <div className="absolute inset-0 rounded-md overflow-hidden">
-                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 20% 30%, oklch(0.68 0.28 278 / 0.55) 0%, transparent 55%)" }} />
-                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 80% 20%, oklch(0.70 0.24 218 / 0.45) 0%, transparent 50%)" }} />
-                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 80%, oklch(0.66 0.30 322 / 0.40) 0%, transparent 55%)" }} />
+                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 20% 30%, oklch(from var(--primary) 0.65 0.22 h / 0.55) 0%, transparent 55%)" }} />
+                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 80% 20%, oklch(from var(--primary) 0.62 0.20 calc(h + 50) / 0.45) 0%, transparent 50%)" }} />
+                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 80%, oklch(from var(--primary) 0.60 0.24 calc(h - 40) / 0.40) 0%, transparent 55%)" }} />
                           </div>
                         ),
                       },

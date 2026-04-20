@@ -121,30 +121,30 @@
     var(--background) 100%);
 }
 
-/* Aurora blob colours — richer in dark mode */
+/* Aurora blob colours — theme-aware via CSS relative color, hue offsets for variety */
 .aurora-blob-1 {
-  background: radial-gradient(circle, oklch(0.58 0.26 278) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.58 0.22 h) 0%, transparent 65%);
 }
 .aurora-blob-2 {
-  background: radial-gradient(circle, oklch(0.60 0.22 218) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.60 0.20 calc(h + 50)) 0%, transparent 65%);
 }
 .aurora-blob-3 {
-  background: radial-gradient(circle, oklch(0.57 0.28 322) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.57 0.24 calc(h - 40)) 0%, transparent 65%);
 }
 .aurora-blob-4 {
-  background: radial-gradient(circle, oklch(0.62 0.22 192) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.62 0.20 calc(h + 90)) 0%, transparent 65%);
 }
 .dark .aurora-blob-1 {
-  background: radial-gradient(circle, oklch(0.74 0.32 278) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.74 0.28 h) 0%, transparent 65%);
 }
 .dark .aurora-blob-2 {
-  background: radial-gradient(circle, oklch(0.76 0.28 218) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.76 0.24 calc(h + 50)) 0%, transparent 65%);
 }
 .dark .aurora-blob-3 {
-  background: radial-gradient(circle, oklch(0.73 0.34 322) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.73 0.30 calc(h - 40)) 0%, transparent 65%);
 }
 .dark .aurora-blob-4 {
-  background: radial-gradient(circle, oklch(0.78 0.26 192) 0%, transparent 65%);
+  background: radial-gradient(circle, oklch(from var(--primary) 0.78 0.22 calc(h + 90)) 0%, transparent 65%);
 }
 
 /* ── Light theme ─────────────────────────────────────────────────────────── */
