@@ -54,6 +54,14 @@ const AI_PROVIDERS = [
   { value: "ollama",      label: "Ollama (local)" },
 ];
 
+type Tab = "appearance" | "ai" | "license";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "appearance", label: "Appearance" },
+  { id: "ai",         label: "AI & Server" },
+  { id: "license",    label: "License"    },
+];
+
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("rounded-xl border bg-card p-3 space-y-2.5", className)}>
@@ -74,15 +82,11 @@ function CardHeader({ icon: Icon, title }: { icon: React.ElementType; title: str
 }
 
 function Field({ label, htmlFor, children }: {
-  label: string;
-  htmlFor?: string;
-  children: React.ReactNode;
+  label: string; htmlFor?: string; children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1">
-      <Label htmlFor={htmlFor} className="text-xs text-muted-foreground">
-        {label}
-      </Label>
+      <Label htmlFor={htmlFor} className="text-xs text-muted-foreground">{label}</Label>
       {children}
     </div>
   );
@@ -104,7 +108,15 @@ export function SettingsPane() {
   const isPro = useIsPro();
   const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
 
+  const licensePromptSeq = useAppStore((s) => s.licensePromptSeq);
+
+  const [tab, setTab] = useState<Tab>("appearance");
   const [localApiUrl, setLocalApiUrl] = useState(apiUrl);
+
+  useEffect(() => {
+    if (licensePromptSeq === 0) return;
+    setTab("license");
+  }, [licensePromptSeq]);
   const [localModel,  setLocalModel]  = useState(aiModel);
   const [localApiKey, setLocalApiKey] = useState(aiApiKey);
   const [showKey,     setShowKey]     = useState(false);
@@ -127,252 +139,252 @@ export function SettingsPane() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="flex-1 min-h-0 overflow-y-auto p-4">
-      <div className="grid grid-cols-2 gap-3 items-start">
 
-        {/* ── Left column ─────────────────────────────────────────────── */}
-        <div className="space-y-3">
+      {/* ── Tab bar ──────────────────────────────────────────────────────── */}
+      <div className="shrink-0 border-b px-4 flex gap-0">
+        {TABS.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={cn(
+              "px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors",
+              tab === id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-          {/* Appearance */}
-          <Card>
-            <CardHeader icon={Palette} title="Appearance" />
+      {/* ── Tab content ──────────────────────────────────────────────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
 
-            {/* Dark mode */}
-            <div className="flex items-center justify-between py-0.5">
-              <div className="flex items-center gap-2">
-                {darkMode
-                  ? <Moon className="w-3.5 h-3.5 text-muted-foreground" />
-                  : <Sun  className="w-3.5 h-3.5 text-muted-foreground" />
-                }
-                <Label htmlFor="dark-mode" className="text-sm cursor-pointer">
-                  Dark mode
-                </Label>
-              </div>
-              <Switch
-                id="dark-mode"
-                checked={darkMode}
-                onCheckedChange={setDarkMode}
-                aria-label="Dark mode"
-              />
-            </div>
+        {/* ── Appearance ─────────────────────────────────────────────────── */}
+        {tab === "appearance" && (
+          <>
+            <Card>
+              <CardHeader icon={Palette} title="Appearance" />
 
-            <div className="h-px bg-border" />
-
-            {/* Accent colour */}
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Accent colour</p>
-              <div className="grid grid-cols-4 gap-1.5">
-                {THEME_OPTIONS.map((opt) => {
-                  const locked = opt.pro && !isPro;
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => {
-                        if (locked) { openUpgradeModal("theme"); return; }
-                        setTheme(opt.value);
-                      }}
-                      className={cn(
-                        "relative flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
-                        theme === opt.value ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
-                        locked && "bg-primary/5 border-primary/25 hover:bg-primary/10"
-                      )}
-                      title={opt.label}
-                      aria-label={opt.label}
-                      aria-pressed={theme === opt.value}
-                    >
-                      <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
-                      <span className={cn(
-                        "text-[10px] font-medium leading-none",
-                        theme === opt.value ? "text-primary" : "text-muted-foreground"
-                      )}>
-                        {opt.label}
-                      </span>
-                      {locked && <ProBadge className="absolute -top-1 -right-1" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </Card>
-
-          {/* API Server */}
-          <Card>
-            <CardHeader icon={Server} title="API Server" />
-            <form onSubmit={handleSaveApi} className="space-y-3">
-              <Field label="URL" htmlFor="api-url">
-                <Input
-                  id="api-url"
-                  value={localApiUrl}
-                  onChange={(e) => setLocalApiUrl(e.target.value)}
-                  placeholder="http://localhost:8000"
-                  aria-label="API URL"
-                  className="font-mono text-xs h-8"
+              {/* Dark mode */}
+              <div className="flex items-center justify-between py-0.5">
+                <div className="flex items-center gap-2">
+                  {darkMode
+                    ? <Moon className="w-3.5 h-3.5 text-muted-foreground" />
+                    : <Sun  className="w-3.5 h-3.5 text-muted-foreground" />
+                  }
+                  <Label htmlFor="dark-mode" className="text-sm cursor-pointer">Dark mode</Label>
+                </div>
+                <Switch
+                  id="dark-mode"
+                  checked={darkMode}
+                  onCheckedChange={setDarkMode}
+                  aria-label="Dark mode"
                 />
-              </Field>
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" className="flex-1">
-                  Save
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => open(`${localApiUrl || "http://localhost:8000"}/docs`)}
-                  aria-label="Open API URL in browser"
-                  title="Open in browser"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </Button>
               </div>
-            </form>
-          </Card>
 
-          {/* License */}
-          <LicenseCard />
+              <div className="h-px bg-border" />
 
-          <WatchFoldersCard />
+              {/* Accent colour */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Accent colour</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {THEME_OPTIONS.map((opt) => {
+                    const locked = opt.pro && !isPro;
+                    return (
+                      <button
+                        key={opt.value}
+                        onClick={() => {
+                          if (locked) { openUpgradeModal("theme"); return; }
+                          setTheme(opt.value);
+                        }}
+                        className={cn(
+                          "relative flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
+                          theme === opt.value ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
+                          locked && "bg-primary/5 border-primary/25 hover:bg-primary/10"
+                        )}
+                        title={opt.label}
+                        aria-label={opt.label}
+                        aria-pressed={theme === opt.value}
+                      >
+                        <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                        <span className={cn(
+                          "text-[10px] font-medium leading-none",
+                          theme === opt.value ? "text-primary" : "text-muted-foreground"
+                        )}>
+                          {opt.label}
+                        </span>
+                        {locked && <ProBadge className="absolute -top-1 -right-1" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </Card>
+          </>
+        )}
 
-        </div>
+        {/* ── AI & Server ────────────────────────────────────────────────── */}
+        {tab === "ai" && (
+          <>
+            <Card>
+              <CardHeader icon={Bot} title="AI Agent" />
+              <form onSubmit={handleSaveAi} className="space-y-2.5">
+                <Field label="Provider" htmlFor="ai-provider">
+                  <Select
+                    value={aiProvider || AUTO_PROVIDER}
+                    onValueChange={(v) => setAiProvider(v === AUTO_PROVIDER ? "" : v)}
+                  >
+                    <SelectTrigger id="ai-provider" aria-label="AI provider" className="w-full h-8 text-sm">
+                      <SelectValue placeholder="Auto-detect" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AI_PROVIDERS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-        {/* ── Right column ────────────────────────────────────────────── */}
-        <div className="space-y-3">
-
-          {/* AI Agent */}
-          <Card>
-            <CardHeader icon={Bot} title="AI Agent" />
-            <form onSubmit={handleSaveAi} className="space-y-2.5">
-
-              <Field label="Provider" htmlFor="ai-provider">
-                <Select
-                  value={aiProvider || AUTO_PROVIDER}
-                  onValueChange={(v) => setAiProvider(v === AUTO_PROVIDER ? "" : v)}
-                >
-                  <SelectTrigger id="ai-provider" aria-label="AI provider" className="w-full h-8 text-sm">
-                    <SelectValue placeholder="Auto-detect" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {AI_PROVIDERS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field label="Model" htmlFor="ai-model">
-                <Input
-                  id="ai-model"
-                  value={localModel}
-                  onChange={(e) => setLocalModel(e.target.value)}
-                  placeholder="claude-opus-4-6 · gpt-4o · llama3"
-                  aria-label="AI model"
-                  className="font-mono text-xs h-8"
-                />
-              </Field>
-
-              <Field label="API Key" htmlFor="ai-key">
-                <div className="flex gap-1.5">
+                <Field label="Model" htmlFor="ai-model">
                   <Input
-                    id="ai-key"
-                    type={showKey ? "text" : "password"}
-                    value={localApiKey}
-                    onChange={(e) => setLocalApiKey(e.target.value)}
-                    placeholder="sk-…"
-                    className="flex-1 font-mono text-xs h-8"
-                    aria-label="AI API key"
+                    id="ai-model"
+                    value={localModel}
+                    onChange={(e) => setLocalModel(e.target.value)}
+                    placeholder="claude-opus-4-6 · gpt-4o · llama3"
+                    aria-label="AI model"
+                    className="font-mono text-xs h-8"
                   />
+                </Field>
+
+                <Field label="API Key" htmlFor="ai-key">
+                  <div className="flex gap-1.5">
+                    <Input
+                      id="ai-key"
+                      type={showKey ? "text" : "password"}
+                      value={localApiKey}
+                      onChange={(e) => setLocalApiKey(e.target.value)}
+                      placeholder="sk-…"
+                      className="flex-1 font-mono text-xs h-8"
+                      aria-label="AI API key"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 shrink-0"
+                      onClick={() => setShowKey((v) => !v)}
+                      aria-label={showKey ? "Hide API key" : "Show API key"}
+                    >
+                      {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Stored locally. Used only by the remex sidecar on your machine.
+                  </p>
+                </Field>
+
+                <Button type="submit" size="sm" className="w-full">Save AI settings</Button>
+              </form>
+            </Card>
+
+            <Card>
+              <CardHeader icon={Server} title="API Server" />
+              <form onSubmit={handleSaveApi} className="space-y-3">
+                <Field label="URL" htmlFor="api-url">
+                  <Input
+                    id="api-url"
+                    value={localApiUrl}
+                    onChange={(e) => setLocalApiUrl(e.target.value)}
+                    placeholder="http://localhost:8000"
+                    aria-label="API URL"
+                    className="font-mono text-xs h-8"
+                  />
+                </Field>
+                <div className="flex gap-2">
+                  <Button type="submit" size="sm" className="flex-1">Save</Button>
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-8 w-8 p-0 shrink-0"
-                    onClick={() => setShowKey((v) => !v)}
-                    aria-label={showKey ? "Hide API key" : "Show API key"}
+                    className="shrink-0"
+                    onClick={() => open(`${localApiUrl || "http://localhost:8000"}/docs`)}
+                    aria-label="Open API URL in browser"
+                    title="Open in browser"
                   >
-                    {showKey
-                      ? <EyeOff className="w-3.5 h-3.5" />
-                      : <Eye    className="w-3.5 h-3.5" />
-                    }
+                    <ExternalLink className="w-3.5 h-3.5" />
                   </Button>
                 </div>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  Stored locally. Used only by the remex sidecar on your machine to call the AI provider.
-                </p>
-              </Field>
+              </form>
+            </Card>
+          </>
+        )}
 
-              <Button type="submit" size="sm" className="w-full">
-                Save AI settings
-              </Button>
-            </form>
-          </Card>
+        {/* ── License ────────────────────────────────────────────────────── */}
+        {tab === "license" && (
+          <>
+            <LicenseCard />
+            <WatchFoldersCard />
 
-          {/* Project */}
-          <Card className="p-0 space-y-0 overflow-hidden">
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-              onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
-              aria-label="Change project"
-            >
-              <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Change project</p>
-                <p className="text-xs text-muted-foreground">
-                  Open a different database folder
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
-            <div className="h-px bg-border mx-4" />
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-              onClick={() => setOnboardingDone(false)}
-              aria-label="Show welcome guide"
-            >
-              <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Show welcome guide</p>
-                <p className="text-xs text-muted-foreground">
-                  Replay the getting-started walkthrough
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
-            <div className="h-px bg-border mx-4" />
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-              onClick={() => setShortcutsOpen(true)}
-              aria-label="Show keyboard shortcuts"
-            >
-              <Keyboard className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Keyboard shortcuts</p>
-                <p className="text-xs text-muted-foreground">
-                  View all keyboard shortcuts
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
-            <div className="h-px bg-border mx-4" />
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-              onClick={() => open("https://github.com/adm-crow/remex/issues/new/choose")}
-              aria-label="Report a bug or request a feature"
-            >
-              <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Report a bug / Request a feature</p>
-                <p className="text-xs text-muted-foreground">
-                  Open an issue on GitHub
-                </p>
-              </div>
-              <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
-          </Card>
+            {/* Project + Help */}
+            <Card className="p-0 space-y-0 overflow-hidden">
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
+                aria-label="Change project"
+              >
+                <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Change project</p>
+                  <p className="text-xs text-muted-foreground">Open a different database folder</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              <div className="h-px bg-border mx-4" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => setOnboardingDone(false)}
+                aria-label="Show welcome guide"
+              >
+                <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Show welcome guide</p>
+                  <p className="text-xs text-muted-foreground">Replay the getting-started walkthrough</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              <div className="h-px bg-border mx-4" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => setShortcutsOpen(true)}
+                aria-label="Show keyboard shortcuts"
+              >
+                <Keyboard className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Keyboard shortcuts</p>
+                  <p className="text-xs text-muted-foreground">View all keyboard shortcuts</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              <div className="h-px bg-border mx-4" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => open("https://github.com/adm-crow/remex/issues/new/choose")}
+                aria-label="Report a bug or request a feature"
+              >
+                <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Report a bug / Request a feature</p>
+                  <p className="text-xs text-muted-foreground">Open an issue on GitHub</p>
+                </div>
+                <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+            </Card>
+          </>
+        )}
 
-        </div>
-      </div>
       </div>
 
       {/* ── Sticky version footer ────────────────────────────────────────── */}

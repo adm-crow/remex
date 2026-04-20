@@ -21,6 +21,7 @@ beforeEach(() => {
 describe("SettingsPane", () => {
   it("renders the current API URL in the input", async () => {
     renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByRole("button", { name: /AI & Server/i }));
     const input = screen.getByRole("textbox", {
       name: /api url/i,
     }) as HTMLInputElement;
@@ -30,6 +31,7 @@ describe("SettingsPane", () => {
 
   it("saving updated API URL updates the store", async () => {
     renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByRole("button", { name: /AI & Server/i }));
     const input = screen.getByRole("textbox", { name: /api url/i });
     fireEvent.change(input, { target: { value: "http://localhost:9000" } });
     fireEvent.submit(input.closest("form")!);
@@ -39,6 +41,7 @@ describe("SettingsPane", () => {
 
   it("saving empty URL falls back to default", async () => {
     renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByRole("button", { name: /AI & Server/i }));
     const input = screen.getByRole("textbox", { name: /api url/i });
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.submit(input.closest("form")!);
@@ -48,6 +51,7 @@ describe("SettingsPane", () => {
 
   it("change project button clears currentDb and currentCollection", async () => {
     renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByRole("button", { name: /License/i }));
     fireEvent.click(screen.getByRole("button", { name: /change project/i }));
     expect(useAppStore.getState().currentDb).toBeNull();
     expect(useAppStore.getState().currentCollection).toBeNull();
