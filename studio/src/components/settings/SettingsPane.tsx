@@ -442,36 +442,69 @@ export function SettingsPane() {
               </form>
             </Card>
 
-            {/* Right — API Server */}
-            <Card>
-              <CardHeader icon={Server} title="API Server" />
-              <form onSubmit={handleSaveApi} className="space-y-3">
-                <Field label="URL" htmlFor="api-url">
-                  <Input
-                    id="api-url"
-                    value={localApiUrl}
-                    onChange={(e) => setLocalApiUrl(e.target.value)}
-                    placeholder="http://localhost:8000"
-                    aria-label="API URL"
-                    className="font-mono text-xs h-8"
-                  />
-                </Field>
-                <div className="flex gap-2">
-                  <Button type="submit" size="sm" className="flex-1">Save</Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => open(`${localApiUrl || "http://localhost:8000"}/docs`)}
-                    aria-label="Open API URL in browser"
-                    title="Open in browser"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </Button>
+            {/* Right column */}
+            <div className="space-y-3">
+
+              {/* API Server */}
+              <Card>
+                <CardHeader icon={Server} title="API Server" />
+                <form onSubmit={handleSaveApi} className="space-y-3">
+                  <Field label="URL" htmlFor="api-url">
+                    <Input
+                      id="api-url"
+                      value={localApiUrl}
+                      onChange={(e) => setLocalApiUrl(e.target.value)}
+                      placeholder="http://localhost:8000"
+                      aria-label="API URL"
+                      className="font-mono text-xs h-8"
+                    />
+                  </Field>
+                  <div className="flex gap-2">
+                    <Button type="submit" size="sm" className="flex-1">Save</Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => open(`${localApiUrl || "http://localhost:8000"}/docs`)}
+                      aria-label="Open API URL in browser"
+                      title="Open in browser"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </form>
+              </Card>
+
+              {/* Find Models */}
+              <Card className="p-0 space-y-0 overflow-hidden">
+                <div className="px-4 py-3 border-b">
+                  <p className="text-sm font-medium">Find models</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Browse available models for each provider</p>
                 </div>
-              </form>
-            </Card>
+                {([
+                  { label: "Anthropic", desc: "Claude model list", url: "https://docs.anthropic.com/en/docs/about-claude/models/overview" },
+                  { label: "OpenAI",    desc: "GPT & o-series models", url: "https://platform.openai.com/docs/models" },
+                  { label: "Ollama",    desc: "Local open-source models", url: "https://ollama.com/library" },
+                ] as const).map(({ label, desc, url }, i, arr) => (
+                  <div key={label}>
+                    <button
+                      type="button"
+                      onClick={() => open(url)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{label}</p>
+                        <p className="text-xs text-muted-foreground">{desc}</p>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    </button>
+                    {i < arr.length - 1 && <div className="h-px bg-border mx-4" />}
+                  </div>
+                ))}
+              </Card>
+
+            </div>
           </div>
         )}
 
