@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, X } from "lucide-react";
+import { Crown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { ProBadge } from "./ProBadge";
 
 function Card({ children, className, id }: { children: React.ReactNode; className?: string; id?: string }) {
-  return <div id={id} className={cn("rounded-xl border bg-card p-3 space-y-2.5", className)}>{children}</div>;
+  return <div id={id} className={cn("rounded-xl border bg-primary/10 border-primary/30 p-3 space-y-2.5", className)}>{children}</div>;
 }
 
 function relative(ts: number | null): string {
@@ -52,7 +52,7 @@ export function LicenseCard() {
     return (
       <Card className="space-y-3" id="license-card">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <Crown className="w-3.5 h-3.5 text-primary" />
           <h2 className="font-semibold text-sm">Remex Pro</h2>
           <ProBadge className="ml-auto" />
         </div>
@@ -79,7 +79,7 @@ export function LicenseCard() {
   return (
     <Card id="license-card" className="space-y-2.5">
       <div className="flex items-center gap-2">
-        <Sparkles className="w-3.5 h-3.5 text-primary" />
+        <Crown className="w-3.5 h-3.5 text-primary" />
         <h2 className="font-semibold text-sm">Remex Pro</h2>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -87,7 +87,7 @@ export function LicenseCard() {
       </p>
       <div className="flex gap-2">
         <Button size="sm" className="flex-1" onClick={() => openUpgradeModal("generic")}>
-          Upgrade to Pro · $39
+          Upgrade to Pro · 29€
         </Button>
         <Button size="sm" variant="outline" onClick={() => setShowPaste((v) => !v)}>
           I already have a key

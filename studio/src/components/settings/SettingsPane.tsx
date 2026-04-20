@@ -174,7 +174,7 @@ export function SettingsPane() {
                       className={cn(
                         "relative flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
                         theme === opt.value ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
-                        locked && "opacity-70"
+                        locked && "bg-muted/60 opacity-80"
                       )}
                       title={opt.label}
                       aria-label={opt.label}
@@ -228,38 +228,8 @@ export function SettingsPane() {
             </form>
           </Card>
 
-          {/* Project */}
-          <Card className="p-0 space-y-0 overflow-hidden">
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-              onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
-              aria-label="Change project"
-            >
-              <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Change project</p>
-                <p className="text-xs text-muted-foreground">
-                  Open a different database folder
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
-            <div className="h-px bg-border mx-4" />
-            <button
-              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-              onClick={() => setOnboardingDone(false)}
-              aria-label="Show welcome guide"
-            >
-              <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">Show welcome guide</p>
-                <p className="text-xs text-muted-foreground">
-                  Replay the getting-started walkthrough
-                </p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-            </button>
-          </Card>
+          {/* License */}
+          <LicenseCard />
 
           <WatchFoldersCard />
 
@@ -338,11 +308,38 @@ export function SettingsPane() {
             </form>
           </Card>
 
-          {/* License */}
-          <LicenseCard />
-
-          {/* Help & feedback */}
+          {/* Project */}
           <Card className="p-0 space-y-0 overflow-hidden">
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+              onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
+              aria-label="Change project"
+            >
+              <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Change project</p>
+                <p className="text-xs text-muted-foreground">
+                  Open a different database folder
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+            <div className="h-px bg-border mx-4" />
+            <button
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+              onClick={() => setOnboardingDone(false)}
+              aria-label="Show welcome guide"
+            >
+              <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">Show welcome guide</p>
+                <p className="text-xs text-muted-foreground">
+                  Replay the getting-started walkthrough
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+            <div className="h-px bg-border mx-4" />
             <button
               className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
               onClick={() => setShortcutsOpen(true)}

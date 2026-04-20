@@ -1,11 +1,11 @@
-import { Sparkles, Check } from "lucide-react";
+import { Crown, Check } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/app";
 
 // One SKU. Price changes ship in a Studio release (see spec §Pricing).
-const PRO_PRICE_USD = 39; // founders price; raise at 200 sales OR 90 days
+const PRO_PRICE = "29€";
 const CHECKOUT_URL =
   "https://getremex.lemonsqueezy.com/checkout/buy/6ade10f8-4f82-4f77-b139-c8b798629cae?checkout%5Bcustom%5D%5Bsource%5D=studio-in-app";
 
@@ -46,11 +46,11 @@ export function UpgradeModal() {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-primary" />
+            <Crown className="w-4 h-4 text-primary" />
             Upgrade to Remex Pro
           </DialogTitle>
           <DialogDescription>
-            One-time ${PRO_PRICE_USD}. Lifetime updates on the v1.x line. No subscription.
+            One-time {PRO_PRICE}. Lifetime updates on the v1.x line. No subscription.
           </DialogDescription>
         </DialogHeader>
 
@@ -65,7 +65,7 @@ export function UpgradeModal() {
 
         <div className="flex gap-2 pt-2">
           <Button className="flex-1" onClick={() => open(CHECKOUT_URL)}>
-            Buy Pro · ${PRO_PRICE_USD}
+            Buy Pro · {PRO_PRICE}
           </Button>
           <Button variant="outline" onClick={() => {
             closeUpgradeModal();
