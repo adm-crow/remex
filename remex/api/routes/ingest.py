@@ -121,6 +121,7 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
     monitor = asyncio.create_task(_monitor_disconnect())
 
     async def _stream() -> AsyncIterator[str]:
+        idle_ticks = 0
         try:
             while True:
                 try:
@@ -129,9 +130,15 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
                     # embedding a large file).  The disconnect monitor handles
                     # cancellation independently, so no need for a tight timeout.
                     event = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    idle_ticks = 0
                 except asyncio.TimeoutError:
                     if cancel_event.is_set():
                         break
+                    # Emit a heartbeat comment every 10 s so the client-side idle
+                    # timer does not fire while a large model is loading.
+                    idle_ticks += 1
+                    if idle_ticks % 10 == 0:
+                        yield ": heartbeat\n\n"
                     continue
 
                 yield f"data: {json.dumps(event)}\n\n"
