@@ -13,9 +13,9 @@ interface Particle {
 
 function resolvePrimaryRGB(): [number, number, number] {
   const el = document.createElement("span");
-  el.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;color:oklch(from var(--primary) l c h)";
+  el.style.cssText = "position:fixed;visibility:hidden;pointer-events:none;background-color:var(--primary)";
   document.body.appendChild(el);
-  const raw = getComputedStyle(el).color; // "rgb(r, g, b)"
+  const raw = getComputedStyle(el).backgroundColor; // always "rgb(r, g, b)"
   document.body.removeChild(el);
   const m = raw.match(/\d+/g);
   return m ? [+m[0], +m[1], +m[2]] : [80, 80, 200];
