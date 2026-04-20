@@ -57,9 +57,9 @@ const AI_PROVIDERS = [
 type Tab = "appearance" | "ai" | "license";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "appearance", label: "Appearance" },
+  { id: "appearance", label: "General"     },
   { id: "ai",         label: "AI & Server" },
-  { id: "license",    label: "License"    },
+  { id: "license",    label: "License"     },
 ];
 
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -162,13 +162,13 @@ export function SettingsPane() {
       {/* ── Tab content ──────────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3">
 
-        {/* ── Appearance ─────────────────────────────────────────────────── */}
+        {/* ── General ────────────────────────────────────────────────────── */}
         {tab === "appearance" && (
-          <>
+          <div className="grid grid-cols-2 gap-3 items-start">
+            {/* Left — Appearance */}
             <Card>
               <CardHeader icon={Palette} title="Appearance" />
 
-              {/* Dark mode */}
               <div className="flex items-center justify-between py-0.5">
                 <div className="flex items-center gap-2">
                   {darkMode
@@ -187,7 +187,6 @@ export function SettingsPane() {
 
               <div className="h-px bg-border" />
 
-              {/* Accent colour */}
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Accent colour</p>
                 <div className="grid grid-cols-4 gap-1.5">
@@ -223,12 +222,68 @@ export function SettingsPane() {
                 </div>
               </div>
             </Card>
-          </>
+
+            {/* Right — Project & Help */}
+            <Card className="p-0 space-y-0 overflow-hidden">
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
+                aria-label="Change project"
+              >
+                <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Change project</p>
+                  <p className="text-xs text-muted-foreground">Open a different database folder</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              <div className="h-px bg-border mx-4" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => setOnboardingDone(false)}
+                aria-label="Show welcome guide"
+              >
+                <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Show welcome guide</p>
+                  <p className="text-xs text-muted-foreground">Replay the getting-started walkthrough</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              <div className="h-px bg-border mx-4" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => setShortcutsOpen(true)}
+                aria-label="Show keyboard shortcuts"
+              >
+                <Keyboard className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Keyboard shortcuts</p>
+                  <p className="text-xs text-muted-foreground">View all keyboard shortcuts</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+              <div className="h-px bg-border mx-4" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
+                onClick={() => open("https://github.com/adm-crow/remex/issues/new/choose")}
+                aria-label="Report a bug or request a feature"
+              >
+                <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">Report a bug / Request a feature</p>
+                  <p className="text-xs text-muted-foreground">Open an issue on GitHub</p>
+                </div>
+                <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
+              </button>
+            </Card>
+          </div>
         )}
 
         {/* ── AI & Server ────────────────────────────────────────────────── */}
         {tab === "ai" && (
-          <>
+          <div className="grid grid-cols-2 gap-3 items-start">
+            {/* Left — AI Agent */}
             <Card>
               <CardHeader icon={Bot} title="AI Agent" />
               <form onSubmit={handleSaveAi} className="space-y-2.5">
@@ -290,6 +345,7 @@ export function SettingsPane() {
               </form>
             </Card>
 
+            {/* Right — API Server */}
             <Card>
               <CardHeader icon={Server} title="API Server" />
               <form onSubmit={handleSaveApi} className="space-y-3">
@@ -319,70 +375,17 @@ export function SettingsPane() {
                 </div>
               </form>
             </Card>
-          </>
+          </div>
         )}
 
         {/* ── License ────────────────────────────────────────────────────── */}
         {tab === "license" && (
-          <>
+          <div className="grid grid-cols-2 gap-3 items-start">
+            {/* Left — License */}
             <LicenseCard />
+            {/* Right — Watch folders */}
             <WatchFoldersCard />
-
-            {/* Project + Help */}
-            <Card className="p-0 space-y-0 overflow-hidden">
-              <button
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
-                aria-label="Change project"
-              >
-                <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Change project</p>
-                  <p className="text-xs text-muted-foreground">Open a different database folder</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-              </button>
-              <div className="h-px bg-border mx-4" />
-              <button
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                onClick={() => setOnboardingDone(false)}
-                aria-label="Show welcome guide"
-              >
-                <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Show welcome guide</p>
-                  <p className="text-xs text-muted-foreground">Replay the getting-started walkthrough</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-              </button>
-              <div className="h-px bg-border mx-4" />
-              <button
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                onClick={() => setShortcutsOpen(true)}
-                aria-label="Show keyboard shortcuts"
-              >
-                <Keyboard className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Keyboard shortcuts</p>
-                  <p className="text-xs text-muted-foreground">View all keyboard shortcuts</p>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-              </button>
-              <div className="h-px bg-border mx-4" />
-              <button
-                className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                onClick={() => open("https://github.com/adm-crow/remex/issues/new/choose")}
-                aria-label="Report a bug or request a feature"
-              >
-                <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Report a bug / Request a feature</p>
-                  <p className="text-xs text-muted-foreground">Open an issue on GitHub</p>
-                </div>
-                <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
-              </button>
-            </Card>
-          </>
+          </div>
         )}
 
       </div>

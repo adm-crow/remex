@@ -51,7 +51,7 @@ describe("SettingsPane", () => {
 
   it("change project button clears currentDb and currentCollection", async () => {
     renderWithProviders(<SettingsPane />);
-    fireEvent.click(screen.getByRole("button", { name: /License/i }));
+    // Change project is on the General tab (default tab — no tab click needed)
     fireEvent.click(screen.getByRole("button", { name: /change project/i }));
     expect(useAppStore.getState().currentDb).toBeNull();
     expect(useAppStore.getState().currentCollection).toBeNull();
