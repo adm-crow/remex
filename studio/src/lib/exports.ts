@@ -13,6 +13,7 @@ function citeKey(source: string, idx: number): string {
 }
 
 export function toBibTeX(results: QueryResultItem[], query: string): string {
+  const year = new Date().getFullYear();
   return results.map((r, i) => {
     const key = citeKey(r.source, i);
     const title = r.source.split(/[/\\]/).pop() ?? r.source;
@@ -22,13 +23,14 @@ export function toBibTeX(results: QueryResultItem[], query: string): string {
       `  title       = {${title}},`,
       `  note        = {Score: ${r.score.toFixed(3)}; Query: ${query.replace(/[{}]/g, "")}},`,
       `  annotation  = {${note}},`,
-      `  year        = {${new Date().getFullYear()}}`,
+      `  year        = {${year}}`,
       `}`,
     ].join("\n");
   }).join("\n\n");
 }
 
 export function toRIS(results: QueryResultItem[], query: string): string {
+  const year = new Date().getFullYear();
   return results.map((r) => {
     const title = r.source.split(/[/\\]/).pop() ?? r.source;
     return [
@@ -36,7 +38,7 @@ export function toRIS(results: QueryResultItem[], query: string): string {
       `TI  - ${title}`,
       `AB  - ${r.text.replace(/\n/g, " ").slice(0, 2000)}`,
       `N1  - Remex semantic search; score ${r.score.toFixed(3)}; query "${query}"`,
-      `PY  - ${new Date().getFullYear()}`,
+      `PY  - ${year}`,
       `UR  - ${r.source}`,
       `ER  - `,
     ].join("\n");
@@ -44,13 +46,14 @@ export function toRIS(results: QueryResultItem[], query: string): string {
 }
 
 export function toCSLJson(results: QueryResultItem[], query: string): string {
+  const year = new Date().getFullYear();
   const items = results.map((r, i) => ({
     id:                citeKey(r.source, i),
     type:              "document",
     title:             r.source.split(/[/\\]/).pop() ?? r.source,
     "abstract":        r.text.slice(0, 2000),
     note:              `score=${r.score.toFixed(3)}; query=${query}`,
-    issued:            { "date-parts": [[new Date().getFullYear()]] },
+    issued:            { "date-parts": [[year]] },
     URL:               r.source,
   }));
   return JSON.stringify(items, null, 2);

@@ -155,7 +155,10 @@ async function* readSseStream(
     resetIdle();
     outer: while (true) {
       if (abort.signal.aborted) throw abort.signal.reason;
-      const { done, value } = await reader.read();
+      const abortPromise = new Promise<never>((_, reject) => {
+        abort.signal.addEventListener("abort", () => reject(abort.signal.reason), { once: true });
+      });
+      const { done, value } = await Promise.race([reader.read(), abortPromise]);
       if (done) break;
       resetIdle();
       buffer += decoder.decode(value, { stream: true });

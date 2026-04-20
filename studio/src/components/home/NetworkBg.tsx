@@ -12,18 +12,28 @@ interface Particle {
 }
 
 // Module-level singleton — avoids creating a new canvas element every 90 frames.
-const _colorCanvas = document.createElement("canvas");
-_colorCanvas.width = _colorCanvas.height = 1;
-const _colorCtx = _colorCanvas.getContext("2d");
+// Lazily initialised so this module is safe to import in vitest/Node environments.
+let _colorCanvas: HTMLCanvasElement | null = null;
+let _colorCtx: CanvasRenderingContext2D | null = null;
+
+function getColorCtx(): CanvasRenderingContext2D | null {
+  if (_colorCtx) return _colorCtx;
+  if (typeof document === "undefined") return null;
+  _colorCanvas = document.createElement("canvas");
+  _colorCanvas.width = _colorCanvas.height = 1;
+  _colorCtx = _colorCanvas.getContext("2d");
+  return _colorCtx;
+}
 
 function resolvePrimaryRGB(): [number, number, number] {
-  if (!_colorCtx) return [80, 80, 200];
+  const ctx = getColorCtx();
+  if (!ctx) return [80, 80, 200];
   // Canvas2D resolves any CSS color syntax (including oklch) to sRGB pixel bytes.
   const value = getComputedStyle(document.documentElement)
     .getPropertyValue("--primary").trim();
-  _colorCtx.fillStyle = value;
-  _colorCtx.fillRect(0, 0, 1, 1);
-  const [r, g, b] = _colorCtx.getImageData(0, 0, 1, 1).data;
+  ctx.fillStyle = value;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
   return [r, g, b];
 }
 

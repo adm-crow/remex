@@ -19,6 +19,8 @@ export function WatchFoldersCard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ db_path: currentDb, source_dir: evt.payload.folder, incremental: true }),
+      }).then((resp) => {
+        if (!resp.ok) console.error("[watch] auto-ingest failed: HTTP", resp.status);
       }).catch((err) => console.error("[watch] auto-ingest failed:", err));
     });
     return () => { void unsub.then((fn) => fn()); };

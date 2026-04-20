@@ -208,7 +208,11 @@ class SourceItem(BaseModel):
 
 
 class RenameRequest(BaseModel):
-    new_name: str
+    new_name: str = Field(
+        min_length=3,
+        max_length=512,
+        pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9]$",
+    )
 
 
 class RenamedResponse(BaseModel):

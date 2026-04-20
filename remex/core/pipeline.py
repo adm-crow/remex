@@ -190,9 +190,15 @@ def _parallel_extract(
     streaming_threshold: int,
 ) -> dict[Path, tuple[str | None, Exception | None]]:
     """Pre-extract non-streaming files concurrently to overlap disk I/O."""
+    def _stat_size_safe(fp: Path) -> int:
+        try:
+            return fp.stat().st_size
+        except OSError:
+            return 0
+
     bulk = [
         fp for fp in file_paths
-        if not (streaming_threshold > 0 and fp.stat().st_size > streaming_threshold
+        if not (streaming_threshold > 0 and _stat_size_safe(fp) > streaming_threshold
                 and supports_streaming(fp))
     ]
     result: dict[Path, tuple[str | None, Exception | None]] = {}
@@ -371,6 +377,12 @@ def _process_file_list(
                 if verbose:
                     logger.info("  -> %d chunks stored", len(chunks))
 
+        except Exception as e:
+            _status = "error"
+            _skip_reason = f"unexpected_error: {e}"
+            result.sources_skipped += 1
+            if verbose:
+                logger.exception("[skip] %s: unexpected error", file_path.name)
         finally:
             if _skip_reason:
                 result.skipped_reasons.append(f"{file_path.name}: {_skip_reason}")

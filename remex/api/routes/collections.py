@@ -163,15 +163,25 @@ def rename_collection(
         raise HTTPException(status_code=500, detail="Rename aborted: sentinel copy count mismatch")
 
     # Step 3-5: Swap names — original is only deleted after copy is verified
-    client.delete_collection(collection)
-    new_col = client.create_collection(req.new_name, metadata=old_col.metadata or {})
-    if original_count:
-        sentinel_data = sentinel.get(include=["documents", "metadatas", "embeddings"])
-        new_col.upsert(
-            ids=sentinel_data["ids"],
-            documents=sentinel_data["documents"],
-            metadatas=sentinel_data["metadatas"],
-            embeddings=sentinel_data["embeddings"],
+    try:
+        client.delete_collection(collection)
+        new_col = client.create_collection(req.new_name, metadata=old_col.metadata or {})
+        if original_count:
+            sentinel_data = sentinel.get(include=["documents", "metadatas", "embeddings"])
+            new_col.upsert(
+                ids=sentinel_data["ids"],
+                documents=sentinel_data["documents"],
+                metadatas=sentinel_data["metadatas"],
+                embeddings=sentinel_data["embeddings"],
+            )
+        client.delete_collection(sentinel_name)
+    except Exception as e:
+        try:
+            client.delete_collection(req.new_name)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=500,
+            detail=f"Rename failed mid-swap: {e}. Your data is safe in sentinel '{sentinel_name}'.",
         )
-    client.delete_collection(sentinel_name)
     return RenamedResponse(renamed=True, old_name=collection, new_name=req.new_name)
