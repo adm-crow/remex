@@ -3,6 +3,8 @@ import { X, FolderOpen, Search, Upload, Database, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/app";
 import { cn } from "@/lib/utils";
+import { AuroraBg } from "@/components/home/AuroraBg";
+import { NetworkBg } from "@/components/home/NetworkBg";
 
 const FEATURES = [
   {
@@ -34,6 +36,7 @@ export function Home() {
     removeRecentProject,
     setCurrentDb,
     setCurrentCollection,
+    homeBg,
   } = useAppStore();
 
   async function handleOpen() {
@@ -57,15 +60,16 @@ export function Home() {
   return (
     <div className="relative flex flex-col h-screen overflow-hidden px-8">
 
-      {/* ── Dot grid background ──────────────────────────────────────────── */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        {/* Dot matrix — breathes in/out */}
-        <div className="dotgrid-bg animate-grid-fade absolute inset-0" />
-        {/* Central radial glow — pulses outward */}
-        <div className="dotgrid-pulse animate-grid-pulse absolute inset-0" />
-        {/* Vignette — fades grid into background at edges */}
-        <div className="dotgrid-vignette absolute inset-0" />
-      </div>
+      {/* ── Background ───────────────────────────────────────────────────── */}
+      {homeBg === "dotgrid" && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="dotgrid-bg animate-grid-fade absolute inset-0" />
+          <div className="dotgrid-pulse animate-grid-pulse absolute inset-0" />
+          <div className="dotgrid-vignette absolute inset-0" />
+        </div>
+      )}
+      {homeBg === "aurora"  && <AuroraBg />}
+      {homeBg === "network" && <NetworkBg />}
 
       {/* ── Main content — centered in upper portion ───────────────────── */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center gap-10 min-h-0">

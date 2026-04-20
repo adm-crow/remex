@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAppStore, useIsPro } from "@/store/app";
-import type { Theme } from "@/store/app";
+import type { HomeBg, Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
 import { LicenseCard } from "@/components/license/LicenseCard";
 import { ProBadge } from "@/components/license/ProBadge";
@@ -98,6 +98,7 @@ export function SettingsPane() {
     setCurrentDb, setCurrentCollection,
     darkMode, setDarkMode,
     theme, setTheme,
+    homeBg, setHomeBg,
     aiProvider, setAiProvider,
     aiModel, setAiModel,
     aiApiKey, setAiApiKey,
@@ -214,6 +215,102 @@ export function SettingsPane() {
                           theme === opt.value ? "text-primary" : "text-muted-foreground"
                         )}>
                           {opt.label}
+                        </span>
+                        {locked && <ProBadge className="absolute -top-1 -right-1" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="h-px bg-border" />
+
+              {/* Homepage background */}
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Homepage background</p>
+                <div className="flex gap-2">
+                  {(
+                    [
+                      {
+                        id: "dotgrid" as HomeBg,
+                        label: "Dot grid",
+                        pro: false,
+                        preview: (
+                          <div className="absolute inset-0 rounded-md overflow-hidden">
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                backgroundImage: "radial-gradient(circle, oklch(from var(--primary) l c h / 0.6) 1px, transparent 1px)",
+                                backgroundSize: "8px 8px",
+                              }}
+                            />
+                            <div
+                              className="absolute inset-0"
+                              style={{ background: "radial-gradient(ellipse 60% 55% at 50% 50%, oklch(from var(--primary) l c h / 0.15) 0%, transparent 70%)" }}
+                            />
+                          </div>
+                        ),
+                      },
+                      {
+                        id: "aurora" as HomeBg,
+                        label: "Aurora",
+                        pro: true,
+                        preview: (
+                          <div className="absolute inset-0 rounded-md overflow-hidden">
+                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 20% 30%, oklch(0.68 0.28 278 / 0.55) 0%, transparent 55%)" }} />
+                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 80% 20%, oklch(0.70 0.24 218 / 0.45) 0%, transparent 50%)" }} />
+                            <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 50% 80%, oklch(0.66 0.30 322 / 0.40) 0%, transparent 55%)" }} />
+                          </div>
+                        ),
+                      },
+                      {
+                        id: "network" as HomeBg,
+                        label: "Network",
+                        pro: true,
+                        preview: (
+                          <div className="absolute inset-0 rounded-md overflow-hidden flex items-center justify-center">
+                            <svg width="100%" height="100%" viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0">
+                              <line x1="8"  y1="10" x2="28" y2="20" stroke="oklch(from var(--primary) l c h / 0.35)" strokeWidth="0.8" />
+                              <line x1="28" y1="20" x2="48" y2="8"  stroke="oklch(from var(--primary) l c h / 0.30)" strokeWidth="0.8" />
+                              <line x1="28" y1="20" x2="40" y2="34" stroke="oklch(from var(--primary) l c h / 0.28)" strokeWidth="0.8" />
+                              <line x1="8"  y1="10" x2="18" y2="32" stroke="oklch(from var(--primary) l c h / 0.22)" strokeWidth="0.8" />
+                              <line x1="48" y1="8"  x2="40" y2="34" stroke="oklch(from var(--primary) l c h / 0.25)" strokeWidth="0.8" />
+                              <circle cx="8"  cy="10" r="2" fill="oklch(from var(--primary) l c h / 0.55)" />
+                              <circle cx="28" cy="20" r="2" fill="oklch(from var(--primary) l c h / 0.55)" />
+                              <circle cx="48" cy="8"  r="2" fill="oklch(from var(--primary) l c h / 0.55)" />
+                              <circle cx="40" cy="34" r="2" fill="oklch(from var(--primary) l c h / 0.55)" />
+                              <circle cx="18" cy="32" r="1.5" fill="oklch(from var(--primary) l c h / 0.45)" />
+                            </svg>
+                          </div>
+                        ),
+                      },
+                    ] satisfies { id: HomeBg; label: string; pro: boolean; preview: React.ReactNode }[]
+                  ).map(({ id, label, pro, preview }) => {
+                    const locked = pro && !isPro;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => {
+                          if (locked) { openUpgradeModal("theme"); return; }
+                          setHomeBg(id);
+                        }}
+                        aria-label={label}
+                        aria-pressed={homeBg === id}
+                        className={cn(
+                          "relative flex-1 flex flex-col items-center gap-1.5 pt-1.5 pb-1 rounded-lg border transition-all duration-150",
+                          homeBg === id ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
+                          locked && "bg-primary/5 border-primary/25 hover:bg-primary/10"
+                        )}
+                      >
+                        <div className="relative w-full h-10 rounded-md overflow-hidden bg-background/60">
+                          {preview}
+                        </div>
+                        <span className={cn(
+                          "text-[10px] font-medium leading-none pb-0.5",
+                          homeBg === id ? "text-primary" : "text-muted-foreground"
+                        )}>
+                          {label}
                         </span>
                         {locked && <ProBadge className="absolute -top-1 -right-1" />}
                       </button>

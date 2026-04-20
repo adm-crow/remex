@@ -12,6 +12,8 @@ export type Theme =
   | "default" | "violet" | "green" | "lime" | "yellow" | "rose" | "coral" | "slate"
   | "midnight" | "forest" | "ocean" | "sunset" | "rosegold" | "teal" | "amethyst" | "graphite";
 
+export type HomeBg = "dotgrid" | "aurora" | "network";
+
 export interface ProgressItem {
   filename: string;
   status: "ingested" | "skipped" | "error";
@@ -39,6 +41,7 @@ export interface AppState {
   sidecarStatus: "starting" | "connected" | "error";
   darkMode: boolean;
   theme: Theme;
+  homeBg: HomeBg;
   aiProvider: string;
   aiModel: string;
   aiApiKey: string;
@@ -74,6 +77,7 @@ export interface AppState {
   setSidecarStatus: (status: AppState["sidecarStatus"]) => void;
   setDarkMode: (dark: boolean) => void;
   setTheme: (theme: Theme) => void;
+  setHomeBg: (bg: HomeBg) => void;
   setAiProvider: (provider: string) => void;
   setAiModel: (model: string) => void;
   setAiApiKey: (key: string) => void;
@@ -139,6 +143,7 @@ export const useAppStore = create<AppState>()(
       sidecarReconnectSeq: 0,
       darkMode: false,
       theme: "default",
+      homeBg: "dotgrid",
       aiProvider: "",
       aiModel: "",
       aiApiKey: "",
@@ -203,6 +208,7 @@ export const useAppStore = create<AppState>()(
       triggerSidecarReconnect: ()       => set((s) => ({ sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
       setDarkMode:       (dark)     => set({ darkMode: dark }),
       setTheme:          (theme)    => set({ theme }),
+      setHomeBg:         (homeBg)   => set({ homeBg }),
       setAiProvider:     (provider) => set({ aiProvider: provider }),
       setAiModel:        (model)    => set({ aiModel: model }),
       setAiApiKey:       (key)      => set({ aiApiKey: key }),
