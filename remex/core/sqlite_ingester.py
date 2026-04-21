@@ -146,6 +146,7 @@ def ingest_sqlite(
             row_dict = dict(row)
             row_id = None
             _status = "skipped"
+            _skip_reason = ""
 
             try:
                 # Extract row identity
@@ -196,6 +197,7 @@ def ingest_sqlite(
                     if text:
                         chunks = [text]
                     else:
+                        _skip_reason = "empty_text"
                         result.sources_skipped += 1
                         continue
 
@@ -225,6 +227,8 @@ def ingest_sqlite(
                 _status = "error"
 
             finally:
+                if _skip_reason:
+                    result.skipped_reasons.append(f"{table}[{row_id}]: {_skip_reason}")
                 if on_progress:
                     on_progress(IngestProgress(
                         filename=f"{table}[{row_id}]",

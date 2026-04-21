@@ -307,3 +307,102 @@ def test_ingest_sqlite_row_error_is_skipped(mock_chroma, tmp_path):
     assert result.sources_ingested == 0
     assert result.sources_skipped == 1
     assert any("extract_error" in r for r in result.skipped_reasons)
+
+
+# --- incremental mode ---
+
+def test_ingest_sqlite_incremental_skips_unchanged_row(tmp_path):
+    """An unchanged row (same hash) must be skipped when incremental=True."""
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30)],
+    )
+    collection = MagicMock()
+    client = MagicMock()
+    client.get_or_create_collection.return_value = collection
+
+    # Simulate row already in collection with matching hash
+    import hashlib
+    from remex.core.sqlite_ingester import _make_sqlite_id
+    text = "body: " + "word " * 30  # default serialization includes "body: " prefix
+    # Just use the actual serialization that ingest_sqlite produces
+    body_text = "word " * 30
+    row_hash = hashlib.sha256(f"body: {body_text}".encode(), usedforsecurity=False).hexdigest()[:16]
+    check_id = _make_sqlite_id(db, "articles", 1, 0)
+    collection.get.return_value = {
+        "ids": [check_id],
+        "metadatas": [{"row_hash": row_hash, "n_chunks": 1}],
+    }
+
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+        result = ingest_sqlite(
+            db_path=db, table="articles",
+            chroma_path=str(tmp_path / "db"), verbose=False,
+            incremental=True,
+        )
+
+    assert result.sources_skipped == 1
+    assert result.sources_ingested == 0
+    collection.upsert.assert_not_called()
+    assert any("hash_match" in r for r in result.skipped_reasons)
+
+
+def test_ingest_sqlite_incremental_reingest_changed_row(tmp_path):
+    """A row whose hash changed must be re-ingested when incremental=True."""
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30)],
+    )
+    collection = MagicMock()
+    client = MagicMock()
+    client.get_or_create_collection.return_value = collection
+
+    # Simulate row already in collection with a DIFFERENT hash
+    from remex.core.sqlite_ingester import _make_sqlite_id
+    check_id = _make_sqlite_id(db, "articles", 1, 0)
+    collection.get.return_value = {
+        "ids": [check_id],
+        "metadatas": [{"row_hash": "stale_hash_abc123", "n_chunks": 1}],
+    }
+
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+        result = ingest_sqlite(
+            db_path=db, table="articles",
+            chroma_path=str(tmp_path / "db"), verbose=False,
+            incremental=True,
+        )
+
+    assert result.sources_ingested == 1
+    collection.delete.assert_called_once()  # old chunks removed
+    collection.upsert.assert_called_once()  # new chunks inserted
+
+
+def test_ingest_sqlite_incremental_new_row_always_ingested(tmp_path):
+    """A row not yet in the collection must be ingested when incremental=True."""
+    db = create_test_db(
+        tmp_path, "articles",
+        ["id INTEGER PRIMARY KEY", "body TEXT"],
+        [(1, "word " * 30)],
+    )
+    collection = MagicMock()
+    client = MagicMock()
+    client.get_or_create_collection.return_value = collection
+
+    # Simulate row not present in collection
+    collection.get.return_value = {"ids": [], "metadatas": []}
+
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
+         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+        result = ingest_sqlite(
+            db_path=db, table="articles",
+            chroma_path=str(tmp_path / "db"), verbose=False,
+            incremental=True,
+        )
+
+    assert result.sources_ingested == 1
+    assert result.sources_skipped == 0
+    collection.upsert.assert_called_once()

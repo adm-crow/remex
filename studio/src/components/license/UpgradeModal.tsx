@@ -44,8 +44,13 @@ export function UpgradeModal() {
           ))}
         </ul>
 
+        <p className="text-xs text-muted-foreground border-t pt-3">
+          Remex is built and maintained by a solo developer. Your purchase directly
+          funds ongoing development — thank you for supporting independent software. 🙏
+        </p>
+
         <div className="flex gap-2 pt-2">
-          <Button className="flex-1" onClick={() => open(CHECKOUT_URL)}>
+          <Button className="flex-1" onClick={() => open(CHECKOUT_URL).catch((err) => console.error("[UpgradeModal] Failed to open URL:", err))}>
             Buy Pro · {PRO_PRICE}
           </Button>
           <Button variant="outline" onClick={() => {

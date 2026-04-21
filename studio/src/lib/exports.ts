@@ -33,15 +33,21 @@ export function toRIS(results: QueryResultItem[], query: string): string {
   const year = new Date().getFullYear();
   return results.map((r) => {
     const title = r.source.split(/[/\\]/).pop() ?? r.source;
-    return [
+    const lines = [
       `TY  - GEN`,
       `TI  - ${title}`,
       `AB  - ${r.text.replace(/\n/g, " ").slice(0, 2000)}`,
       `N1  - Remex semantic search; score ${r.score.toFixed(3)}; query "${query.replace(/\n/g, " ")}"`,
       `PY  - ${year}`,
-      `UR  - ${r.source}`,
-      `ER  - `,
-    ].join("\n");
+    ];
+    // UR must be a valid URI — SQLite sources are file paths, not URLs
+    if (r.source_type !== "sqlite") {
+      lines.push(`UR  - ${r.source}`);
+    } else {
+      lines.push(`N1  - SQLite source: ${r.source}`);
+    }
+    lines.push(`ER  - `);
+    return lines.join("\n");
   }).join("\n\n");
 }
 
@@ -75,12 +81,14 @@ export function toObsidianVault(results: QueryResultItem[], query: string): Reco
   ].join("\n");
   results.forEach((r, i) => {
     const key = citeKey(r.source, i);
+    const safeSource = r.source.replace(/"/g, '\\"').replace(/\n/g, " ");
+    const safeQueryYaml = query.replace(/"/g, '\\"').replace(/\n/g, " ");
     files[`${folder}/${key}.md`] = [
       `---`,
-      `source: ${r.source}`,
+      `source: "${safeSource}"`,
       `score: ${r.score.toFixed(3)}`,
       `chunk: ${r.chunk ?? ""}`,
-      `query: ${query}`,
+      `query: "${safeQueryYaml}"`,
       `---`,
       ``,
       r.text,

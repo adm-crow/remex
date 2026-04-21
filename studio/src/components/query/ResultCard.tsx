@@ -16,7 +16,7 @@ export function ResultCard({ result }: Props) {
     navigator.clipboard.writeText(result.text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
+    }).catch((err) => console.error("[ResultCard] Clipboard write failed:", err));
   }
 
   return (

@@ -3,6 +3,7 @@ import sqlite3
 from fastapi import APIRouter, HTTPException, Query
 from remex.core import collection_stats, delete_source, list_collections, purge, reset, source_chunk_counts
 from remex.core.exceptions import CollectionNotFoundError, RemexError
+from remex.core.pipeline import _get_client
 from remex.api.schemas import (
     CollectionStatsResponse,
     DeletedChunksResponse,
@@ -101,6 +102,10 @@ def reset_collection(
 def purge_collection(
     collection: str, db_path: str = Query(default="./remex_db")
 ) -> PurgeResultResponse:
+    try:
+        collection_stats(db_path=db_path, collection_name=collection)
+    except CollectionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     result = purge(db_path=db_path, collection_name=collection)
     return PurgeResultResponse(
         chunks_deleted=result.chunks_deleted,
@@ -127,8 +132,7 @@ def rename_collection(
     sentinel survive — no data is lost.  On the next request the stale sentinel
     is cleaned up automatically.
     """
-    import chromadb
-    client = chromadb.PersistentClient(path=db_path)
+    client = _get_client(db_path)
     try:
         old_col = client.get_collection(collection)
     except Exception:

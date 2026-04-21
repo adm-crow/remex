@@ -282,9 +282,10 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     try {
       await invoke("write_text_file", { path, content });
       setAiExportDone(true);
+      setExportError(null);
       setTimeout(() => setAiExportDone(false), 3000);
-    } catch {
-      // silently ignore — rare Tauri write error
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : String(e));
     }
   }
 

@@ -58,10 +58,10 @@ class IngestRequest(BaseModel):
 
 class IngestSQLiteRequest(BaseModel):
     sqlite_path: str
-    table: str
+    table: str = Field(max_length=256)
     db_path: str = "./remex_db"
     columns: Optional[list[str]] = None
-    id_column: str = "id"
+    id_column: str = Field(default="id", max_length=256)
     row_template: Optional[str] = None
     embedding_model: str = "all-MiniLM-L6-v2"
     chunk_size: int = Field(default=1000, ge=1)
@@ -83,7 +83,7 @@ class IngestSQLiteRequest(BaseModel):
 class QueryRequest(BaseModel):
     text: str = Field(min_length=1)
     db_path: str = "./remex_db"
-    n_results: int = Field(default=5, ge=1)
+    n_results: int = Field(default=5, ge=1, le=500)
     embedding_model: str = "all-MiniLM-L6-v2"
     where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
@@ -99,7 +99,7 @@ class QueryRequest(BaseModel):
 class ChatRequest(BaseModel):
     text: str = Field(min_length=1)
     db_path: str = "./remex_db"
-    n_results: int = Field(default=5, ge=1)
+    n_results: int = Field(default=5, ge=1, le=500)
     embedding_model: str = "all-MiniLM-L6-v2"
     where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
@@ -170,7 +170,7 @@ class MultiChatRequest(BaseModel):
     text: str = Field(min_length=1)
     collections: list[str]
     db_path: str = "./remex_db"
-    n_results: int = Field(default=5, ge=1)
+    n_results: int = Field(default=5, ge=1, le=500)
     embedding_model: str = "all-MiniLM-L6-v2"
     where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)

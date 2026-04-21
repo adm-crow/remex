@@ -35,14 +35,14 @@ const THEME_OPTIONS: ThemeOpt[] = [
   { value: "yellow",  label: "Yellow",  color: "#EAAD04" },
   { value: "lime",    label: "Lime",    color: "#7EBD01" },
   { value: "slate",   label: "Slate",   color: "#516572" },
-  { value: "midnight", label: "Midnight", color: "#323C97", pro: true },
+  { value: "midnight", label: "Midnight", color: "#1D42CC", pro: true },
   { value: "forest",   label: "Forest",   color: "#1a6b35", pro: true },
-  { value: "ocean",    label: "Ocean",    color: "#046D9E", pro: true },
-  { value: "sunset",   label: "Sunset",   color: "#E26327", pro: true },
-  { value: "rosegold", label: "Rosegold", color: "#C64B70", pro: true },
+  { value: "ocean",    label: "Ocean",    color: "#0A8FAD", pro: true },
+  { value: "sunset",   label: "Sunset",   color: "#C98700", pro: true },
+  { value: "rosegold", label: "Rosegold", color: "#C05040", pro: true },
   { value: "teal",     label: "Teal",     color: "#0D8F8E", pro: true },
-  { value: "amethyst", label: "Amethyst", color: "#7B2EC4", pro: true },
-  { value: "graphite", label: "Graphite", color: "#52575F", pro: true },
+  { value: "amethyst", label: "Amethyst", color: "#7715D2", pro: true },
+  { value: "graphite", label: "Graphite", color: "#6A5E50", pro: true },
 ];
 
 const AUTO_PROVIDER = "__auto__";
@@ -483,7 +483,10 @@ export function SettingsPane() {
               {/* Find Models */}
               <Card className="p-0 space-y-0 overflow-hidden">
                 <div className="px-4 py-3 border-b">
-                  <p className="text-sm font-medium">Find models</p>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium">Find models</p>
+                  </div>
                   <p className="text-xs text-muted-foreground mt-0.5">Browse available models for each provider</p>
                 </div>
                 {([
