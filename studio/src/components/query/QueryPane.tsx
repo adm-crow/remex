@@ -88,6 +88,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [exportDone, setExportDone] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [aiExportDone, setAiExportDone] = useState(false);
 
   // Keep selection in sync when the user switches collections from the sidebar.
   // Also reset source filter so stale where-filters aren't applied to new collection.
@@ -248,6 +249,42 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       setTimeout(() => setExportDone(false), 3000);
     } catch (e) {
       setExportError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function handleExportAiAnswer() {
+    if (!chatResult.data) return;
+    const path = await save({
+      defaultPath: "remex-answer.md",
+      filters: [{ name: "Markdown", extensions: ["md"] }],
+    });
+    if (!path) return;
+    const { answer, provider, model, sources } = chatResult.data;
+    const sourceList = sources
+      .map((s, i) =>
+        `### ${i + 1}. ${s.source.split(/[/\\]/).pop() ?? s.source} (score: ${s.score.toFixed(3)})\n\n${s.text}`
+      )
+      .join("\n\n---\n\n");
+    const content = [
+      `# Remex AI Answer`,
+      ``,
+      `**Query:** ${submitted}`,
+      `**Provider:** ${provider} · ${model}`,
+      ``,
+      `## Answer`,
+      ``,
+      answer,
+      ``,
+      `## Sources`,
+      ``,
+      sourceList,
+    ].join("\n");
+    try {
+      await invoke("write_text_file", { path, content });
+      setAiExportDone(true);
+      setTimeout(() => setAiExportDone(false), 3000);
+    } catch {
+      // silently ignore — rare Tauri write error
     }
   }
 
@@ -569,12 +606,24 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary shrink-0" />
                 <span className="text-sm font-semibold">AI Answer</span>
-                <Badge variant="secondary" className="text-xs ml-auto font-mono">
+                <Badge variant="secondary" className="text-xs ml-2 font-mono">
                   {chatResult.data.provider} · {chatResult.data.model}
                   {isMultiAi && (
                     <span className="ml-1 opacity-70">({selectedCollections.length} collections)</span>
                   )}
                 </Badge>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs gap-1.5 ml-auto"
+                  onClick={() => void handleExportAiAnswer()}
+                  aria-label="Export AI answer"
+                >
+                  {aiExportDone
+                    ? <><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Saved</>
+                    : <><Download className="w-3 h-3" /> Export</>}
+                </Button>
               </div>
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed
                 [&>p]:mb-2 [&>ul]:mb-2 [&>ol]:mb-2 [&>ul]:pl-4 [&>ol]:pl-4

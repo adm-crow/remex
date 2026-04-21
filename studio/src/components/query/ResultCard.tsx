@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FolderOpen } from "lucide-react";
+import { FolderOpen, Copy, Check } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
 import type { QueryResultItem } from "@/api/client";
@@ -10,6 +10,14 @@ interface Props {
 
 export function ResultCard({ result }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(result.text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
 
   return (
     <div
@@ -34,6 +42,16 @@ export function ResultCard({ result }: Props) {
         <span className="text-xs text-muted-foreground shrink-0">
           #{result.chunk}
         </span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label="Copy text"
+          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          {copied
+            ? <Check className="w-3.5 h-3.5 text-emerald-500" />
+            : <Copy className="w-3.5 h-3.5" />}
+        </button>
         {result.source_type !== "sqlite" && (
           <button
             type="button"
@@ -43,7 +61,7 @@ export function ResultCard({ result }: Props) {
               });
             }}
             aria-label="Open source file"
-            className="opacity-0 group-hover:opacity-100 transition-opacity ml-auto shrink-0 text-muted-foreground hover:text-foreground"
+            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-foreground"
           >
             <FolderOpen className="w-3.5 h-3.5" />
           </button>

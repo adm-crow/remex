@@ -101,6 +101,7 @@ export interface IngestSQLiteRequest {
   columns?: string[];
   id_column?: string;
   row_template?: string;
+  incremental?: boolean;
 }
 
 export interface IngestProgressEvent {

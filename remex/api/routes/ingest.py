@@ -178,6 +178,7 @@ async def ingest_sqlite_table(
             min_chunk_size=req.min_chunk_size,
             chunking=req.chunking,
             embedding_model=req.embedding_model,
+            incremental=req.incremental,
         )
     except (RemexError, FileNotFoundError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -236,6 +237,7 @@ async def ingest_sqlite_stream(
                 min_chunk_size=req.min_chunk_size,
                 chunking=req.chunking,
                 embedding_model=req.embedding_model,
+                incremental=req.incremental,
                 on_progress=_on_progress,
             )
             await queue.put({
@@ -266,13 +268,18 @@ async def ingest_sqlite_stream(
     monitor = asyncio.create_task(_monitor_disconnect())
 
     async def _stream() -> AsyncIterator[str]:
+        idle_ticks = 0
         try:
             while True:
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=1.0)
+                    idle_ticks = 0
                 except asyncio.TimeoutError:
                     if cancel_event.is_set():
                         break
+                    idle_ticks += 1
+                    if idle_ticks % 10 == 0:
+                        yield ": heartbeat\n\n"
                     continue
 
                 yield f"data: {json.dumps(event)}\n\n"

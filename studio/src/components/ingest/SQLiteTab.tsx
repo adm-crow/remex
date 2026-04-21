@@ -60,6 +60,7 @@ export function SQLiteTab() {
   const [idColumn,        setIdColumn]        = useState("id");
   const [rowTemplate,     setRowTemplate]     = useState("");
   const [embeddingModel,  setEmbeddingModel]  = useState("all-MiniLM-L6-v2");
+  const [incremental,     setIncremental]     = useState(false);
   const [result,          setResult]          = useState<IngestResultResponse | null>(null);
   const [duration,        setDuration]        = useState<string | null>(null);
   const [eta,             setEta]             = useState<string | null>(null);
@@ -156,6 +157,7 @@ export function SQLiteTab() {
           : undefined,
         id_column: idColumn || "id",
         row_template: rowTemplate || undefined,
+        incremental,
       },
       signal,
     )) {
@@ -398,6 +400,17 @@ export function SQLiteTab() {
               placeholder="{title}: {body}"
               className="h-7 text-xs"
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="sqlite-incremental"
+              checked={incremental}
+              onCheckedChange={setIncremental}
+              aria-label="Incremental ingest"
+            />
+            <Label htmlFor="sqlite-incremental" className="text-xs">
+              Incremental — skip unchanged rows
+            </Label>
           </div>
           <EmbeddingModelField
             inputId="sqlite-embedding-model"

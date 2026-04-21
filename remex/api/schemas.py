@@ -68,6 +68,7 @@ class IngestSQLiteRequest(BaseModel):
     overlap: int = Field(default=200, ge=0)
     min_chunk_size: int = Field(default=50, ge=1)
     chunking: Literal["word", "sentence"] = "word"
+    incremental: bool = False
 
     _check_overlap = model_validator(mode="after")(_validate_overlap)
 

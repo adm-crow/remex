@@ -44,6 +44,7 @@ def ingest_sqlite(
     min_chunk_size: int = 50,
     embedding_model: str = "all-MiniLM-L6-v2",
     chunking: str = "word",
+    incremental: bool = False,
     verbose: bool = True,
     on_progress: Optional[Callable[[IngestProgress], None]] = None,
 ) -> IngestResult:
@@ -164,6 +165,22 @@ def ingest_sqlite(
                     if k in row_dict and (row_template or k != id_column)
                 }
                 text = _row_to_text(text_dict, row_template)
+                source_str = f"{Path(db_path).resolve()}::{table}"
+                row_hash = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:16]
+
+                if incremental:
+                    check_id = _make_sqlite_id(db_path, table, row_id, 0)
+                    existing = collection.get(ids=[check_id], include=["metadatas"])
+                    if existing["ids"]:
+                        if existing["metadatas"][0].get("row_hash") == row_hash:
+                            _skip_reason = "hash_match"
+                            result.sources_skipped += 1
+                            continue
+                        # Hash changed — delete all old chunks
+                        n_old = int(existing["metadatas"][0].get("n_chunks", 1))
+                        collection.delete(
+                            ids=[_make_sqlite_id(db_path, table, row_id, i) for i in range(n_old)]
+                        )
 
                 chunks = chunk_text(
                     text,
@@ -186,9 +203,11 @@ def ingest_sqlite(
                 metadatas = [
                     {
                         "source_type": "sqlite",
-                        "source": f"{Path(db_path).resolve()}::{table}",
+                        "source": source_str,
                         "row_id": str(row_id),
                         "chunk": i,
+                        "row_hash": row_hash,
+                        "n_chunks": len(chunks),
                     }
                     for i in range(len(chunks))
                 ]
