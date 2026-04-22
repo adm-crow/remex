@@ -141,11 +141,13 @@ Use `remex <command> --help` for the full option reference.
 - **Fully offline** — local embeddings, local storage, no telemetry
 - **12 file formats** — `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.jsonl` `.html` `.pptx` `.xlsx` `.epub` `.odt`
 - **SQLite ingest** — embed rows from any table alongside your files
-- **Incremental ingest** — SHA-256 hash check skips unchanged files
-- **AI answers** — auto-detects Anthropic, OpenAI, or a local Ollama
-- **Multi-collection search** — query across collections, merged by score
-- **Source filtering & export** — narrow to a file, copy or export results
-- **Collections manager** — rename, delete, inspect from the UI
+- **Incremental ingest** — SHA-256 hash check skips unchanged files and rows on re-runs
+- **AI answers** — auto-detects Anthropic, OpenAI, or a local Ollama; export the answer as Markdown
+- **Multi-collection search** — query across collections simultaneously, results merged by score
+- **Source filtering** — narrow results to one or more source documents before searching or asking AI
+- **Chunk viewer** — expand any result to read the full chunk text; navigate with keyboard arrows
+- **Collections manager** — rename, describe, bulk-delete sources, re-ingest with saved parameters
+- **Export** — JSON, CSV, Markdown, BibTeX, RIS, CSL-JSON, Obsidian vault (Pro)
 - **Keyboard-driven** — press `?` in Studio for the shortcuts reference
 
 ---

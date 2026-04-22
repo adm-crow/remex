@@ -8,22 +8,55 @@ All notable changes to `remex` are documented here.
 
 ---
 
-## [1.3.0] — 2026-04-19
+## [1.3.0] — 2026-04-22
 
 ### Added
 - **Remex Pro** — commercial tier, 29€, one-time purchase
   - Pro embedding models: `bge-large-en-v1.5`, `e5-large-v2`, `nomic-embed-text-v1.5`
   - Advanced exports: BibTeX, RIS, CSL-JSON, Obsidian vault
   - Watch-folder auto-ingest
-  - Unlimited searchable query history
-  - Eight extra accent themes + Pro badge
+  - Unlimited searchable query history (free tier capped at 20)
+  - Eight extra accent themes + Pro badge in-app
   - Priority email support (`support@getremex.com`, 48-hour business-day SLA)
 - Lemon Squeezy-backed license activation (`Settings → License`)
+- **Dark mode "Follow system"** — new toggle in Settings that tracks the OS theme automatically
+- **Chunk viewer modal** — expand any result card to read the full chunk text; navigate with arrow keys or buttons
+- **Source filter in Query pane** — collapsible chip strip lets you narrow results to one or more source documents before searching; works for both vector search and AI Answer
+- **Bulk source delete** — select multiple sources with checkboxes and delete in one step; partial failures shown inline
+- **Collection description** — add a short note to any collection via the pencil icon; shown in the stats row
+- **Re-ingest button** — every collection card gains a one-click re-ingest button once parameters have been saved; navigates to the Ingest tab with all fields pre-filled
+- **Ingest parameters saved per collection** — chunk size, overlap, embedding model, and source path are persisted after each successful ingest and restored on re-ingest
+- **Query history filter** (Pro) — search across saved queries when history exceeds 20 entries
+- **Multi-collection AI Answer** — select multiple collection pills to generate a single AI-synthesised answer across them, with merged sources ranked by score
+- **AI Answer export** — copy or save the AI answer + source list as Markdown
+- **SQLite incremental mode** — `--incremental` flag for `ingest-sqlite` skips unchanged rows by row hash
+- **Embedding model presets redesigned** — single-column list showing tag, full model name, and relative CPU speed; new "Balanced" preset (`intfloat/e5-base-v2`)
+- **Advanced settings section** — chunk size, overlap, and incremental toggle consolidated on one row; separator line and tinted background card clearly scope the section
 
 ### Changed
 - **Studio license** — `studio/` subtree relicensed to FSL-1.1-MIT starting this release.
   Pre-1.3.0 releases remain Apache-2.0 forever. See [`LICENSES.md`](LICENSES.md).
 - Python CLI and library (`remex-cli` on PyPI) remain **Apache-2.0 indefinitely** — no change.
+- `db_path` validated as an absolute path on all five API request schemas (was only enforced in route handlers)
+
+### Performance
+- Embedding batch size raised from 32 → 128 via a `_RemexEmbeddingFunction` subclass that overrides `__call__`; lets `sentence_transformers` sort by sequence length before encoding — ~15% fewer FLOPs for variable-length text
+- Cross-file ChromaDB upsert batch limit raised from 256 → 2 048 chunks, reducing round-trips on large ingests
+
+### Fixed
+- **AI Answer ignored source filter** — `where`, `n_results`, and `min_score` were missing from the `useChat` / `useMultiChat` React Query cache keys; changing the filter returned the cached result instead of re-fetching
+- **Progress counter "7 of 6"** — off-by-one: `files_done` is 1-based from the backend but the UI was adding an extra `+1`
+- **"Processing file N of N…" persisted after all files done** — spinner now shows "Storing embeddings…" while the final batch flush + embed is in progress
+- **Unhandled error responses leaked internal detail** — exception handler in `main.py` now logs full stack server-side and returns a generic `"An internal error occurred."` to the client
+- **Sentinel collection name collision** — rename sentinel is now an MD5-based name (`remextmp.<8hex>`) instead of a prefix, preventing collisions between collections that share a long common prefix
+- **`lastIngestParamsMap` lost on collection rename** — re-ingest params now migrated from old to new name in the rename `onSuccess` handler
+- **Bulk delete "Deleting…" button state unreliable** — replaced `deleteMutation.isPending` (flips per-item) with a local `isBulkDeleting` flag for the duration of the whole loop
+- **Obsidian vault export broken on Windows** — extension detection used `path.split(".").pop()` which returns the last path segment for folder paths with no dot; replaced with last-segment `lastIndexOf(".")` logic
+- **Streaming `fetch()` no network-error handling** — `ingestFilesStream` and `ingestSqliteStream` now wrap `fetch()` in try/catch and surface a human-readable connection error
+- **`purge` route fetched collection metadata twice** — simplified to a single pass using `raise_if_missing=True`
+- **`ChunkViewerModal` had no keyboard navigation** — `ArrowLeft` / `ArrowRight` key events now move between chunks while the modal is open
+- **Query state not cleared on project switch** — `text` and `submitted` are now reset when `currentDb` changes, preventing stale queries from a previous project from executing
+- **`UpgradeModal` crashed when `open()` returned `undefined` in tests** — switched to optional chaining `?.catch()`
 
 ---
 
