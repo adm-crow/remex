@@ -106,6 +106,9 @@ export function useChat(
       dbPath,
       collection,
       text,
+      options?.n_results,
+      options?.min_score,
+      options?.where,
       options?.provider,
       options?.model,
       !!options?.api_key, // presence change (key added/removed) busts cache without exposing value
@@ -145,6 +148,9 @@ export function useMultiChat(
       "multiChat", apiUrl, dbPath,
       JSON.stringify(collections.slice().sort()), // stable key regardless of order
       text,
+      options?.n_results,
+      options?.min_score,
+      options?.where,
       options?.provider, options?.model,
       !!options?.api_key, // presence change busts cache without exposing value
     ],

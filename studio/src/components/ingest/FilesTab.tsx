@@ -198,7 +198,7 @@ export function FilesTab() {
   }
 
   return (
-    <div className="flex flex-col h-full p-4 gap-3">
+    <div className="flex flex-col h-full p-4 gap-3 overflow-y-auto">
       {/* Directory picker */}
       <div
         className={cn(
@@ -259,44 +259,45 @@ export function FilesTab() {
 
       {/* Advanced settings */}
       <Collapsible>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="text-muted-foreground px-0 h-7">
-            Advanced ▾
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-3 mt-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="chunk-size" className="text-xs">Chunk size</Label>
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-muted-foreground px-0 h-7 shrink-0">
+              Advanced ▾
+            </Button>
+          </CollapsibleTrigger>
+          <div className="h-px bg-border flex-1" />
+        </div>
+        <CollapsibleContent className="space-y-3 mt-2 bg-primary/5 rounded-lg p-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="chunk-size" className="text-xs whitespace-nowrap">Chunk size</Label>
               <Input
                 id="chunk-size"
                 type="number"
                 value={chunkSize}
                 onChange={(e) => setChunkSize(Number(e.target.value))}
-                className="h-7 text-xs"
+                className="h-7 w-20 text-xs"
               />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="overlap" className="text-xs">Overlap</Label>
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor="overlap" className="text-xs whitespace-nowrap">Overlap</Label>
               <Input
                 id="overlap"
                 type="number"
                 value={overlap}
                 onChange={(e) => setOverlap(Number(e.target.value))}
-                className="h-7 text-xs"
+                className="h-7 w-20 text-xs"
               />
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="incremental"
-              checked={incremental}
-              onCheckedChange={setIncremental}
-              aria-label="Incremental ingest"
-            />
-            <Label htmlFor="incremental" className="text-xs">
-              Incremental — skip unchanged files
-            </Label>
+            <div className="flex items-center gap-1.5">
+              <Switch
+                id="incremental"
+                checked={incremental}
+                onCheckedChange={setIncremental}
+                aria-label="Incremental ingest"
+              />
+              <Label htmlFor="incremental" className="text-xs">Incremental</Label>
+            </div>
           </div>
           <EmbeddingModelField
             value={embeddingModel}
@@ -419,9 +420,11 @@ export function FilesTab() {
             <div className="flex items-center gap-2 text-xs p-1 text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-primary" />
               <span className="truncate flex-1">
-                {ingestFilesTotal > 0
-                  ? `Processing file ${ingestFilesDone + 1} of ${ingestFilesTotal}…`
-                  : "Starting ingestion…"}
+                {ingestFilesTotal === 0
+                  ? "Starting ingestion…"
+                  : ingestFilesDone >= ingestFilesTotal
+                    ? "Storing embeddings…"
+                    : `Processing file ${ingestFilesDone} of ${ingestFilesTotal}…`}
               </span>
             </div>
           )}

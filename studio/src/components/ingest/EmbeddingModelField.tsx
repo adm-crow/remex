@@ -10,7 +10,7 @@ type Preset = {
   tagColor: string;
   model: string;
   desc: string;
-  speed: string;  // relative to all-MiniLM-L6-v2 on CPU
+  speed: string;
   pro?: boolean;
 };
 
@@ -35,16 +35,16 @@ const PRESETS: Preset[] = [
     model: "intfloat/e5-large-v2",
     desc: "1.3 GB · strong retrieval benchmark",
     speed: "~15× slower", pro: true },
-  { tag: "Nomic",        tagColor: "bg-primary/15 text-primary",
+  { tag: "Long ctx",     tagColor: "bg-primary/15 text-primary",
     model: "nomic-ai/nomic-embed-text-v1.5",
-    desc: "547 MB · long context window",
+    desc: "547 MB · long context window (8 192 tokens)",
     speed: "~6× slower", pro: true },
 ];
 
 const LINKS = [
-  { label: "SBERT pretrained models",         href: "https://www.sbert.net/docs/pretrained_models.html" },
-  { label: "HuggingFace sentence-similarity", href: "https://huggingface.co/models?pipeline_tag=sentence-similarity&sort=downloads" },
-  { label: "Ollama embedding models",         href: "https://ollama.com/search?c=embedding" },
+  { label: "SBERT",       href: "https://www.sbert.net/docs/pretrained_models.html" },
+  { label: "HuggingFace", href: "https://huggingface.co/models?pipeline_tag=sentence-similarity&sort=downloads" },
+  { label: "Ollama",      href: "https://ollama.com/search?c=embedding" },
 ];
 
 interface EmbeddingModelFieldProps {
@@ -58,7 +58,7 @@ export function EmbeddingModelField({ value, onChange, inputId = "embedding-mode
   const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <Label htmlFor={inputId} className="text-xs">Embedding model</Label>
       <Input
         id={inputId}
@@ -66,53 +66,53 @@ export function EmbeddingModelField({ value, onChange, inputId = "embedding-mode
         onChange={(e) => onChange(e.target.value)}
         className="h-7 text-xs"
       />
-      <div className="pt-1 space-y-1.5">
-        <div className="flex flex-wrap gap-1.5">
-          {PRESETS.map(({ tag, tagColor, model, desc, speed, pro }) => {
-            const locked = pro && !isPro;
-            const isSelected = value === model;
-            return (
-              <button
-                key={model}
-                type="button"
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full border pl-1.5 pr-2.5 py-0.5 transition-colors",
-                  isSelected
-                    ? "border-primary bg-primary/10"
-                    : locked
-                      ? "bg-primary/5 border-primary/25 hover:bg-primary/10 cursor-pointer"
-                      : "bg-muted/30 hover:bg-muted/60"
-                )}
-                onClick={() => {
-                  if (locked) { openUpgradeModal("embedding-model"); return; }
-                  onChange(model);
-                }}
-                title={`${desc} · CPU speed: ${speed}`}
-              >
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0 ${tagColor}`}>
-                  {tag}
-                </span>
-                <span className="text-[11px] text-muted-foreground font-mono truncate">{model.split("/").pop()}</span>
-                <span className="text-[10px] text-muted-foreground/60 shrink-0">{speed}</span>
-                {locked && <ProBadge className="ml-1" />}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex flex-row flex-wrap gap-x-3 gap-y-1">
-          {LINKS.map(({ label, href }) => (
-            <a
-              key={href}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-[11px] text-primary hover:underline w-fit"
+      <div className="flex flex-col gap-1 pt-0.5">
+        {PRESETS.map(({ tag, tagColor, model, desc, speed, pro }) => {
+          const locked = pro && !isPro;
+          const isSelected = value === model;
+          return (
+            <button
+              key={model}
+              type="button"
+              title={desc}
+              className={cn(
+                "flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors",
+                isSelected
+                  ? "border-primary bg-primary/10"
+                  : locked
+                    ? "border-dashed bg-muted/20 hover:bg-muted/40 cursor-pointer"
+                    : "bg-muted/20 hover:bg-muted/50 border-transparent hover:border-border"
+              )}
+              onClick={() => {
+                if (locked) { openUpgradeModal("embedding-model"); return; }
+                onChange(model);
+              }}
             >
-              <ExternalLink className="w-3 h-3 shrink-0" />
-              {label}
-            </a>
-          ))}
-        </div>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${tagColor}`}>
+                {tag}
+              </span>
+              <span className="text-[11px] font-mono text-muted-foreground flex-1 truncate min-w-0">
+                {model}
+              </span>
+              <span className="text-[10px] text-muted-foreground/60 shrink-0">{speed}</span>
+              {locked && <ProBadge />}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex flex-row gap-x-3">
+        {LINKS.map(({ label, href }) => (
+          <a
+            key={href}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+          >
+            <ExternalLink className="w-3 h-3 shrink-0" />
+            {label}
+          </a>
+        ))}
       </div>
     </div>
   );

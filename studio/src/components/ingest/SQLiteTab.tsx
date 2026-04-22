@@ -359,17 +359,18 @@ export function SQLiteTab() {
 
       {/* Advanced */}
       <Collapsible>
-        <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="text-muted-foreground px-0 h-7">
-            Advanced ▾
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="space-y-3 mt-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label htmlFor="sqlite-columns" className="text-xs">
-                Columns (comma-sep.)
-              </Label>
+        <div className="flex items-center gap-2">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="text-muted-foreground px-0 h-7 shrink-0">
+              Advanced ▾
+            </Button>
+          </CollapsibleTrigger>
+          <div className="h-px bg-border flex-1" />
+        </div>
+        <CollapsibleContent className="space-y-3 mt-2 bg-primary/5 rounded-lg p-3">
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+            <div className="flex-1 min-w-[120px] space-y-1">
+              <Label htmlFor="sqlite-columns" className="text-xs">Columns (comma-sep.)</Label>
               <Input
                 id="sqlite-columns"
                 value={columns}
@@ -378,7 +379,7 @@ export function SQLiteTab() {
                 className="h-7 text-xs"
               />
             </div>
-            <div className="space-y-1">
+            <div className="w-24 space-y-1">
               <Label htmlFor="sqlite-id-col" className="text-xs">ID column</Label>
               <Input
                 id="sqlite-id-col"
@@ -389,28 +390,26 @@ export function SQLiteTab() {
               />
             </div>
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="sqlite-template" className="text-xs">
-              Row template (optional)
-            </Label>
-            <Input
-              id="sqlite-template"
-              value={rowTemplate}
-              onChange={(e) => setRowTemplate(e.target.value)}
-              placeholder="{title}: {body}"
-              className="h-7 text-xs"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch
-              id="sqlite-incremental"
-              checked={incremental}
-              onCheckedChange={setIncremental}
-              aria-label="Incremental ingest"
-            />
-            <Label htmlFor="sqlite-incremental" className="text-xs">
-              Incremental — skip unchanged rows
-            </Label>
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+            <div className="flex-1 min-w-[120px] space-y-1">
+              <Label htmlFor="sqlite-template" className="text-xs">Row template (optional)</Label>
+              <Input
+                id="sqlite-template"
+                value={rowTemplate}
+                onChange={(e) => setRowTemplate(e.target.value)}
+                placeholder="{title}: {body}"
+                className="h-7 text-xs"
+              />
+            </div>
+            <div className="flex items-center gap-1.5 pb-0.5">
+              <Switch
+                id="sqlite-incremental"
+                checked={incremental}
+                onCheckedChange={setIncremental}
+                aria-label="Incremental ingest"
+              />
+              <Label htmlFor="sqlite-incremental" className="text-xs whitespace-nowrap">Incremental</Label>
+            </div>
           </div>
           <EmbeddingModelField
             inputId="sqlite-embedding-model"
