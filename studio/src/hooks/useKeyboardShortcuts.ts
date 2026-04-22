@@ -51,6 +51,13 @@ export function useKeyboardShortcuts({
         }
         return;
       }
+      // / — focus search (only when not typing)
+      if (!isEditable && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === "/") {
+        e.preventDefault();
+        onViewChange("query");
+        focusSearch();
+        return;
+      }
       // ? — show keyboard shortcuts (only when not typing)
       if (!isEditable && !e.ctrlKey && !e.metaKey && !e.altKey && e.key === "?") {
         e.preventDefault();

@@ -37,6 +37,7 @@ export function FilesTab() {
     setIngestRunning, setIngestStreamError, setLastIngestResult,
     setIngestDoneUnread, setCollectionType,
     setIncompleteCollection, clearIncompleteCollection,
+    setIngestPrefill, setLastIngestParams,
   } = useAppStore();
 
   // Reset session state when navigating away after a completed ingest
@@ -63,6 +64,18 @@ export function FilesTab() {
   const abortedRef  = useRef(false);
   const startTimeRef = useRef<number | null>(null);
   const { isDragging } = useDragDrop((path) => setSourcePath(path));
+
+  // Apply prefill from re-ingest button (CollectionCard → IngestPane). Read once on mount.
+  useEffect(() => {
+    const prefill = useAppStore.getState().ingestPrefill;
+    if (!prefill) return;
+    setSourcePath(prefill.sourcePath);
+    setChunkSize(prefill.chunkSize);
+    setOverlap(prefill.overlap);
+    setEmbeddingModel(prefill.embeddingModel);
+    setIncremental(prefill.incremental);
+    setIngestPrefill(null);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally once on mount
 
   // Tick every second while ingesting to keep ETA display current.
   useEffect(() => {
@@ -145,6 +158,16 @@ export function FilesTab() {
             chunksStored:    event.result.chunks_stored,
             skippedReasons:  event.result.skipped_reasons,
           });
+          if (event.result.sources_ingested > 0) {
+            setLastIngestParams(currentDb, effectiveCollection, {
+              sourcePath,
+              chunkSize,
+              overlap,
+              embeddingModel,
+              incremental,
+              chunking: "word",
+            });
+          }
           queryClient.invalidateQueries({
             queryKey: ["sources", apiUrl, currentDb, effectiveCollection],
           });

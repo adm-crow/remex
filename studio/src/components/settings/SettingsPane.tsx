@@ -97,6 +97,7 @@ export function SettingsPane() {
     apiUrl, setApiUrl,
     setCurrentDb, setCurrentCollection,
     darkMode, setDarkMode,
+    darkModeAuto, setDarkModeAuto,
     theme, setTheme,
     homeBg, setHomeBg,
     aiProvider, setAiProvider,
@@ -186,7 +187,20 @@ export function SettingsPane() {
                   id="dark-mode"
                   checked={darkMode}
                   onCheckedChange={setDarkMode}
+                  disabled={darkModeAuto}
                   aria-label="Dark mode"
+                />
+              </div>
+
+              <div className="flex items-center justify-between py-0.5">
+                <Label htmlFor="dark-mode-auto" className="text-sm cursor-pointer text-muted-foreground">
+                  Follow system
+                </Label>
+                <Switch
+                  id="dark-mode-auto"
+                  checked={darkModeAuto}
+                  onCheckedChange={setDarkModeAuto}
+                  aria-label="Follow system dark mode"
                 />
               </div>
 

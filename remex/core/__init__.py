@@ -9,6 +9,7 @@ from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, 
 from .pipeline import (
     collection_stats,
     delete_source,
+    update_collection_description,
     ingest,
     ingest_async,
     ingest_many,
@@ -27,6 +28,7 @@ __all__ = [
     # core API
     "collection_stats",
     "delete_source",
+    "update_collection_description",
     "ingest",
     "ingest_async",
     "ingest_many",

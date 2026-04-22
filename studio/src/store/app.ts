@@ -32,6 +32,15 @@ export interface LastIngestResult {
   skippedReasons: string[];
 }
 
+export interface FileIngestParams {
+  sourcePath: string;
+  chunkSize: number;
+  overlap: number;
+  embeddingModel: string;
+  incremental: boolean;
+  chunking: "word" | "sentence";
+}
+
 export interface AppState {
   currentDb: string | null;
   currentCollection: string | null;
@@ -48,6 +57,18 @@ export interface AppState {
   // Sidecar reconnect (not persisted)
   sidecarReconnectSeq: number;
   triggerSidecarReconnect: () => void;
+  // Appearance (persisted)
+  darkModeAuto: boolean;
+  setDarkModeAuto: (v: boolean) => void;
+  // Re-ingest params per collection (persisted) — keyed "${dbPath}::${collection}"
+  lastIngestParamsMap: Record<string, FileIngestParams>;
+  setLastIngestParams: (dbPath: string, collection: string, params: FileIngestParams) => void;
+  removeLastIngestParams: (dbPath: string, collection: string) => void;
+  // Ingest prefill / nav request (not persisted)
+  ingestPrefill: FileIngestParams | null;
+  setIngestPrefill: (params: FileIngestParams | null) => void;
+  requestedView: string | null;
+  setRequestedView: (view: string | null) => void;
   // Files ingest session state (not persisted)
   ingestRunning: boolean;
   ingestProgress: ProgressItem[];
@@ -142,6 +163,10 @@ export const useAppStore = create<AppState>()(
       sidecarStatus: "starting",
       sidecarReconnectSeq: 0,
       darkMode: false,
+      darkModeAuto: false,
+      lastIngestParamsMap: {},
+      ingestPrefill: null,
+      requestedView: null,
       theme: "default",
       homeBg: "dotgrid",
       aiProvider: "",
@@ -206,6 +231,17 @@ export const useAppStore = create<AppState>()(
       setSidecarStatus:        (status) => set({ sidecarStatus: status }),
       triggerSidecarReconnect: ()       => set((s) => ({ sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
       setDarkMode:       (dark)     => set({ darkMode: dark }),
+      setDarkModeAuto:   (v)        => set({ darkModeAuto: v }),
+      setLastIngestParams: (dbPath, collection, params) =>
+        set((s) => ({ lastIngestParamsMap: { ...s.lastIngestParamsMap, [`${dbPath}::${collection}`]: params } })),
+      removeLastIngestParams: (dbPath, collection) =>
+        set((s) => {
+          const next = { ...s.lastIngestParamsMap };
+          delete next[`${dbPath}::${collection}`];
+          return { lastIngestParamsMap: next };
+        }),
+      setIngestPrefill:  (params)   => set({ ingestPrefill: params }),
+      setRequestedView:  (view)     => set({ requestedView: view }),
       setTheme:          (theme)    => set({ theme }),
       setHomeBg:         (homeBg)   => set({ homeBg }),
       setAiProvider:     (provider) => set({ aiProvider: provider }),
@@ -334,6 +370,8 @@ export const useAppStore = create<AppState>()(
         queryHistory:     state.queryHistory,
         apiUrl:           state.apiUrl,
         darkMode:         state.darkMode,
+        darkModeAuto:     state.darkModeAuto,
+        lastIngestParamsMap: state.lastIngestParamsMap,
         theme:            state.theme,
         aiProvider:       state.aiProvider,
         aiModel:          state.aiModel,

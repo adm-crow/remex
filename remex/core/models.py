@@ -100,6 +100,8 @@ class CollectionStats:
     """Number of unique source documents (files or SQLite tables) in the collection."""
     embedding_model: str
     """Embedding model used when the collection was created; empty string if unknown."""
+    description: str = ""
+    """Optional user-provided description for the collection."""
 
 
 @dataclass

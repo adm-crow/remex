@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { FolderOpen, Copy, Check } from "lucide-react";
+import { FolderOpen, Copy, Check, Expand } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
 import type { QueryResultItem } from "@/api/client";
 
 interface Props {
   result: QueryResultItem;
+  onOpenViewer?: (result: QueryResultItem) => void;
 }
 
-export function ResultCard({ result }: Props) {
+export function ResultCard({ result, onOpenViewer }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -42,6 +43,16 @@ export function ResultCard({ result }: Props) {
         <span className="text-xs text-muted-foreground shrink-0">
           #{result.chunk}
         </span>
+        {onOpenViewer && (
+          <button
+            type="button"
+            onClick={() => onOpenViewer(result)}
+            aria-label="View full chunk"
+            className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <Expand className="w-3.5 h-3.5" />
+          </button>
+        )}
         <button
           type="button"
           onClick={handleCopy}

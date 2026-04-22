@@ -759,17 +759,43 @@ def collection_stats(
         for meta in (results["metadatas"] or [])
         if meta.get("source")
     })
-    embedding_model = (
-        collection.metadata.get("embedding_model", "")
-        if isinstance(collection.metadata, dict)
-        else ""
-    )
+    meta = collection.metadata if isinstance(collection.metadata, dict) else {}
+    embedding_model = meta.get("embedding_model", "")
+    description = meta.get("description", "")
     return CollectionStats(
         name=collection_name,
         total_chunks=total_chunks,
         total_sources=unique_sources,
         embedding_model=embedding_model,
+        description=description,
     )
+
+
+def update_collection_description(
+    db_path: str = "./remex_db",
+    collection_name: str = "remex",
+    description: str = "",
+) -> None:
+    """Set the human-readable description for a collection.
+
+    Args:
+        db_path:          ChromaDB persistence path.
+        collection_name:  Name of the collection to update.
+        description:      New description string (empty = clear).
+
+    Raises:
+        CollectionNotFoundError: If the collection does not exist.
+    """
+    client = _get_client(db_path)
+    try:
+        collection = client.get_collection(name=collection_name)
+    except (ValueError, ChromaNotFoundError):
+        raise CollectionNotFoundError(
+            f"Collection '{collection_name}' not found in '{db_path}'."
+        ) from None
+    meta = dict(collection.metadata or {})
+    meta["description"] = description
+    collection.modify(metadata=meta)
 
 
 def delete_source(

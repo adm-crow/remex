@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from fastapi import APIRouter, HTTPException, Query
-from remex.core import collection_stats, delete_source, list_collections, purge, reset, source_chunk_counts
+from remex.core import collection_stats, delete_source, list_collections, purge, reset, source_chunk_counts, update_collection_description
 from remex.core.exceptions import CollectionNotFoundError, RemexError
 from remex.core.pipeline import _get_client
 from remex.api.schemas import (
@@ -13,6 +13,7 @@ from remex.api.schemas import (
     SourceItem,
     RenameRequest,
     RenamedResponse,
+    UpdateDescriptionRequest,
 )
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -59,6 +60,31 @@ def get_stats(
         total_chunks=stats.total_chunks,
         total_sources=stats.total_sources,
         embedding_model=stats.embedding_model,
+        description=stats.description,
+    )
+
+
+@router.patch("/{collection}/description", response_model=CollectionStatsResponse)
+def set_description(
+    collection: str,
+    req: UpdateDescriptionRequest,
+    db_path: str = Query(default="./remex_db"),
+) -> CollectionStatsResponse:
+    try:
+        update_collection_description(
+            db_path=db_path,
+            collection_name=collection,
+            description=req.description,
+        )
+        stats = collection_stats(db_path=db_path, collection_name=collection)
+    except CollectionNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return CollectionStatsResponse(
+        name=stats.name,
+        total_chunks=stats.total_chunks,
+        total_sources=stats.total_sources,
+        embedding_model=stats.embedding_model,
+        description=stats.description,
     )
 
 

@@ -34,12 +34,20 @@ export function AppShell() {
   const setIngestDoneUnread = useAppStore((s) => s.setIngestDoneUnread);
   const lastIngestResult = useAppStore((s) => s.lastIngestResult);
   const licensePromptSeq = useAppStore((s) => s.licensePromptSeq);
+  const requestedView = useAppStore((s) => s.requestedView);
+  const setRequestedView = useAppStore((s) => s.setRequestedView);
   const isDragging = useRef(false);
 
   useEffect(() => {
     if (licensePromptSeq === 0) return;
     setActiveView("settings");
   }, [licensePromptSeq]);
+
+  useEffect(() => {
+    if (!requestedView) return;
+    setActiveView(requestedView as View);
+    setRequestedView(null);
+  }, [requestedView, setRequestedView]);
   const focusSearchRef = useRef<(() => void) | null>(null);
 
   const handleFocusReady = useCallback((fn: () => void) => {

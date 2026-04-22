@@ -194,11 +194,16 @@ class MultiChatResponse(BaseModel):
     collections: list[str]
 
 
+class UpdateDescriptionRequest(BaseModel):
+    description: str = Field(default="", max_length=500)
+
+
 class CollectionStatsResponse(BaseModel):
     name: str
     total_chunks: int
     total_sources: int
     embedding_model: str
+    description: str = ""
 
 
 class PurgeResultResponse(BaseModel):

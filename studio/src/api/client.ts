@@ -10,6 +10,7 @@ export interface CollectionStatsResponse {
   total_chunks: number;
   total_sources: number;
   embedding_model: string;
+  description: string;
 }
 
 export interface PurgeResultResponse {
@@ -364,6 +365,24 @@ export const api = {
       throw new Error(`${res.status}: ${message}`);
     }
     yield* readSseStream(res.body, signal);
+  },
+
+  updateCollectionDescription: (
+    base: string,
+    dbPath: string,
+    collection: string,
+    description: string,
+  ): Promise<CollectionStatsResponse> => {
+    const url = new URL(`${base}/collections/${encodeURIComponent(collection)}/description`);
+    url.searchParams.set("db_path", dbPath);
+    return apiFetch<CollectionStatsResponse>(
+      url.toString(),
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description }),
+      }
+    );
   },
 
   renameCollection: (

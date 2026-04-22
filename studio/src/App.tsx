@@ -18,8 +18,20 @@ const queryClient = new QueryClient({
 export function App() {
   const currentDb = useAppStore((s) => s.currentDb);
   const darkMode = useAppStore((s) => s.darkMode);
+  const darkModeAuto = useAppStore((s) => s.darkModeAuto);
+  const setDarkMode = useAppStore((s) => s.setDarkMode);
   const theme = useAppStore((s) => s.theme);
   useSidecar();
+
+  // Sync dark mode with system preference when Auto is enabled.
+  useEffect(() => {
+    if (!darkModeAuto) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    setDarkMode(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setDarkMode(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [darkModeAuto, setDarkMode]);
 
   useEffect(() => {
     const html = document.documentElement;

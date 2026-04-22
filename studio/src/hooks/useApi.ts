@@ -215,6 +215,23 @@ export function useRenameCollection(apiUrl: string, dbPath: string) {
   });
 }
 
+export function useUpdateCollectionDescription(
+  apiUrl: string,
+  dbPath: string,
+  collection: string
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (description: string) =>
+      api.updateCollectionDescription(apiUrl, dbPath, collection, description),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["collectionStats", apiUrl, dbPath, collection],
+      });
+    },
+  });
+}
+
 export function usePurgeCollection(
   apiUrl: string,
   dbPath: string,

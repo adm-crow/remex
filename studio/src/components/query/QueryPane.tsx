@@ -16,6 +16,8 @@ import { useAppStore, useIsPro } from "@/store/app";
 import { toBibTeX, toRIS, toCSLJson, toObsidianVault } from "@/lib/exports";
 import { join } from "@tauri-apps/api/path";
 import { ResultCard } from "./ResultCard";
+import { ChunkViewerModal } from "./ChunkViewerModal";
+import type { QueryResultItem } from "@/api/client";
 
 function CollectionPill({
   col,
@@ -86,6 +88,9 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   );
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [sourceSearch, setSourceSearch] = useState("");
+  const [viewerResult, setViewerResult] = useState<QueryResultItem | null>(null);
+  const [viewerIndex, setViewerIndex] = useState(0);
   const [exportDone, setExportDone] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [aiExportDone, setAiExportDone] = useState(false);
@@ -294,6 +299,18 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const error = useAi ? chatResult.error : multiResult.error;
   const canRun = !isLoading && selectedCollections.length > 0;
 
+  const filteredSources = useMemo(() => {
+    const q = sourceSearch.trim().toLowerCase();
+    if (!q) return sourcesData;
+    return sourcesData.filter((s) => s.source.toLowerCase().includes(q));
+  }, [sourcesData, sourceSearch]);
+
+  function handleOpenViewer(result: QueryResultItem) {
+    const idx = results.indexOf(result);
+    setViewerIndex(idx >= 0 ? idx : 0);
+    setViewerResult(result);
+  }
+
   return (
     <div className="flex flex-col h-full">
 
@@ -480,42 +497,53 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <div className="flex flex-wrap gap-1.5 pt-1.5">
-                {sourcesData.map((s) => {
-                  const label = s.source.split(/[/\\]/).pop() ?? s.source;
-                  const isSelected = selectedSources.includes(s.source);
-                  return (
-                    <button
-                      key={s.source}
-                      type="button"
-                      title={s.source}
-                      onClick={() =>
-                        setSelectedSources((prev) =>
-                          prev.includes(s.source)
-                            ? prev.filter((x) => x !== s.source)
-                            : [...prev, s.source]
-                        )
-                      }
-                      className={cn(
-                        "text-xs px-2 py-0.5 rounded border transition-colors font-mono truncate max-w-[200px]",
-                        isSelected
-                          ? "bg-primary/10 border-primary text-primary"
-                          : "border-border text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-                {selectedSources.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedSources([])}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Clear
-                  </button>
+              <div className="pt-1.5 space-y-1.5">
+                {sourcesData.length > 6 && (
+                  <Input
+                    value={sourceSearch}
+                    onChange={(e) => setSourceSearch(e.target.value)}
+                    placeholder="Filter sources…"
+                    className="h-7 text-xs"
+                    aria-label="Filter sources"
+                  />
                 )}
+                <div className="flex flex-wrap gap-1.5">
+                  {filteredSources.map((s) => {
+                    const label = s.source.split(/[/\\]/).pop() ?? s.source;
+                    const isSelected = selectedSources.includes(s.source);
+                    return (
+                      <button
+                        key={s.source}
+                        type="button"
+                        title={s.source}
+                        onClick={() =>
+                          setSelectedSources((prev) =>
+                            prev.includes(s.source)
+                              ? prev.filter((x) => x !== s.source)
+                              : [...prev, s.source]
+                          )
+                        }
+                        className={cn(
+                          "text-xs px-2 py-0.5 rounded border transition-colors font-mono truncate max-w-[200px]",
+                          isSelected
+                            ? "bg-primary/10 border-primary text-primary"
+                            : "border-border text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                  {selectedSources.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSources([])}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -683,7 +711,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                 <CollapsibleContent>
                   <div className="flex flex-col gap-2 mt-2">
                     {results.map((r, i) => (
-                      <ResultCard key={`${r.source}-${r.chunk}-${i}`} result={r} />
+                      <ResultCard key={`${r.source}-${r.chunk}-${i}`} result={r} onOpenViewer={handleOpenViewer} />
                     ))}
                   </div>
                 </CollapsibleContent>
@@ -712,7 +740,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                 </div>
                 <div className="flex flex-col gap-2">
                   {results.map((r, i) => (
-                    <ResultCard key={`${r.source}-${r.chunk}-${i}`} result={r} />
+                    <ResultCard key={`${r.source}-${r.chunk}-${i}`} result={r} onOpenViewer={handleOpenViewer} />
                   ))}
                 </div>
               </>
@@ -721,6 +749,13 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
 
         </div>
       </div>
+
+      <ChunkViewerModal
+        results={results}
+        initialIndex={viewerIndex}
+        open={!!viewerResult}
+        onClose={() => setViewerResult(null)}
+      />
     </div>
   );
 }

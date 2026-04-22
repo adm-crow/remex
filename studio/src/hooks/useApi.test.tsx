@@ -60,6 +60,7 @@ describe("useCollectionStats", () => {
       total_chunks: 10,
       total_sources: 2,
       embedding_model: "all-MiniLM-L6-v2",
+      description: "",
     });
     const { result } = renderHook(
       () =>

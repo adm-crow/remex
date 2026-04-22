@@ -19,6 +19,7 @@ const SHORTCUTS: { group: string; items: Shortcut[] }[] = [
     group: "Search",
     items: [
       { keys: ["Ctrl", "K"], description: "Focus search input" },
+      { keys: ["/"], description: "Focus search (from any pane)" },
       { keys: ["Esc"], description: "Clear search / close" },
     ],
   },
