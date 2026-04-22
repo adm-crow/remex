@@ -18,6 +18,16 @@ export function ChunkViewerModal({ results, initialIndex, open, onClose }: Chunk
     if (open) setIndex(initialIndex);
   }, [open, initialIndex]);
 
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "ArrowLeft")  setIndex((i) => Math.max(0, i - 1));
+      if (e.key === "ArrowRight") setIndex((i) => Math.min(results.length - 1, i + 1));
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, results.length]);
+
   if (results.length === 0) return null;
   const result = results[Math.min(index, results.length - 1)];
 

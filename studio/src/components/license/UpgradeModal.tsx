@@ -50,7 +50,7 @@ export function UpgradeModal() {
         </p>
 
         <div className="flex gap-2 pt-2">
-          <Button className="flex-1" onClick={() => open(CHECKOUT_URL).catch((err) => console.error("[UpgradeModal] Failed to open URL:", err))}>
+          <Button className="flex-1" onClick={() => void open(CHECKOUT_URL)?.catch((err) => console.error("[UpgradeModal] Failed to open URL:", err))}>
             Buy Pro · {PRO_PRICE}
           </Button>
           <Button variant="outline" onClick={() => {

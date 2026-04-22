@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { UpgradeModal } from "./UpgradeModal";
 import { useAppStore } from "@/store/app";
 
-vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn() }));
+vi.mock("@tauri-apps/plugin-shell", () => ({ open: vi.fn().mockResolvedValue(undefined) }));
 import { open } from "@tauri-apps/plugin-shell";
 
 describe("UpgradeModal", () => {

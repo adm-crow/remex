@@ -31,7 +31,7 @@ describe("EmbeddingModelField — Pro lock", () => {
   it("clicking a free preset works regardless of tier", () => {
     let selected = "";
     render(<EmbeddingModelField value="" onChange={(v) => { selected = v; }} />);
-    fireEvent.click(screen.getByTitle(/fast, good for most cases/));
+    fireEvent.click(screen.getByTitle(/recommended for most cases/));
     expect(selected).toBe("all-MiniLM-L6-v2");
   });
 });

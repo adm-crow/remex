@@ -49,6 +49,7 @@ class _RemexEmbeddingFunction(embedding_functions.SentenceTransformerEmbeddingFu
     def __call__(self, input: list[str]) -> list[Any]:  # type: ignore[override]
         import numpy as np
 
+        # _model and normalize_embeddings are private attrs set by the parent __init__.
         embeddings = self._model.encode(
             list(input),
             batch_size=128,
@@ -626,17 +627,26 @@ def purge(
     db_path: str = "./remex_db",
     collection_name: str = "remex",
     verbose: bool = True,
+    raise_if_missing: bool = False,
 ) -> PurgeResult:
     """
     Remove chunks from ChromaDB whose source file no longer exists on disk.
 
     Returns a :class:`~remex.core.PurgeResult` with ``chunks_deleted`` and
     ``chunks_checked``.
+
+    Args:
+        raise_if_missing: When True, raise :class:`CollectionNotFoundError` if the
+            collection does not exist instead of returning an empty result.
     """
     client = _get_client(db_path)
     try:
         collection = client.get_collection(name=collection_name)
     except (ValueError, ChromaNotFoundError):
+        if raise_if_missing:
+            raise CollectionNotFoundError(
+                f"Collection '{collection_name}' not found in '{db_path}'."
+            ) from None
         if verbose:
             logger.warning("Collection '%s' not found.", collection_name)
         return PurgeResult()

@@ -15,6 +15,13 @@ def _validate_overlap(values):
     return values
 
 
+def _validate_db_path(v: str) -> str:
+    """Allow the default sentinel or any absolute path; block relative traversals."""
+    if v != "./remex_db" and not os.path.isabs(v):
+        raise ValueError("db_path must be an absolute path")
+    return v
+
+
 def _check_where_depth(obj: Any, depth: int = 0) -> None:
     """Prevent deeply nested or oversized ChromaDB filter expressions."""
     if depth > 5:
@@ -35,10 +42,24 @@ def _check_where_depth(obj: Any, depth: int = 0) -> None:
 # Requests
 # ---------------------------------------------------------------------------
 
+_EMBEDDING_MODEL_FIELD = Field(
+    default="all-MiniLM-L6-v2",
+    max_length=256,
+    pattern=r"^[a-zA-Z0-9][\w./\-]*$",
+)
+_TEXT_FIELD = Field(min_length=1, max_length=8192)
+
+
 class IngestRequest(BaseModel):
     source_dir: str
     db_path: str = "./remex_db"
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = _EMBEDDING_MODEL_FIELD
+
+    @field_validator("db_path")
+    @classmethod
+    def _check_db_path(cls, v: str) -> str:
+        return _validate_db_path(v)
+
     chunk_size: int = Field(default=1000, ge=1)
     overlap: int = Field(default=200, ge=0)
     min_chunk_size: int = Field(default=50, ge=1)
@@ -63,7 +84,7 @@ class IngestSQLiteRequest(BaseModel):
     columns: Optional[list[str]] = None
     id_column: str = Field(default="id", max_length=256)
     row_template: Optional[str] = None
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = _EMBEDDING_MODEL_FIELD
     chunk_size: int = Field(default=1000, ge=1)
     overlap: int = Field(default=200, ge=0)
     min_chunk_size: int = Field(default=50, ge=1)
@@ -71,6 +92,11 @@ class IngestSQLiteRequest(BaseModel):
     incremental: bool = False
 
     _check_overlap = model_validator(mode="after")(_validate_overlap)
+
+    @field_validator("db_path")
+    @classmethod
+    def _check_db_path(cls, v: str) -> str:
+        return _validate_db_path(v)
 
     @field_validator("sqlite_path")
     @classmethod
@@ -81,12 +107,17 @@ class IngestSQLiteRequest(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = _TEXT_FIELD
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1, le=500)
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = _EMBEDDING_MODEL_FIELD
     where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+
+    @field_validator("db_path")
+    @classmethod
+    def _check_db_path(cls, v: str) -> str:
+        return _validate_db_path(v)
 
     @field_validator("where")
     @classmethod
@@ -97,15 +128,20 @@ class QueryRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = _TEXT_FIELD
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1, le=500)
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = _EMBEDDING_MODEL_FIELD
     where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+
+    @field_validator("db_path")
+    @classmethod
+    def _check_db_path(cls, v: str) -> str:
+        return _validate_db_path(v)
 
     @field_validator("where")
     @classmethod
@@ -167,16 +203,21 @@ class ChatResponse(BaseModel):
 
 
 class MultiChatRequest(BaseModel):
-    text: str = Field(min_length=1)
+    text: str = _TEXT_FIELD
     collections: list[str]
     db_path: str = "./remex_db"
     n_results: int = Field(default=5, ge=1, le=500)
-    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_model: str = _EMBEDDING_MODEL_FIELD
     where: Optional[dict[str, Any]] = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+
+    @field_validator("db_path")
+    @classmethod
+    def _check_db_path(cls, v: str) -> str:
+        return _validate_db_path(v)
 
     @field_validator("where")
     @classmethod

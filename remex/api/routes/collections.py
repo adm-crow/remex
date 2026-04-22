@@ -1,3 +1,4 @@
+import hashlib
 import os
 import sqlite3
 from fastapi import APIRouter, HTTPException, Query
@@ -19,8 +20,16 @@ from remex.api.schemas import (
 router = APIRouter(prefix="/collections", tags=["collections"])
 
 
+def _require_absolute_db_path(db_path: str) -> str:
+    """Reject relative paths to prevent directory-traversal into unintended locations."""
+    if db_path != "./remex_db" and not os.path.isabs(db_path):
+        raise HTTPException(status_code=400, detail="db_path must be an absolute path")
+    return db_path
+
+
 @router.get("", response_model=list[str])
 def get_collections(db_path: str = Query(default="./remex_db")) -> list[str]:
+    _require_absolute_db_path(db_path)
     return list_collections(db_path=db_path)
 
 
@@ -51,6 +60,7 @@ def list_sqlite_tables(
 def get_stats(
     collection: str, db_path: str = Query(default="./remex_db")
 ) -> CollectionStatsResponse:
+    _require_absolute_db_path(db_path)
     try:
         stats = collection_stats(db_path=db_path, collection_name=collection)
     except CollectionNotFoundError as e:
@@ -70,12 +80,16 @@ def set_description(
     req: UpdateDescriptionRequest,
     db_path: str = Query(default="./remex_db"),
 ) -> CollectionStatsResponse:
+    _require_absolute_db_path(db_path)
     try:
         update_collection_description(
             db_path=db_path,
             collection_name=collection,
             description=req.description,
         )
+        # Re-fetch stats to return the updated state; update_collection_description
+        # only modifies metadata so count/sources are unchanged but we return the
+        # full response shape for consistency.
         stats = collection_stats(db_path=db_path, collection_name=collection)
     except CollectionNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -92,6 +106,7 @@ def set_description(
 def get_sources(
     collection: str, db_path: str = Query(default="./remex_db")
 ) -> list[SourceItem]:
+    _require_absolute_db_path(db_path)
     try:
         counts = source_chunk_counts(db_path=db_path, collection_name=collection)
     except CollectionNotFoundError as e:
@@ -106,6 +121,7 @@ def get_sources(
 def remove_source(
     collection: str, source: str, db_path: str = Query(default="./remex_db")
 ) -> DeletedChunksResponse:
+    _require_absolute_db_path(db_path)
     try:
         deleted = delete_source(source=source, db_path=db_path, collection_name=collection)
     except RemexError as e:
@@ -117,6 +133,7 @@ def remove_source(
 def reset_collection(
     collection: str, db_path: str = Query(default="./remex_db")
 ) -> DeletedResponse:
+    _require_absolute_db_path(db_path)
     try:
         reset(db_path=db_path, collection_name=collection, confirm=True)
     except RemexError as e:
@@ -128,11 +145,11 @@ def reset_collection(
 def purge_collection(
     collection: str, db_path: str = Query(default="./remex_db")
 ) -> PurgeResultResponse:
+    _require_absolute_db_path(db_path)
     try:
-        collection_stats(db_path=db_path, collection_name=collection)
+        result = purge(db_path=db_path, collection_name=collection, raise_if_missing=True)
     except CollectionNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
-    result = purge(db_path=db_path, collection_name=collection)
     return PurgeResultResponse(
         chunks_deleted=result.chunks_deleted,
         chunks_checked=result.chunks_checked,
@@ -145,6 +162,7 @@ def rename_collection(
     req: RenameRequest,
     db_path: str = Query(default="./remex_db"),
 ) -> RenamedResponse:
+    _require_absolute_db_path(db_path)
     """Rename a ChromaDB collection via a sentinel-copy pattern.
 
     Steps:
@@ -168,7 +186,10 @@ def rename_collection(
     if req.new_name in existing:
         raise HTTPException(status_code=409, detail=f"Collection '{req.new_name}' already exists")
 
-    sentinel_name = f"remextmp.{collection}"[:512]
+    # Hash the collection name so the sentinel is always exactly 17 chars and
+    # never collides even when two names share a long common prefix.
+    _hash = hashlib.md5(collection.encode(), usedforsecurity=False).hexdigest()[:8]
+    sentinel_name = f"remextmp.{_hash}"
     # Clean up any stale sentinel from a previous interrupted rename.
     if sentinel_name in existing:
         try:

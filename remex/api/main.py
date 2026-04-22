@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
@@ -6,6 +8,8 @@ from fastapi.responses import JSONResponse
 
 from remex.core import __version__
 from remex.api.routes import collections, ingest, query, system
+
+_logger = logging.getLogger(__name__)
 
 # Tauri webview origins — localhost:1420 in dev, tauri://localhost in production
 _ALLOWED_ORIGINS = [
@@ -35,10 +39,13 @@ def create_app() -> FastAPI:
         request: Request, exc: Exception
     ) -> JSONResponse:
         """Catch-all: routes through FastAPI's HTTPException handler so that
-        CORSMiddleware can attach Access-Control-Allow-Origin to error responses."""
+        CORSMiddleware can attach Access-Control-Allow-Origin to error responses.
+        Full detail is logged server-side only — the response never leaks
+        internal paths, API keys, or stack content."""
+        _logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
         return await http_exception_handler(
             request,
-            FastAPIHTTPException(status_code=500, detail=str(exc)),
+            FastAPIHTTPException(status_code=500, detail="An internal error occurred."),
         )
 
     app.include_router(system.router)

@@ -345,15 +345,23 @@ export const api = {
     req: IngestSQLiteRequest,
     signal?: AbortSignal
   ): AsyncGenerator<IngestStreamEvent> {
-    const res = await fetch(
-      `${base}/collections/${encodeURIComponent(collection)}/ingest/sqlite/stream`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...req, db_path: dbPath }),
-        signal,
-      }
-    );
+    let res: Response;
+    try {
+      res = await fetch(
+        `${base}/collections/${encodeURIComponent(collection)}/ingest/sqlite/stream`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...req, db_path: dbPath }),
+          signal,
+        }
+      );
+    } catch (e) {
+      throw new Error(
+        `Cannot reach the server at ${base}. Make sure 'remex serve' is running. ` +
+        `(${e instanceof Error ? e.message : String(e)})`
+      );
+    }
     if (!res.ok || !res.body) {
       const body = await res.text().catch(() => "");
       let message: string;
@@ -410,15 +418,23 @@ export const api = {
     req: IngestRequest,
     signal?: AbortSignal
   ): AsyncGenerator<IngestStreamEvent> {
-    const res = await fetch(
-      `${base}/collections/${encodeURIComponent(collection)}/ingest/stream`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...req, db_path: dbPath }),
-        signal,
-      }
-    );
+    let res: Response;
+    try {
+      res = await fetch(
+        `${base}/collections/${encodeURIComponent(collection)}/ingest/stream`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...req, db_path: dbPath }),
+          signal,
+        }
+      );
+    } catch (e) {
+      throw new Error(
+        `Cannot reach the server at ${base}. Make sure 'remex serve' is running. ` +
+        `(${e instanceof Error ? e.message : String(e)})`
+      );
+    }
     if (!res.ok || !res.body) {
       const body = await res.text().catch(() => "");
       let message: string;

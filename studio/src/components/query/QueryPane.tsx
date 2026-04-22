@@ -102,6 +102,12 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     setSelectedSources([]);
   }, [currentCollection]);
 
+  // Clear query state when the user opens a different project.
+  useEffect(() => {
+    setText("");
+    setSubmitted("");
+  }, [currentDb]);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -200,7 +206,11 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     });
     if (!path) return;
 
-    const ext = path.split(".").pop()?.toLowerCase();
+    // Derive extension from the last path segment only, so folder paths
+    // like "C:\Users\foo\vault" (no dot in last segment) correctly map to no ext.
+    const lastSegment = path.replace(/.*[/\\]/, "");
+    const dotIdx = lastSegment.lastIndexOf(".");
+    const ext = dotIdx === -1 ? "" : lastSegment.slice(dotIdx + 1).toLowerCase();
     let content: string | null = null;
 
     if (ext === "bib") {
@@ -212,7 +222,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     } else if (ext === "csl") {
       if (!isPro) { openUpgradeModal("export"); return; }
       content = toCSLJson(results, submitted);
-    } else if (!ext) {
+    } else if (ext === "") {
       // Obsidian vault: path is the folder the user chose.
       if (!isPro) { openUpgradeModal("export"); return; }
       const files = toObsidianVault(results, submitted);

@@ -39,6 +39,8 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
   const [confirmDelete, setConfirmDelete] = useState<SourceItem | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmBulk, setConfirmBulk] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [bulkFailCount, setBulkFailCount] = useState(0);
   const { data: sources = [], isLoading } = useSources(apiUrl, dbPath, collection);
   const deleteMutation = useDeleteSource(apiUrl, dbPath, collection);
 
@@ -52,15 +54,25 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
   }
 
   async function handleBulkDelete() {
+    setIsBulkDeleting(true);
+    setBulkFailCount(0);
+    let fails = 0;
     for (const src of selected) {
-      try { await deleteMutation.mutateAsync(src); } catch { /* continue */ }
+      try { await deleteMutation.mutateAsync(src); } catch { fails++; }
     }
+    setIsBulkDeleting(false);
+    setBulkFailCount(fails);
     setSelected(new Set());
     setConfirmBulk(false);
   }
 
   return (
     <>
+      {bulkFailCount > 0 && (
+        <div className="px-3 py-1.5 border-b bg-destructive/10 text-xs text-destructive">
+          {bulkFailCount} source{bulkFailCount !== 1 ? "s" : ""} could not be deleted.
+        </div>
+      )}
       {selected.size > 0 && (
         <div className="flex items-center justify-between px-3 py-1.5 border-b bg-muted/30">
           <span className="text-xs text-muted-foreground">{selected.size} selected</span>
@@ -183,10 +195,10 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
             <Button variant="outline" onClick={() => setConfirmBulk(false)}>Cancel</Button>
             <Button
               variant="destructive"
-              disabled={deleteMutation.isPending}
+              disabled={isBulkDeleting}
               onClick={handleBulkDelete}
             >
-              {deleteMutation.isPending ? "Deleting…" : `Delete ${selected.size}`}
+              {isBulkDeleting ? "Deleting…" : `Delete ${selected.size}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -222,6 +234,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
     setCollectionType, removeCollectionType,
     setIncompleteCollection, clearIncompleteCollection,
     lastIngestParamsMap, setIngestPrefill, setRequestedView,
+    setLastIngestParams, removeLastIngestParams,
   } = useAppStore();
 
   const { data: stats, isLoading: statsLoading } = useCollectionStats(apiUrl, dbPath, name);
@@ -418,6 +431,11 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
                 if (isIncomplete) {
                   clearIncompleteCollection(dbPath, data.old_name);
                   setIncompleteCollection(dbPath, data.new_name);
+                }
+                const oldParams = lastIngestParamsMap[`${dbPath}::${data.old_name}`];
+                if (oldParams) {
+                  setLastIngestParams(dbPath, data.new_name, oldParams);
+                  removeLastIngestParams(dbPath, data.old_name);
                 }
               },
             }
