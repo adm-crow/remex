@@ -87,6 +87,9 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
                 embedding_model=req.embedding_model,
                 on_progress=_on_progress,
             )
+            # Yield to the event loop so any call_soon_threadsafe callbacks
+            # (progress events) queued from the thread are processed before done.
+            await asyncio.sleep(0)
             await queue.put({
                 "type": "done",
                 "result": {
@@ -240,6 +243,9 @@ async def ingest_sqlite_stream(
                 incremental=req.incremental,
                 on_progress=_on_progress,
             )
+            # Yield to the event loop so any call_soon_threadsafe callbacks
+            # (progress events) queued from the thread are processed before done.
+            await asyncio.sleep(0)
             await queue.put({
                 "type": "done",
                 "result": {
