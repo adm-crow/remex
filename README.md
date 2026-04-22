@@ -39,41 +39,6 @@ Native desktop app for Windows. No terminal required.
 
 <br/>
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <a href="docs/screenshots/remex_query.png">
-          <img src="docs/screenshots/remex_query.png" width="380" alt="Semantic search" />
-        </a>
-        <br/><sub><b>Semantic search</b> — vector similarity, min-score filter, source chips</sub>
-      </td>
-      <td align="center">
-        <a href="docs/screenshots/remex_ai_answer.png">
-          <img src="docs/screenshots/remex_ai_answer.png" width="380" alt="AI answer" />
-        </a>
-        <br/><sub><b>AI Answer</b> — grounded in your files, sources cited, exportable</sub>
-      </td>
-    </tr>
-    <tr>
-      <td align="center">
-        <a href="docs/screenshots/remex_ingest.png">
-          <img src="docs/screenshots/remex_ingest.png" width="380" alt="File ingestion" />
-        </a>
-        <br/><sub><b>Ingest</b> — live progress, drag-and-drop, incremental re-ingest</sub>
-      </td>
-      <td align="center">
-        <a href="docs/screenshots/remex_collection.png">
-          <img src="docs/screenshots/remex_collection.png" width="380" alt="Collections" />
-        </a>
-        <br/><sub><b>Collections</b> — rename, describe, bulk-delete, re-ingest in one click</sub>
-      </td>
-    </tr>
-  </table>
-</div>
-
-<br/>
-
 ### What you can do
 
 | | |
