@@ -1,4 +1,4 @@
-import { Search, Upload, Database, Settings, RotateCcw } from "lucide-react";
+import { Search, Upload, Database, Settings, RotateCcw, House } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CollectionSwitcher } from "./CollectionSwitcher";
@@ -21,7 +21,7 @@ const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
 ];
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
-  const { currentDb, sidecarStatus, setIngestDoneUnread, triggerSidecarReconnect } = useAppStore();
+  const { currentDb, sidecarStatus, setIngestDoneUnread, triggerSidecarReconnect, setCurrentDb } = useAppStore();
   const isPro = useIsPro();
 
   return (
@@ -90,6 +90,19 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
           </button>
         ))}
       </nav>
+
+      {/* ── Home button ─────────────────────────────────────────────────── */}
+      <div className="px-2 pb-1 shrink-0">
+        <button
+          onClick={() => setCurrentDb(null)}
+          className="flex items-center gap-3 text-left text-sm px-3 py-2 rounded-md w-full text-muted-foreground hover:bg-accent/50 hover:text-sidebar-foreground transition-all duration-150"
+          title="Back to home"
+          aria-label="Back to home"
+        >
+          <House className="w-4 h-4 shrink-0" />
+          <span>Home</span>
+        </button>
+      </div>
 
       {/* ── Status footer ───────────────────────────────────────────────── */}
       <div className="h-px bg-sidebar-border mx-0 shrink-0" />

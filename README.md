@@ -1,186 +1,255 @@
 <div align="center">
 
-  <img src="logo.svg" alt="remex" width="90" /><br/><br/>
+  <img src="logo.svg" alt="Remex" width="96" /><br/><br/>
 
-  # remex
+  # Remex
 
   **Your private knowledge base — fully offline, never leaves your machine.**
 
   <br/>
 
-![GitHub Release](https://img.shields.io/github/v/release/adm-crow/remex)
-![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?style=flat&logo=github&label=CI)
-![GitHub License](https://img.shields.io/github/license/adm-crow/remex?style=flat)
-[![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
-![Python](https://img.shields.io/badge/Python-FFD43B?style=flat&logo=python&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
+  [![GitHub Release](https://img.shields.io/github/v/release/adm-crow/remex?style=flat&label=release&color=4f8ef7)](https://github.com/adm-crow/remex/releases)
+  [![CI](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?style=flat&logo=github&label=CI)](https://github.com/adm-crow/remex/actions)
+  [![PyPI](https://img.shields.io/pypi/v/remex-cli?style=flat&logo=pypi&logoColor=white&label=PyPI&color=3775a9)](https://pypi.org/project/remex-cli)
+  [![License](https://img.shields.io/badge/CLI-Apache%202.0-22c55e?style=flat)](LICENSES.md)
+  [![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
+  [![Python](https://img.shields.io/badge/3.10+-FFD43B?style=flat&logo=python&logoColor=black)](https://pypi.org/project/remex-cli)
+
   <br/>
 
-  <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio" width="820" />
+  <img src="docs/screenshots/remex_homepage.png" alt="Remex Studio — homepage" width="860" />
 
 </div>
 
----
+<br/>
 
-Remex turns any folder of documents — PDFs, notes, code, spreadsheets — into a searchable knowledge base. Ask questions in natural language and get answers grounded in your own files.
+Remex turns any folder of documents — PDFs, Word files, notes, spreadsheets, code — into a **private, searchable knowledge base**. Ask questions in plain language and get answers grounded in your own files, with sources cited.
 
-Everything runs locally. No cloud account. No data leaves your machine. Bring your own AI provider (Anthropic, OpenAI, or a local Ollama) only when you want AI-synthesised answers.
+Everything runs on your machine. No cloud account. No API key required for search. Bring your own AI provider (Anthropic, OpenAI, or a local Ollama instance) only when you want synthesised answers.
+
+<br/>
 
 ---
 
 ## Remex Studio
 
-Native desktop app for Windows — ingest, search, and query your documents with AI. No terminal required.
+Native desktop app for Windows. No terminal required.
 
-**[Download the latest release →](https://github.com/adm-crow/remex/releases)**
+**[⬇ Download the latest release](https://github.com/adm-crow/remex/releases)**
+
+<br/>
 
 <div align="center">
   <table>
     <tr>
       <td align="center">
         <a href="docs/screenshots/remex_query.png">
-          <img src="docs/screenshots/remex_query.png" width="360" alt="Semantic search" />
-        </a><br/>
-        <em>Semantic search</em>
+          <img src="docs/screenshots/remex_query.png" width="380" alt="Semantic search" />
+        </a>
+        <br/><sub><b>Semantic search</b> — vector similarity, min-score filter, source chips</sub>
       </td>
       <td align="center">
         <a href="docs/screenshots/remex_ai_answer.png">
-          <img src="docs/screenshots/remex_ai_answer.png" width="360" alt="AI answer" />
-        </a><br/>
-        <em>AI answer, grounded in your files</em>
+          <img src="docs/screenshots/remex_ai_answer.png" width="380" alt="AI answer" />
+        </a>
+        <br/><sub><b>AI Answer</b> — grounded in your files, sources cited, exportable</sub>
       </td>
     </tr>
     <tr>
       <td align="center">
         <a href="docs/screenshots/remex_ingest.png">
-          <img src="docs/screenshots/remex_ingest.png" width="360" alt="File ingestion" />
-        </a><br/>
-        <em>Ingest any folder</em>
+          <img src="docs/screenshots/remex_ingest.png" width="380" alt="File ingestion" />
+        </a>
+        <br/><sub><b>Ingest</b> — live progress, drag-and-drop, incremental re-ingest</sub>
       </td>
-      <td align="center">
-        <a href="docs/screenshots/remex_ingest_sqlite.png">
-          <img src="docs/screenshots/remex_ingest_sqlite.png" width="360" alt="SQLite ingestion" />
-        </a><br/>
-        <em>…or a SQLite table</em>
-      </td>
-    </tr>
-    <tr>
       <td align="center">
         <a href="docs/screenshots/remex_collection.png">
-          <img src="docs/screenshots/remex_collection.png" width="360" alt="Collections manager" />
-        </a><br/>
-        <em>Manage collections</em>
-      </td>
-      <td align="center">
-        <a href="docs/screenshots/remex_settings.png">
-          <img src="docs/screenshots/remex_settings.png" width="360" alt="Settings" />
-        </a><br/>
-        <em>Themes · AI provider · more</em>
+          <img src="docs/screenshots/remex_collection.png" width="380" alt="Collections" />
+        </a>
+        <br/><sub><b>Collections</b> — rename, describe, bulk-delete, re-ingest in one click</sub>
       </td>
     </tr>
   </table>
 </div>
 
-> Building from source? See [`studio/README.md`](studio/README.md).
+<br/>
+
+### What you can do
+
+| | |
+|---|---|
+| 🔍 **Semantic search** | Vector similarity search across one or more collections simultaneously |
+| 🤖 **AI Answer** | Ask a question, get a synthesised answer with cited sources (Anthropic · OpenAI · Ollama) |
+| 📄 **12 file formats** | `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.jsonl` `.html` `.pptx` `.xlsx` `.epub` `.odt` |
+| 🗄 **SQLite ingest** | Embed rows from any table alongside your files |
+| ♻️ **Incremental ingest** | SHA-256 hash check — only changed files are re-processed |
+| 🎯 **Source filter** | Narrow results to one or more documents before searching or asking AI |
+| 🔎 **Chunk viewer** | Expand any result to read the full chunk, navigate with keyboard arrows |
+| 📦 **Collections manager** | Rename, describe, purge, bulk-delete sources, one-click re-ingest |
+| 📤 **Export** | JSON · CSV · Markdown · BibTeX · RIS · CSL-JSON · Obsidian vault |
+| 🌙 **Themes** | Light, dark, auto (follows OS) + ten accent colours |
+| ⌨️ **Keyboard-driven** | Press `?` anywhere in Studio for the full shortcuts reference |
+
+<br/>
 
 ---
 
 ## Remex Pro — 29€, one-time
 
-Free Remex Studio covers the full local-first workflow. **Remex Pro** unlocks power-user features for 29€ (one-time purchase, two machines):
+Free Remex covers the full local-first workflow. **Remex Pro** unlocks power-user features for a single one-time payment (two machines):
 
-- **Pro embedding models** — `bge-large-en-v1.5`, `e5-large-v2`, `nomic-embed-text-v1.5`
-- **Advanced exports** — BibTeX, RIS, CSL-JSON, Obsidian vault
-- **Watch-folder auto-ingest** — keep collections in sync as files change
-- **Unlimited searchable query history** (free tier: last 20)
-- **Eight extra accent themes** + Pro badge in-app
-- **Priority email support** — 48-hour business-day SLA
+| Feature | Free | Pro |
+|:--------|:----:|:---:|
+| Semantic search | ✓ | ✓ |
+| AI Answer | ✓ | ✓ |
+| All 12 file formats + SQLite | ✓ | ✓ |
+| Incremental ingest | ✓ | ✓ |
+| Source filter + chunk viewer | ✓ | ✓ |
+| Collections manager | ✓ | ✓ |
+| JSON · CSV · Markdown export | ✓ | ✓ |
+| Query history (last 20) | ✓ | ✓ |
+| **Pro embedding models** (`bge-large`, `e5-large`, `nomic-embed`) | — | ✓ |
+| **Advanced exports** (BibTeX · RIS · CSL-JSON · Obsidian vault) | — | ✓ |
+| **Watch-folder auto-ingest** | — | ✓ |
+| **Unlimited searchable query history** | — | ✓ |
+| **Extra accent themes** (8 additional) | — | ✓ |
+| **Priority email support** (48-hour SLA) | — | ✓ |
 
-Activate in `Settings → License` inside Studio. Licenses are issued and validated via [Lemon Squeezy](https://lemonsqueezy.com/).
+Activate in `Settings → License` inside Studio. Licenses are issued and validated offline via [Lemon Squeezy](https://lemonsqueezy.com/).
+
+<br/>
 
 ---
 
-## Python CLI
+## Python CLI & Library
 
 ```bash
-pip install remex-cli          # core — ingest + query
-pip install remex-cli[api]     # adds the FastAPI sidecar (used by Studio)
+pip install remex-cli            # core — ingest + query
+pip install "remex-cli[api]"     # + FastAPI sidecar (used by Studio)
 ```
 
 ### Quick start
 
 ```bash
-remex init                                # scaffold docs/ + remex.toml
-remex ingest docs/                        # ingest a folder
-remex query "how does auth work?"         # semantic search
-remex query "how does auth work?" --ai    # AI answer
+# Scaffold a project
+remex init
+
+# Ingest a folder of documents
+remex ingest ./docs
+
+# Semantic search
+remex query "how does authentication work?"
+
+# AI-synthesised answer (requires ANTHROPIC_API_KEY, OPENAI_API_KEY, or a running Ollama)
+remex query "how does authentication work?" --ai
 ```
 
-### All commands
+### Command reference
 
 | Command | Description |
-|:---|:---|
-| `remex init [path]` | Scaffold `docs/`, `remex.toml`, and `.gitignore` |
-| `remex ingest [dir]` | Ingest files from a directory |
+|:--------|:------------|
+| `remex init [path]` | Scaffold `docs/`, `remex.toml`, and `.gitignore` entries |
+| `remex ingest <dir>` | Ingest files from a directory into a collection |
 | `remex ingest-sqlite <db>` | Ingest rows from a SQLite table |
-| `remex query <text>` | Semantic search (add `--ai` for AI answer) |
-| `remex sources` | List all ingested source paths |
-| `remex stats` | Show chunk/source counts for a collection |
-| `remex delete-source <path>` | Remove all chunks for a source |
-| `remex purge` | Remove chunks whose source file no longer exists |
+| `remex query <text>` | Semantic search; add `--ai` for an AI-synthesised answer |
+| `remex sources` | List all ingested source paths in a collection |
+| `remex stats` | Show chunk and source counts |
+| `remex delete-source <path>` | Remove all chunks for a specific source |
+| `remex purge` | Remove chunks whose source file no longer exists on disk |
 | `remex reset` | Wipe an entire collection |
 | `remex list-collections` | List all collections in a database |
-| `remex serve` | Start the FastAPI sidecar (used by Studio) |
+| `remex serve` | Start the FastAPI sidecar on `localhost:8745` |
 
-Use `remex <command> --help` for the full option reference.
+```bash
+remex <command> --help    # full option reference for any command
+```
 
----
+### Use as a library
 
-## Features
+```python
+from remex import ingest, query
 
-- **Fully offline** — local embeddings, local storage, no telemetry
-- **12 file formats** — `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.jsonl` `.html` `.pptx` `.xlsx` `.epub` `.odt`
-- **SQLite ingest** — embed rows from any table alongside your files
-- **Incremental ingest** — SHA-256 hash check skips unchanged files and rows on re-runs
-- **AI answers** — auto-detects Anthropic, OpenAI, or a local Ollama; export the answer as Markdown
-- **Multi-collection search** — query across collections simultaneously, results merged by score
-- **Source filtering** — narrow results to one or more source documents before searching or asking AI
-- **Chunk viewer** — expand any result to read the full chunk text; navigate with keyboard arrows
-- **Collections manager** — rename, describe, bulk-delete sources, re-ingest with saved parameters
-- **Export** — JSON, CSV, Markdown, BibTeX, RIS, CSL-JSON, Obsidian vault (Pro)
-- **Keyboard-driven** — press `?` in Studio for the shortcuts reference
+# Ingest a folder
+result = ingest("./docs", collection_name="my-kb")
+print(f"{result.chunks_stored} chunks stored")
+
+# Search
+results = query("how does auth work?", collection_name="my-kb")
+for r in results:
+    print(f"[{r.score:.3f}] {r.source}  →  {r.text[:120]}")
+```
+
+<br/>
 
 ---
 
 ## Configuration
 
-Drop a `remex.toml` in your project root (created by `remex init`):
+Drop a `remex.toml` in your project root (or run `remex init` to generate one):
 
 ```toml
 [remex]
 db              = "./remex_db"
-collection      = "remex"
+collection      = "my-kb"
 embedding_model = "all-MiniLM-L6-v2"
 
-# chunk_size     = 1000
-# overlap        = 200
-# min_chunk_size = 50
-# chunking       = "word"   # "word" or "sentence"
+# chunk_size     = 1000   # tokens per chunk
+# overlap        = 200    # overlap between chunks
+# min_chunk_size = 50     # discard chunks shorter than this
+# chunking       = "word" # "word" or "sentence"
 ```
 
-CLI flags always override `remex.toml`.
+CLI flags always override `remex.toml` values.
+
+<br/>
+
+---
+
+## Supported embedding models
+
+| Preset | Model | Size | Notes |
+|:-------|:------|:----:|:------|
+| **Light** | `all-MiniLM-L6-v2` | 22 MB | Default — fast, good accuracy |
+| **Balanced** | `intfloat/e5-base-v2` | 438 MB | Better retrieval quality |
+| **Multilingual** | `paraphrase-multilingual-MiniLM-L12-v2` | 470 MB | 50+ languages |
+| **Large** *(Pro)* | `BAAI/bge-large-en-v1.5` | 1.3 GB | Best English accuracy |
+| **E5 Large** *(Pro)* | `intfloat/e5-large-v2` | 1.3 GB | Strong retrieval benchmark |
+| **Long ctx** *(Pro)* | `nomic-ai/nomic-embed-text-v1.5` | 547 MB | 8 192-token context window |
+
+Any model from [SBERT](https://www.sbert.net/docs/pretrained_models.html), [HuggingFace sentence-similarity](https://huggingface.co/models?pipeline_tag=sentence-similarity), or [Ollama](https://ollama.com/search?c=embedding) can be used by typing the model name directly.
+
+<br/>
+
+---
+
+## Building from source
+
+> **Studio** requires [Rust](https://rustup.rs/), [Node.js 20+](https://nodejs.org/), and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for Windows.
+
+```bash
+# Python CLI
+pip install -e ".[dev]"
+pytest
+
+# Studio (dev server with hot-reload)
+cd studio
+npm install
+npm run tauri dev
+
+# Studio (production build)
+npm run tauri build
+```
+
+See [`studio/README.md`](studio/README.md) for the full build guide.
+
+<br/>
 
 ---
 
 <div align="center">
-  <sub>
-    <a href="CHANGELOG.md">Changelog</a> ·
-    <a href="CONTRIBUTING.md">Contributing</a> ·
-    <a href="LICENSES.md">Licensing</a> ·
-    <a href="https://github.com/adm-crow/remex">GitHub</a>
-  </sub>
-  <br/>
-  <sub>
-    Python CLI: Apache-2.0 · Studio (v1.3.0+): FSL-1.1-MIT — see <a href="LICENSES.md">LICENSES.md</a>
-  </sub>
+
+  **[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Licensing](LICENSES.md) · [GitHub](https://github.com/adm-crow/remex)**
+
+  <sub>Python CLI: Apache-2.0 · Studio (v1.3.0+): FSL-1.1-MIT — see <a href="LICENSES.md">LICENSES.md</a></sub>
+
 </div>
