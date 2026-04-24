@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 16">
+  <defs>
+    <linearGradient id="remexGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1CAC78"/>
+      <stop offset="100%" stop-color="#7EBD01"/>
+    </linearGradient>
+  </defs>
+
+  <path d="M0 0Q0 8 8 8 8 0 0 0M0 8q8 0 8 8-8 0-8-8M0 16"
+        fill="url(#remexGradient)"/>
+</svg>
