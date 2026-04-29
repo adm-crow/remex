@@ -10,8 +10,11 @@ const HEALTH_CHECK_TIMEOUT_MS = 3000;
 function parseUrl(apiUrl: string): { host: string; port: number } {
   try {
     const u = new URL(apiUrl);
+    // Always use 127.0.0.1 — on Windows "localhost" can resolve to ::1 (IPv6)
+    // which causes the Tauri WebView fetch to fail against an IPv4-bound server.
+    const hostname = u.hostname === "localhost" ? "127.0.0.1" : (u.hostname || "127.0.0.1");
     return {
-      host: u.hostname || "127.0.0.1",
+      host: hostname,
       port: u.port ? parseInt(u.port) : 8000,
     };
   } catch {
@@ -38,7 +41,7 @@ export function useSidecar() {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), HEALTH_CHECK_TIMEOUT_MS);
       try {
-        const res = await fetch(`${apiUrl}/health`, { signal: ctrl.signal });
+        const res = await fetch(`http://${host}:${port}/health`, { signal: ctrl.signal });
         return res.ok;
       } catch {
         return false;
