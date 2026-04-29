@@ -3,7 +3,13 @@ use std::process::{Child, Command};
 use std::sync::Mutex;
 use std::time::Duration;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 use tauri::{AppHandle, Manager, RunEvent, State};
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub mod license;
 pub mod watch;
@@ -22,8 +28,11 @@ async fn spawn_sidecar(
             return Ok(()); // already running
         }
     }
-    let mut child = Command::new("remex")
-        .args(["serve", "--host", &host, "--port", &port.to_string()])
+    let mut cmd = Command::new("remex");
+    cmd.args(["serve", "--host", &host, "--port", &port.to_string()]);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn 'remex serve': {e}"))?;
 
