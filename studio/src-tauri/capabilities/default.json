@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "dialog:default",
+    "http:default",
     "shell:allow-open"
   ]
 }

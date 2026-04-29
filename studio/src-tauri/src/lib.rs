@@ -146,6 +146,7 @@ fn kill_sidecar(state: State<'_, SidecarState>) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState(Mutex::new(None)))
         .manage(watch::WatchState::new())

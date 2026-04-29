@@ -1,3 +1,5 @@
+import { fetch } from "@tauri-apps/plugin-http";
+
 // ---- Types (mirror FastAPI schemas in remex/api/schemas.py) ----
 
 export interface HealthResponse {

@@ -29,6 +29,12 @@ Object.defineProperty(globalThis, "localStorage", {
   writable: true,
 });
 
+// Route the plugin fetch through globalThis.fetch so tests can stub it with vi.stubGlobal.
+vi.mock("@tauri-apps/plugin-http", () => ({
+  fetch: (url: string, init?: RequestInit) =>
+    init !== undefined ? globalThis.fetch(url, init) : globalThis.fetch(url),
+}));
+
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn().mockResolvedValue(undefined),
 }));
