@@ -10,10 +10,13 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // Must match the remex-cli version published to PyPI.
 pub const EXPECTED_VERSION: &str = "1.3.0";
+pub const PYTHON_VERSION: &str = "3.13";
 
 #[derive(Serialize, Deserialize)]
 struct SetupJson {
     remex_cli_version: String,
+    #[serde(default)]
+    python_version: String,
 }
 
 #[derive(Serialize, Clone)]
@@ -43,6 +46,7 @@ pub fn setup_json_path(data_dir: &Path) -> PathBuf {
 fn write_setup_json(data_dir: &Path) -> Result<(), String> {
     let json = serde_json::to_string(&SetupJson {
         remex_cli_version: EXPECTED_VERSION.to_string(),
+        python_version: PYTHON_VERSION.to_string(),
     })
     .map_err(|e| e.to_string())?;
     fs::write(setup_json_path(data_dir), &json)
@@ -57,7 +61,7 @@ pub fn version_is_current(data_dir: &Path) -> bool {
     let Ok(json) = serde_json::from_str::<SetupJson>(&contents) else {
         return false;
     };
-    json.remex_cli_version == EXPECTED_VERSION
+    json.remex_cli_version == EXPECTED_VERSION && json.python_version == PYTHON_VERSION
 }
 
 fn classify_uv_error(stderr: &str) -> String {
@@ -213,9 +217,20 @@ mod tests {
     #[test]
     fn version_is_current_true_when_matches() {
         let dir = tempdir().unwrap();
-        let json = format!(r#"{{"remex_cli_version":"{}"}}"#, EXPECTED_VERSION);
+        let json = format!(
+            r#"{{"remex_cli_version":"{}","python_version":"{}"}}"#,
+            EXPECTED_VERSION, PYTHON_VERSION
+        );
         fs::write(dir.path().join("setup.json"), json).unwrap();
         assert!(version_is_current(&dir.path().to_path_buf()));
+    }
+
+    #[test]
+    fn version_is_current_false_when_python_version_mismatch() {
+        let dir = tempdir().unwrap();
+        let json = format!(r#"{{"remex_cli_version":"{}","python_version":"3.11"}}"#, EXPECTED_VERSION);
+        fs::write(dir.path().join("setup.json"), json).unwrap();
+        assert!(!version_is_current(&dir.path().to_path_buf()));
     }
 
     #[test]
