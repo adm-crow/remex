@@ -149,8 +149,8 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
     let uv_path = std::env::temp_dir().join(uv_tmp);
     fs::copy(&uv_src, &uv_path).map_err(|e| format!("Failed to copy uv.exe: {e}"))?;
 
-    // Step 1: create venv with Python 3.11
-    emit_progress(app, "Installing Python 3.11…", 1);
+    // Step 1: create venv with Python 3.13
+    emit_progress(app, "Installing Python 3.13…", 1);
     run_uv(
         &uv_path,
         &["venv", venv_dir.to_str().unwrap_or(""), "--python", "3.13"],
