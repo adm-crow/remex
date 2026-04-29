@@ -47,6 +47,16 @@ jobs:
         working-directory: studio
         run: npm ci
 
+      - name: Download uv.exe for bundling
+        shell: pwsh
+        run: |
+          $url = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"
+          Invoke-WebRequest -Uri $url -OutFile "uv.zip" -UseBasicParsing
+          Expand-Archive -Path "uv.zip" -DestinationPath "uv-dist" -Force
+          New-Item -ItemType Directory -Force -Path "studio/src-tauri/resources" | Out-Null
+          Copy-Item "uv-dist/uv.exe" "studio/src-tauri/resources/uv.exe"
+          Remove-Item "uv.zip", "uv-dist" -Recurse -Force
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
