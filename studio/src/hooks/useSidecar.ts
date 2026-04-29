@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useAppStore } from "@/store/app";
 
 const POLL_INTERVAL_MS = 2000;
@@ -22,10 +23,9 @@ export function useSidecar() {
   const apiUrl = useAppStore((s) => s.apiUrl);
   const reconnectSeq = useAppStore((s) => s.sidecarReconnectSeq);
   const setSidecarStatus = useAppStore((s) => s.setSidecarStatus);
+  const setSetupProgress = useAppStore((s) => s.setSetupProgress);
+  const setSetupError = useAppStore((s) => s.setSetupError);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // True only when this effect run successfully spawned the sidecar.
-  // Used to avoid killing an externally-started server on cleanup
-  // (important in React StrictMode which mounts → unmounts → remounts).
   const didSpawnRef = useRef(false);
 
   useEffect(() => {
@@ -56,6 +56,27 @@ export function useSidecar() {
 
       if (cancelled) return;
 
+      // Register setup event listeners before invoking spawn_sidecar so we
+      // don't miss events emitted during the (potentially long) setup phase.
+      const unlistenStarted = await listen("setup://started", () => {
+        if (!cancelled) setSidecarStatus("setup");
+      });
+      const unlistenProgress = await listen<{ step: string; index: number; total: number }>(
+        "setup://progress",
+        (event) => {
+          if (!cancelled) setSetupProgress(event.payload.step, event.payload.index);
+        }
+      );
+      const unlistenError = await listen<{ message: string }>("setup://error", (event) => {
+        if (!cancelled) {
+          setSetupError(event.payload.message);
+          setSidecarStatus("setup_error");
+        }
+      });
+      const unlistenDone = await listen("setup://done", () => {
+        // spawn_sidecar resolves after this; status transitions to "starting" naturally
+      });
+
       try {
         await invoke("spawn_sidecar", { host, port });
         didSpawnRef.current = true;
@@ -63,13 +84,17 @@ export function useSidecar() {
         console.error("[useSidecar] spawn_sidecar failed:", err);
         if (!cancelled) setSidecarStatus("error");
         return;
+      } finally {
+        unlistenStarted();
+        unlistenProgress();
+        unlistenError();
+        unlistenDone();
       }
 
       if (cancelled) return;
+      setSidecarStatus("starting");
 
       const deadline = Date.now() + TIMEOUT_MS;
-      // Use a local variable so each effect's callbacks only clear their own
-      // timer — not the one created by a subsequent StrictMode re-mount.
       let timerId: ReturnType<typeof setInterval>;
       timerId = setInterval(async () => {
         if (cancelled) {
@@ -81,7 +106,6 @@ export function useSidecar() {
           if (!cancelled) setSidecarStatus("error");
           return;
         }
-        // Bail fast if the process has already died
         const alive = await invoke<boolean>("is_sidecar_alive").catch(() => false);
         if (!alive) {
           clearInterval(timerId);
@@ -101,13 +125,10 @@ export function useSidecar() {
     return () => {
       cancelled = true;
       if (intervalRef.current) clearInterval(intervalRef.current);
-      // Only kill the sidecar if we spawned it — not if we found an
-      // already-running external server (avoids killing it on React
-      // StrictMode's double-mount or on unrelated re-renders).
       if (didSpawnRef.current) {
         didSpawnRef.current = false;
         invoke("kill_sidecar").catch(() => {});
       }
     };
-  }, [apiUrl, reconnectSeq, setSidecarStatus]);
+  }, [apiUrl, reconnectSeq, setSidecarStatus, setSetupProgress, setSetupError]);
 }
