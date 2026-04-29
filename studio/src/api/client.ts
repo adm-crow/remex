@@ -187,13 +187,20 @@ async function* readSseStream(
 
 // ---- Internal fetch helper ----
 
+// On Windows, "localhost" may resolve to ::1 (IPv6) while the sidecar binds to
+// 127.0.0.1 (IPv4), causing "Failed to fetch". Always use the explicit IPv4 address.
+function normalizeBase(base: string): string {
+  return base.replace("://localhost:", "://127.0.0.1:");
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const resolvedUrl = normalizeBase(url);
   let res: Response;
   try {
-    res = await (init !== undefined ? fetch(url, init) : fetch(url));
+    res = await (init !== undefined ? fetch(resolvedUrl, init) : fetch(resolvedUrl));
   } catch (e) {
     throw new Error(
-      `Cannot reach the server at ${url.replace(/\/[^/]+$/, "")}. ` +
+      `Cannot reach the server at ${resolvedUrl.replace(/\/[^/]+$/, "")}. ` +
       `Make sure 'remex serve' is running. (${e instanceof Error ? e.message : String(e)})`
     );
   }
@@ -345,10 +352,11 @@ export const api = {
     req: IngestSQLiteRequest,
     signal?: AbortSignal
   ): AsyncGenerator<IngestStreamEvent> {
+    const resolvedBase = normalizeBase(base);
     let res: Response;
     try {
       res = await fetch(
-        `${base}/collections/${encodeURIComponent(collection)}/ingest/sqlite/stream`,
+        `${resolvedBase}/collections/${encodeURIComponent(collection)}/ingest/sqlite/stream`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -358,7 +366,7 @@ export const api = {
       );
     } catch (e) {
       throw new Error(
-        `Cannot reach the server at ${base}. Make sure 'remex serve' is running. ` +
+        `Cannot reach the server at ${resolvedBase}. Make sure 'remex serve' is running. ` +
         `(${e instanceof Error ? e.message : String(e)})`
       );
     }
@@ -418,10 +426,11 @@ export const api = {
     req: IngestRequest,
     signal?: AbortSignal
   ): AsyncGenerator<IngestStreamEvent> {
+    const resolvedBase = normalizeBase(base);
     let res: Response;
     try {
       res = await fetch(
-        `${base}/collections/${encodeURIComponent(collection)}/ingest/stream`,
+        `${resolvedBase}/collections/${encodeURIComponent(collection)}/ingest/stream`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -431,7 +440,7 @@ export const api = {
       );
     } catch (e) {
       throw new Error(
-        `Cannot reach the server at ${base}. Make sure 'remex serve' is running. ` +
+        `Cannot reach the server at ${resolvedBase}. Make sure 'remex serve' is running. ` +
         `(${e instanceof Error ? e.message : String(e)})`
       );
     }

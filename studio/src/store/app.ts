@@ -166,7 +166,7 @@ export const useAppStore = create<AppState>()(
       currentCollection: null,
       recentProjects: [],
       queryHistory: [],
-      apiUrl: "http://localhost:8000",
+      apiUrl: "http://127.0.0.1:8000",
       sidecarStatus: "starting",
       sidecarError: "",
       setupStep: "",

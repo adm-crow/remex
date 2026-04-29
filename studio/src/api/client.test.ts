@@ -32,7 +32,7 @@ describe("api.getHealth", () => {
   it("calls /health and returns data", async () => {
     mockFetch.mockReturnValue(okJson({ status: "ok", version: "0.2.0" }));
     const result = await api.getHealth("http://localhost:8000");
-    expect(mockFetch).toHaveBeenCalledWith("http://localhost:8000/health");
+    expect(mockFetch).toHaveBeenCalledWith("http://127.0.0.1:8000/health");
     expect(result).toEqual({ status: "ok", version: "0.2.0" });
   });
 });
@@ -42,7 +42,7 @@ describe("api.getCollections", () => {
     mockFetch.mockReturnValue(okJson(["col1", "col2"]));
     await api.getCollections("http://localhost:8000", "./remex_db");
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:8000/collections?db_path=.%2Fremex_db"
+      "http://127.0.0.1:8000/collections?db_path=.%2Fremex_db"
     );
   });
 
@@ -61,7 +61,7 @@ describe("api.queryCollection", () => {
       text: "hello",
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:8000/collections/myCol/query",
+      "http://127.0.0.1:8000/collections/myCol/query",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ text: "hello", db_path: "./remex_db" }),
@@ -81,7 +81,7 @@ describe("api.purgeCollection", () => {
       "myCol"
     );
     expect(mockFetch).toHaveBeenCalledWith(
-      "http://localhost:8000/collections/myCol/purge?db_path=.%2Fremex_db",
+      "http://127.0.0.1:8000/collections/myCol/purge?db_path=.%2Fremex_db",
       expect.objectContaining({ method: "POST" })
     );
     expect(result.chunks_deleted).toBe(3);

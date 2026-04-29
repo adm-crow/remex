@@ -35,7 +35,10 @@ async fn spawn_sidecar(
 
     // Redirect stderr to a log file so uvicorn output doesn't block on a
     // full pipe, and so we can read the error if the process exits early.
-    let log_path = app.path().app_data_dir().ok().map(|d| d.join("sidecar.log"));
+    let log_path = app.path().app_data_dir().ok().map(|d| {
+        let _ = fs::create_dir_all(&d);
+        d.join("sidecar.log")
+    });
     let log_file = log_path.as_ref().and_then(|p| fs::File::create(p).ok());
 
     let mut cmd = Command::new(&remex_path);
