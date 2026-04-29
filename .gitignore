@@ -224,3 +224,6 @@ chroma.sqlite3
 # Git worktrees
 .worktrees/
 node_modules/
+
+# Marketing website (deployed separately to Hostinger)
+website/

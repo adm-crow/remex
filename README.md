@@ -37,6 +37,10 @@ Native desktop app for Windows. No terminal required.
 
 **[⬇ Download the latest release](https://github.com/adm-crow/remex/releases)**
 
+> **⚠️ Windows SmartScreen warning**
+> Windows may display a "Windows protected your PC" warning when downloading or installing Remex Studio. This happens because the app is not yet code-signed with a paid certificate — the software is safe and fully open source, feel free to audit the source code in this repository.
+> To proceed: click **"More info"** then **"Run anyway"**.
+
 <br/>
 
 ### What you can do
