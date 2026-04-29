@@ -8,6 +8,13 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.3.1] — 2026-04-29
+
+### Fixed
+- **Python console window visible on launch** — `remex serve` now spawns hidden on Windows using `CREATE_NO_WINDOW`, so no terminal window appears when Studio starts the sidecar.
+
+---
+
 ## [1.3.0] — 2026-04-22
 
 ### Added
