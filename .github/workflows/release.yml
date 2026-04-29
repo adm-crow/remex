@@ -50,12 +50,17 @@ jobs:
       - name: Download uv.exe for bundling
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $url = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"
           Invoke-WebRequest -Uri $url -OutFile "uv.zip" -UseBasicParsing
           Expand-Archive -Path "uv.zip" -DestinationPath "uv-dist" -Force
+          $uvExe = Get-ChildItem -Path "uv-dist" -Filter "uv.exe" -Recurse | Select-Object -First 1
+          if (-not $uvExe) { throw "uv.exe not found inside uv archive" }
           New-Item -ItemType Directory -Force -Path "studio/src-tauri/resources" | Out-Null
-          Copy-Item "uv-dist/uv.exe" "studio/src-tauri/resources/uv.exe"
+          Copy-Item $uvExe.FullName "studio/src-tauri/resources/uv.exe"
           Remove-Item "uv.zip", "uv-dist" -Recurse -Force
+          $size = (Get-Item "studio/src-tauri/resources/uv.exe").Length
+          Write-Host "uv.exe ready ($size bytes)"
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

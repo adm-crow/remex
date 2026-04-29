@@ -8,6 +8,13 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.4.2] — 2026-04-29
+
+### Fixed
+- **CI release workflow** — the "Download uv.exe for bundling" step now uses `$ErrorActionPreference = 'Stop'` and a recursive file search (`Get-ChildItem -Recurse`) to locate `uv.exe` inside the archive regardless of its internal directory structure, fixing a silent failure that caused `resources/uv.exe` to be missing at Tauri build time.
+
+---
+
 ## [1.4.1] — 2026-04-29
 
 ### Fixed
