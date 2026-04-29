@@ -69,6 +69,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
+      - name: Create placeholder uv.exe for Tauri resource validation
+        run: mkdir -p studio/src-tauri/resources && touch studio/src-tauri/resources/uv.exe
+
       - name: Check (no warnings treated as errors)
         working-directory: studio/src-tauri
         run: cargo check
