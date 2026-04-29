@@ -77,7 +77,7 @@ fn classify_uv_error(stderr: &str) -> String {
     }
 }
 
-async fn run_uv(uv_path: &PathBuf, args: &[&str]) -> Result<(), String> {
+async fn run_uv(uv_path: &Path, args: &[&str]) -> Result<(), String> {
     let mut cmd = tokio::process::Command::new(uv_path);
     cmd.args(args);
     #[cfg(target_os = "windows")]
