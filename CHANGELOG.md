@@ -10,8 +10,16 @@ All notable changes to `remex` are documented here.
 
 ## [1.3.1] — 2026-04-29
 
+### Added
+- **First-launch bootstrapper** — Studio now auto-installs `remex-cli[api]` on first run; no manual `pip install` step required.
+  - `uv.exe` is bundled inside the installer; a self-contained Python 3.11 virtual environment is created in `%APPDATA%\Remex Studio\venv\` on first launch.
+  - A full-screen setup UI shows a progress bar and step label while the install runs (~30 s on a typical connection). Requires an internet connection once.
+  - Subsequent launches hit a fast path (~1 ms version check) and show no setup screen.
+  - If setup fails (no network, disk error) an error screen is shown with a **Retry** button.
+  - The sidecar is now launched from the venv's full path instead of relying on `PATH`, fixing the "Could not start remex serve" error when Studio is opened from the Start Menu or taskbar.
+
 ### Fixed
-- **Python console window visible on launch** — `remex serve` now spawns hidden on Windows using `CREATE_NO_WINDOW`, so no terminal window appears when Studio starts the sidecar.
+- **Python console window visible on launch** — `remex serve` (and the bundled `uv.exe` during setup) now spawns hidden on Windows using `CREATE_NO_WINDOW`, so no terminal window appears.
 
 ---
 

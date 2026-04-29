@@ -3,7 +3,13 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
-pub const EXPECTED_VERSION: &str = "1.3.1";
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+// Must match the remex-cli version published to PyPI.
+pub const EXPECTED_VERSION: &str = "1.3.0";
 
 #[derive(Serialize, Deserialize)]
 struct SetupJson {
@@ -23,7 +29,11 @@ pub struct ErrorEvent {
 }
 
 pub fn venv_remex_path(data_dir: &PathBuf) -> PathBuf {
-    data_dir.join("venv").join("Scripts").join("remex.exe")
+    let venv = data_dir.join("venv");
+    #[cfg(target_os = "windows")]
+    { venv.join("Scripts").join("remex.exe") }
+    #[cfg(not(target_os = "windows"))]
+    { venv.join("bin").join("remex") }
 }
 
 pub fn setup_json_path(data_dir: &PathBuf) -> PathBuf {
@@ -64,8 +74,11 @@ fn classify_uv_error(stderr: &str) -> String {
 }
 
 async fn run_uv(uv_path: &PathBuf, args: &[&str]) -> Result<(), String> {
-    let output = tokio::process::Command::new(uv_path)
-        .args(args)
+    let mut cmd = tokio::process::Command::new(uv_path);
+    cmd.args(args);
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    let output = cmd
         .output()
         .await
         .map_err(|e| format!("Failed to run uv: {e}"))?;
@@ -117,13 +130,17 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .resource_dir()
         .map_err(|e| e.to_string())?;
-    let uv_src = resource_dir.join("uv.exe");
+    #[cfg(target_os = "windows")]
+    let (uv_bin, uv_tmp) = ("uv.exe", "remex-uv.exe");
+    #[cfg(not(target_os = "windows"))]
+    let (uv_bin, uv_tmp) = ("uv", "remex-uv");
+    let uv_src = resource_dir.join(uv_bin);
     if !uv_src.exists() {
         let msg = "Installation tool not found. Please reinstall Remex Studio.".to_string();
         let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
         return Err(msg);
     }
-    let uv_path = std::env::temp_dir().join("remex-uv.exe");
+    let uv_path = std::env::temp_dir().join(uv_tmp);
     fs::copy(&uv_src, &uv_path).map_err(|e| format!("Failed to copy uv.exe: {e}"))?;
 
     // Step 1: create venv with Python 3.11
@@ -141,7 +158,10 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
 
     // Step 2: install remex-cli[api] into the venv
     emit_progress(app, "Installing remex-cli…", 2);
+    #[cfg(target_os = "windows")]
     let python_path = venv_dir.join("Scripts").join("python.exe");
+    #[cfg(not(target_os = "windows"))]
+    let python_path = venv_dir.join("bin").join("python");
     run_uv(
         &uv_path,
         &[
@@ -206,12 +226,12 @@ mod tests {
 
     #[test]
     fn venv_remex_path_constructs_correctly() {
-        let base = PathBuf::from("C:\\AppData\\Remex Studio");
+        let base = PathBuf::from("/AppData/Remex Studio");
         let result = venv_remex_path(&base);
-        assert_eq!(
-            result,
-            PathBuf::from("C:\\AppData\\Remex Studio\\venv\\Scripts\\remex.exe")
-        );
+        #[cfg(target_os = "windows")]
+        assert_eq!(result, PathBuf::from("/AppData/Remex Studio/venv/Scripts/remex.exe"));
+        #[cfg(not(target_os = "windows"))]
+        assert_eq!(result, PathBuf::from("/AppData/Remex Studio/venv/bin/remex"));
     }
 
     #[test]
