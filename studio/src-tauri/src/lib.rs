@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::Read;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -34,9 +33,17 @@ async fn spawn_sidecar(
 
     let remex_path = setup::ensure_ready(&app).await?;
 
+    // Redirect stderr to a log file so uvicorn output doesn't block on a
+    // full pipe, and so we can read the error if the process exits early.
+    let log_path = app.path().app_data_dir().ok().map(|d| d.join("sidecar.log"));
+    let log_file = log_path.as_ref().and_then(|p| fs::File::create(p).ok());
+
     let mut cmd = Command::new(&remex_path);
     cmd.args(["serve", "--host", &host, "--port", &port.to_string()]);
-    cmd.stderr(Stdio::piped());
+    match log_file {
+        Some(f) => { cmd.stderr(f); }
+        None    => { cmd.stderr(Stdio::null()); }
+    }
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
     let mut child = cmd
@@ -45,12 +52,12 @@ async fn spawn_sidecar(
 
     tokio::time::sleep(Duration::from_millis(1500)).await;
     if let Ok(Some(status)) = child.try_wait() {
-        let stderr = child.stderr.as_mut().map(|s| {
-            let mut buf = String::new();
-            let _ = s.read_to_string(&mut buf);
-            buf
-        }).unwrap_or_default();
-        return Err(format!("Sidecar exited immediately ({status}): {stderr}"));
+        let log = log_path
+            .as_ref()
+            .and_then(|p| fs::read_to_string(p).ok())
+            .unwrap_or_default();
+        let tail: String = log.lines().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+        return Err(format!("Sidecar exited immediately ({status}): {tail}"));
     }
 
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
