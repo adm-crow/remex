@@ -5,7 +5,6 @@ import { useAppStore } from "@/store/app";
 
 const POLL_INTERVAL_MS = 2000;
 const TIMEOUT_MS = 60000;
-const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
 function parseUrl(apiUrl: string): { host: string; port: number } {
   try {
@@ -38,16 +37,7 @@ export function useSidecar() {
     const { host, port } = parseUrl(apiUrl);
 
     async function checkHealth(): Promise<boolean> {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), HEALTH_CHECK_TIMEOUT_MS);
-      try {
-        const res = await fetch(`http://${host}:${port}/health`, { signal: ctrl.signal });
-        return res.ok;
-      } catch {
-        return false;
-      } finally {
-        clearTimeout(timer);
-      }
+      return invoke<boolean>("check_sidecar_health", { host, port }).catch(() => false);
     }
 
     async function start() {

@@ -98,6 +98,18 @@ fn write_text_file(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn check_sidecar_health(host: String, port: u16) -> bool {
+    let url = format!("http://{}:{}/health", host, port);
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(3))
+        .build()
+    else {
+        return false;
+    };
+    client.get(&url).send().await.map(|r| r.status().is_success()).unwrap_or(false)
+}
+
+#[tauri::command]
 fn export_log(path: String, content: String) -> Result<(), String> {
     let path_buf = std::path::PathBuf::from(&path);
     if !path_buf.is_absolute() {
@@ -135,7 +147,7 @@ pub fn run() {
         .manage(SidecarState(Mutex::new(None)))
         .manage(watch::WatchState::new())
         .invoke_handler(tauri::generate_handler![
-            spawn_sidecar, kill_sidecar, is_sidecar_alive,
+            spawn_sidecar, kill_sidecar, is_sidecar_alive, check_sidecar_health,
             read_sidecar_log, export_log, write_text_file,
             license::license_activate,
             license::license_status,
