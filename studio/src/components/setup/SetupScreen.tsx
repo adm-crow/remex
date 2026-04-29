@@ -2,7 +2,7 @@ import { useAppStore } from "@/store/app";
 
 const STEPS = [
   "Preparing installer",
-  "Installing Python 3.11",
+  "Installing Python 3.13",
   "Installing remex-cli",
   "Finalising",
 ];
@@ -50,9 +50,9 @@ export function SetupScreen() {
             className={`h-full rounded-full transition-all duration-500 ${
               isError
                 ? "bg-destructive w-full"
-                : "bg-gradient-to-r from-[#1CAC78] to-[#7EBD01]"
+                : "animate-progress-shimmer"
             }`}
-            style={isError ? undefined : { width: `${pct}%` }}
+            style={isError ? undefined : { width: `${Math.max(pct, 8)}%` }}
           />
         </div>
 

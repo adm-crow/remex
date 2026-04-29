@@ -6,6 +6,7 @@ import { QueryPane } from "@/components/query/QueryPane";
 import { IngestPane } from "@/components/ingest/IngestPane";
 import { SourcesPane } from "@/components/sources/SourcesPane";
 import { SettingsPane } from "@/components/settings/SettingsPane";
+import { LogsPane } from "@/components/log-viewer/LogsPane";
 import { useAppStore } from "@/store/app";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { formatDuration } from "@/lib/formatDuration";
@@ -17,6 +18,7 @@ const PANE_MAP: Record<View, ComponentType> = {
   ingest:      IngestPane,
   collections: SourcesPane,
   settings:    SettingsPane,
+  logs:        LogsPane,
 };
 
 const MIN_SIDEBAR = 160;
@@ -108,8 +110,14 @@ export function AppShell() {
             <span className="size-1.5 rounded-full bg-destructive shrink-0" />
             {sidecarError || "Could not start the Remex sidecar."}
             <button
-              onClick={triggerSidecarReconnect}
+              onClick={() => setActiveView("logs")}
               className="ml-auto shrink-0 underline underline-offset-2 hover:no-underline"
+            >
+              View logs
+            </button>
+            <button
+              onClick={triggerSidecarReconnect}
+              className="shrink-0 underline underline-offset-2 hover:no-underline"
             >
               Retry
             </button>

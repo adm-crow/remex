@@ -612,3 +612,23 @@
 .animate-pulse-dot {
   animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ── Setup progress bar shimmer ─────────────────────────────────────────── */
+
+@keyframes progress-shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.animate-progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    #1CAC78 0%,
+    #7EBD01 40%,
+    #b8f04a 55%,
+    #7EBD01 70%,
+    #1CAC78 100%
+  );
+  background-size: 200% auto;
+  animation: progress-shimmer 1.6s linear infinite;
+}

@@ -1,11 +1,11 @@
-import { Search, Upload, Database, Settings, RotateCcw, House } from "lucide-react";
+import { Search, Upload, Database, Settings, RotateCcw, House, ScrollText } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CollectionSwitcher } from "./CollectionSwitcher";
 import { useAppStore, useIsPro } from "@/store/app";
 import { ProBadge } from "@/components/license/ProBadge";
 
-export type View = "query" | "ingest" | "collections" | "settings";
+export type View = "query" | "ingest" | "collections" | "settings" | "logs";
 
 interface SidebarProps {
   activeView: View;
@@ -18,6 +18,7 @@ const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
   { view: "ingest",      label: "Ingest",      icon: Upload   },
   { view: "collections", label: "Collections", icon: Database },
   { view: "settings",    label: "Settings",    icon: Settings },
+  { view: "logs",        label: "Logs",        icon: ScrollText },
 ];
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {

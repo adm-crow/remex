@@ -98,6 +98,28 @@ fn write_text_file(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn export_log(path: String, content: String) -> Result<(), String> {
+    let path_buf = std::path::PathBuf::from(&path);
+    if !path_buf.is_absolute() {
+        return Err("Path must be absolute".to_string());
+    }
+    fs::write(&path_buf, content).map_err(|e| format!("Failed to write log: {e}"))
+}
+
+#[tauri::command]
+fn read_sidecar_log(app: AppHandle) -> Result<String, String> {
+    let path = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("sidecar.log");
+    if !path.exists() {
+        return Ok(String::new());
+    }
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read log: {e}"))
+}
+
+#[tauri::command]
 fn kill_sidecar(state: State<'_, SidecarState>) -> Result<(), String> {
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
     if let Some(mut child) = guard.take() {
@@ -113,7 +135,8 @@ pub fn run() {
         .manage(SidecarState(Mutex::new(None)))
         .manage(watch::WatchState::new())
         .invoke_handler(tauri::generate_handler![
-            spawn_sidecar, kill_sidecar, is_sidecar_alive, write_text_file,
+            spawn_sidecar, kill_sidecar, is_sidecar_alive,
+            read_sidecar_log, export_log, write_text_file,
             license::license_activate,
             license::license_status,
             license::license_deactivate,

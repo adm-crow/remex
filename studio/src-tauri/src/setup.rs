@@ -149,7 +149,7 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
     emit_progress(app, "Installing Python 3.11…", 1);
     run_uv(
         &uv_path,
-        &["venv", venv_dir.to_str().unwrap_or(""), "--python", "3.11"],
+        &["venv", venv_dir.to_str().unwrap_or(""), "--python", "3.13"],
     )
     .await
     .map_err(|e| {
