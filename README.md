@@ -8,10 +8,10 @@
 
   <br/>
 
-  [![GitHub Release](https://img.shields.io/github/v/release/adm-crow/remex?style=flat&label=release&color=4f8ef7)](https://github.com/adm-crow/remex/releases)
+  [![GitHub Release](https://img.shields.io/github/v/release/adm-crow/remex?style=flat&label=Release&color=4f8ef7)](https://github.com/adm-crow/remex/releases)
   [![CI](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?style=flat&logo=github&label=CI)](https://github.com/adm-crow/remex/actions)
   [![PyPI](https://img.shields.io/pypi/v/remex-cli?style=flat&logo=pypi&logoColor=white&label=PyPI&color=3775a9)](https://pypi.org/project/remex-cli)
-  [![License](https://img.shields.io/badge/CLI-Apache%202.0-22c55e?style=flat)](LICENSES.md)
+  [![License](https://img.shields.io/badge/CLI-Apache%202.0-22c55e?style=flat&label=License)](LICENSES.md)
   [![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
   [![Python](https://img.shields.io/badge/3.10+-FFD43B?style=flat&logo=python&logoColor=black)](https://pypi.org/project/remex-cli)
 
