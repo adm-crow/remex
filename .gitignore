@@ -227,3 +227,6 @@ node_modules/
 
 # Marketing website (deployed separately to Hostinger)
 website/
+
+# uv.exe is downloaded at build time — not committed
+studio/src-tauri/resources/uv.exe
