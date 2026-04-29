@@ -13,8 +13,9 @@ export function LogsPane() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const content = await invoke<string>("read_sidecar_log");
-      setLog(content);
+      const raw = await invoke<string>("read_sidecar_log");
+      // eslint-disable-next-line no-control-regex
+      setLog(raw.replace(/\x1b\[[0-9;]*m/g, ""));
     } finally {
       setLoading(false);
     }
