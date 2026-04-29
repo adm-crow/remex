@@ -23,6 +23,7 @@ export function useSidecar() {
   const apiUrl = useAppStore((s) => s.apiUrl);
   const reconnectSeq = useAppStore((s) => s.sidecarReconnectSeq);
   const setSidecarStatus = useAppStore((s) => s.setSidecarStatus);
+  const setSidecarError = useAppStore((s) => s.setSidecarError);
   const setSetupProgress = useAppStore((s) => s.setSetupProgress);
   const setSetupError = useAppStore((s) => s.setSetupError);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -85,6 +86,7 @@ export function useSidecar() {
         // Don't overwrite "setup_error" — the SetupScreen already shows the
         // specific message and Retry button from the setup://error event.
         if (!cancelled && useAppStore.getState().sidecarStatus !== "setup_error") {
+          setSidecarError(String(err));
           setSidecarStatus("error");
         }
         return;
@@ -134,5 +136,5 @@ export function useSidecar() {
         invoke("kill_sidecar").catch(() => {});
       }
     };
-  }, [apiUrl, reconnectSeq, setSidecarStatus, setSetupProgress, setSetupError]);
+  }, [apiUrl, reconnectSeq, setSidecarStatus, setSidecarError, setSetupProgress, setSetupError]);
 }

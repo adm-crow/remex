@@ -1,5 +1,6 @@
 use std::fs;
-use std::process::{Child, Command};
+use std::io::Read;
+use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -35,15 +36,21 @@ async fn spawn_sidecar(
 
     let mut cmd = Command::new(&remex_path);
     cmd.args(["serve", "--host", &host, "--port", &port.to_string()]);
+    cmd.stderr(Stdio::piped());
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {e}"))?;
 
-    tokio::time::sleep(Duration::from_millis(800)).await;
+    tokio::time::sleep(Duration::from_millis(1500)).await;
     if let Ok(Some(status)) = child.try_wait() {
-        return Err(format!("Sidecar exited immediately ({})", status));
+        let stderr = child.stderr.as_mut().map(|s| {
+            let mut buf = String::new();
+            let _ = s.read_to_string(&mut buf);
+            buf
+        }).unwrap_or_default();
+        return Err(format!("Sidecar exited immediately ({status}): {stderr}"));
     }
 
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;

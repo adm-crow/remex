@@ -27,6 +27,7 @@ export function AppShell() {
   const [activeView, setActiveView] = useState<View>("query");
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
+  const sidecarError = useAppStore((s) => s.sidecarError);
   const shortcutsOpen = useAppStore((s) => s.shortcutsOpen);
   const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
@@ -105,7 +106,7 @@ export function AppShell() {
             role="alert"
           >
             <span className="size-1.5 rounded-full bg-destructive shrink-0" />
-            Could not start the Remex sidecar.
+            {sidecarError || "Could not start the Remex sidecar."}
             <button
               onClick={triggerSidecarReconnect}
               className="ml-auto shrink-0 underline underline-offset-2 hover:no-underline"

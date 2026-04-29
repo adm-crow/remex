@@ -48,6 +48,7 @@ export interface AppState {
   queryHistory: string[];
   apiUrl: string;
   sidecarStatus: "starting" | "connected" | "error" | "setup" | "setup_error";
+  sidecarError: string;
   setupStep: string;
   setupProgress: number;
   setupError: string;
@@ -99,6 +100,7 @@ export interface AppState {
   clearQueryHistory: () => void;
   setApiUrl: (url: string) => void;
   setSidecarStatus: (status: AppState["sidecarStatus"]) => void;
+  setSidecarError: (message: string) => void;
   setSetupProgress: (step: string, index: number) => void;
   setSetupError: (message: string) => void;
   setDarkMode: (dark: boolean) => void;
@@ -166,6 +168,7 @@ export const useAppStore = create<AppState>()(
       queryHistory: [],
       apiUrl: "http://localhost:8000",
       sidecarStatus: "starting",
+      sidecarError: "",
       setupStep: "",
       setupProgress: 0,
       setupError: "",
@@ -237,6 +240,7 @@ export const useAppStore = create<AppState>()(
 
       setApiUrl:         (url)      => set({ apiUrl: url }),
       setSidecarStatus:        (status) => set({ sidecarStatus: status }),
+      setSidecarError:         (message) => set({ sidecarError: message }),
       setSetupProgress: (step, index) => set({ setupStep: step, setupProgress: index }),
       setSetupError:    (message)     => set({ setupError: message }),
       triggerSidecarReconnect: ()       => set((s) => ({ sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
