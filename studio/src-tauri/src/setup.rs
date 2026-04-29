@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -28,7 +28,7 @@ pub struct ErrorEvent {
     pub message: String,
 }
 
-pub fn venv_remex_path(data_dir: &PathBuf) -> PathBuf {
+pub fn venv_remex_path(data_dir: &Path) -> PathBuf {
     let venv = data_dir.join("venv");
     #[cfg(target_os = "windows")]
     { venv.join("Scripts").join("remex.exe") }
@@ -36,11 +36,11 @@ pub fn venv_remex_path(data_dir: &PathBuf) -> PathBuf {
     { venv.join("bin").join("remex") }
 }
 
-pub fn setup_json_path(data_dir: &PathBuf) -> PathBuf {
+pub fn setup_json_path(data_dir: &Path) -> PathBuf {
     data_dir.join("setup.json")
 }
 
-fn write_setup_json(data_dir: &PathBuf) -> Result<(), String> {
+fn write_setup_json(data_dir: &Path) -> Result<(), String> {
     let json = serde_json::to_string(&SetupJson {
         remex_cli_version: EXPECTED_VERSION.to_string(),
     })
@@ -49,7 +49,7 @@ fn write_setup_json(data_dir: &PathBuf) -> Result<(), String> {
         .map_err(|e| format!("Failed to write setup.json: {e}"))
 }
 
-pub fn version_is_current(data_dir: &PathBuf) -> bool {
+pub fn version_is_current(data_dir: &Path) -> bool {
     let path = setup_json_path(data_dir);
     let Ok(contents) = fs::read_to_string(&path) else {
         return false;
@@ -183,9 +183,8 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
 
     // Step 3: write setup.json to mark this version as installed
     emit_progress(app, "Finalising…", 3);
-    write_setup_json(&data_dir).map_err(|e| {
+    write_setup_json(&data_dir).inspect_err(|e| {
         let _ = app.emit("setup://error", ErrorEvent { message: e.clone() });
-        e
     })?;
 
     let _ = app.emit("setup://done", ());
