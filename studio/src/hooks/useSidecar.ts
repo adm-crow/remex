@@ -82,7 +82,11 @@ export function useSidecar() {
         didSpawnRef.current = true;
       } catch (err) {
         console.error("[useSidecar] spawn_sidecar failed:", err);
-        if (!cancelled) setSidecarStatus("error");
+        // Don't overwrite "setup_error" — the SetupScreen already shows the
+        // specific message and Retry button from the setup://error event.
+        if (!cancelled && useAppStore.getState().sidecarStatus !== "setup_error") {
+          setSidecarStatus("error");
+        }
         return;
       } finally {
         unlistenStarted();

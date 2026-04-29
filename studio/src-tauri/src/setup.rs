@@ -134,7 +134,9 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
     let (uv_bin, uv_tmp) = ("uv.exe", "remex-uv.exe");
     #[cfg(not(target_os = "windows"))]
     let (uv_bin, uv_tmp) = ("uv", "remex-uv");
-    let uv_src = resource_dir.join(uv_bin);
+    // Tauri v2 preserves the source path structure within resource_dir, so
+    // "resources/uv.exe" in tauri.conf.json ends up at resource_dir/resources/uv.exe.
+    let uv_src = resource_dir.join("resources").join(uv_bin);
     if !uv_src.exists() {
         let msg = "Installation tool not found. Please reinstall Remex Studio.".to_string();
         let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
