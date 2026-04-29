@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppStore } from "@/store/app";
 import { Home } from "@/pages/Home";
 import { AppShell } from "@/components/layout/AppShell";
+import { SetupScreen } from "@/components/setup/SetupScreen";
 import { useSidecar } from "@/hooks/useSidecar";
 import { UpgradeModal } from "@/components/license/UpgradeModal";
 
@@ -17,6 +18,7 @@ const queryClient = new QueryClient({
 
 export function App() {
   const currentDb = useAppStore((s) => s.currentDb);
+  const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const darkMode = useAppStore((s) => s.darkMode);
   const darkModeAuto = useAppStore((s) => s.darkModeAuto);
   const setDarkMode = useAppStore((s) => s.setDarkMode);
@@ -65,7 +67,13 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {currentDb ? <AppShell /> : <Home />}
+      {sidecarStatus === "setup" || sidecarStatus === "setup_error" ? (
+        <SetupScreen />
+      ) : currentDb ? (
+        <AppShell />
+      ) : (
+        <Home />
+      )}
       <UpgradeModal />
     </QueryClientProvider>
   );

@@ -105,8 +105,7 @@ export function AppShell() {
             role="alert"
           >
             <span className="size-1.5 rounded-full bg-destructive shrink-0" />
-            Could not start remex serve — is remex-cli installed?{" "}
-            <code className="font-mono text-xs opacity-80">pip install remex-cli[api]</code>
+            Could not start the Remex sidecar.
             <button
               onClick={triggerSidecarReconnect}
               className="ml-auto shrink-0 underline underline-offset-2 hover:no-underline"

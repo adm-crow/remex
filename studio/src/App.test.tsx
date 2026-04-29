@@ -10,6 +10,12 @@ vi.mock("@/components/layout/AppShell", () => ({
 vi.mock("@/pages/Home", () => ({
   Home: () => <div data-testid="home" />,
 }));
+vi.mock("@/components/setup/SetupScreen", () => ({
+  SetupScreen: () => <div data-testid="setup-screen"><h1>Setting up Remex…</h1><button>Retry</button></div>,
+}));
+vi.mock("@/hooks/useSidecar", () => ({
+  useSidecar: () => {},
+}));
 
 beforeEach(() => {
   localStorage.clear();
@@ -34,5 +40,17 @@ describe("App", () => {
     render(<App />);
     expect(screen.getByTestId("app-shell")).toBeInTheDocument();
     expect(screen.queryByTestId("home")).not.toBeInTheDocument();
+  });
+
+  it("renders SetupScreen when sidecarStatus is setup", () => {
+    useAppStore.setState({ sidecarStatus: "setup", setupStep: "Installing Python 3.11…", setupProgress: 1, setupError: "" } as any);
+    render(<App />);
+    expect(screen.getByTestId("setup-screen")).toBeInTheDocument();
+  });
+
+  it("renders SetupScreen when sidecarStatus is setup_error", () => {
+    useAppStore.setState({ sidecarStatus: "setup_error", setupStep: "", setupProgress: 0, setupError: "No internet." } as any);
+    render(<App />);
+    expect(screen.getByTestId("setup-screen")).toBeInTheDocument();
   });
 });
