@@ -12,6 +12,7 @@ use tauri::{AppHandle, Manager, RunEvent, State};
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub mod license;
+pub mod setup;
 pub mod watch;
 
 pub struct SidecarState(pub Mutex<Option<Child>>);
