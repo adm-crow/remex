@@ -8,23 +8,7 @@ All notable changes to `remex` are documented here.
 
 ---
 
-## [1.4.2] — 2026-04-29
-
-### Fixed
-- **CI release workflow** — the "Download uv.exe for bundling" step now uses `$ErrorActionPreference = 'Stop'` and a recursive file search (`Get-ChildItem -Recurse`) to locate `uv.exe` inside the archive regardless of its internal directory structure, fixing a silent failure that caused `resources/uv.exe` to be missing at Tauri build time.
-
----
-
-## [1.4.1] — 2026-04-29
-
-### Fixed
-- **Bootstrapper "Could not start the Remex sidecar" on first launch** — two bugs combined to show the wrong error:
-  - `uv.exe` was looked up at the wrong path inside the bundle (`resource_dir/uv.exe` instead of `resource_dir/resources/uv.exe`), causing an immediate "Installation tool not found" failure.
-  - When setup failed, the `spawn_sidecar` rejection overwrote the `setup_error` status (which carries the specific message and Retry button) with the generic `error` status.
-
----
-
-## [1.4.0] — 2026-04-29
+## [1.4.0] — 2026-04-30
 
 ### Added
 - **First-launch bootstrapper** — Studio now auto-installs `remex-cli[api]` on first run; no manual `pip install` step required.

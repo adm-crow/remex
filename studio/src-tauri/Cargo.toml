@@ -1,6 +1,6 @@
 [package]
 name = "studio"
-version = "1.4.2"
+version = "1.4.0"
 description = "A Tauri App"
 authors = ["Jeremy Gerbeaud"]
 edition = "2021"
