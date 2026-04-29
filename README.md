@@ -13,7 +13,7 @@
   [![PyPI](https://img.shields.io/pypi/v/remex-cli?style=flat&logo=pypi&logoColor=white&label=PyPI&color=3775a9)](https://pypi.org/project/remex-cli)
   [![License](https://img.shields.io/badge/CLI-Apache%202.0-22c55e?style=flat&label=License)](LICENSES.md)
   [![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
-  [![Python](https://img.shields.io/badge/3.10+-FFD43B?style=flat&logo=python&logoColor=black)](https://pypi.org/project/remex-cli)
+  [![Python](https://img.shields.io/badge/3.11+-FFD43B?style=flat&logo=python&logoColor=black)](https://pypi.org/project/remex-cli)
 
   <br/>
 
@@ -82,7 +82,7 @@ Free Remex covers the full local-first workflow. **Remex Pro** unlocks power-use
 | **Watch-folder auto-ingest** | — | ✓ |
 | **Unlimited searchable query history** | — | ✓ |
 | **Extra accent themes** (8 additional) | — | ✓ |
-| **Priority email support** (48-hour SLA) | — | ✓ |
+| **Priority email support** (48-hour business-day SLA) | — | ✓ |
 
 Activate in `Settings → License` inside Studio. Licenses are issued and validated offline via [Lemon Squeezy](https://lemonsqueezy.com/).
 
