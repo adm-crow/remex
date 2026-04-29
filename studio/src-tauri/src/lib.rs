@@ -19,6 +19,7 @@ pub struct SidecarState(pub Mutex<Option<Child>>);
 
 #[tauri::command]
 async fn spawn_sidecar(
+    app: AppHandle,
     state: State<'_, SidecarState>,
     host: String,
     port: u16,
@@ -29,23 +30,20 @@ async fn spawn_sidecar(
             return Ok(()); // already running
         }
     }
-    let mut cmd = Command::new("remex");
+
+    let remex_path = setup::ensure_ready(&app).await?;
+
+    let mut cmd = Command::new(&remex_path);
     cmd.args(["serve", "--host", &host, "--port", &port.to_string()]);
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("Failed to spawn 'remex serve': {e}"))?;
+        .map_err(|e| format!("Failed to spawn sidecar: {e}"))?;
 
-    // Brief pause — if remex crashes immediately (missing deps, bad install),
-    // catch it here rather than silently polling for 60 s.
     tokio::time::sleep(Duration::from_millis(800)).await;
     if let Ok(Some(status)) = child.try_wait() {
-        return Err(format!(
-            "'remex serve' exited immediately ({}). \
-             Make sure remex is installed and available on PATH.",
-            status
-        ));
+        return Err(format!("Sidecar exited immediately ({})", status));
     }
 
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
