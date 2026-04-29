@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Emitter, Manager};
 
 pub const EXPECTED_VERSION: &str = "1.3.1";
 
@@ -29,6 +30,15 @@ pub fn setup_json_path(data_dir: &PathBuf) -> PathBuf {
     data_dir.join("setup.json")
 }
 
+fn write_setup_json(data_dir: &PathBuf) -> Result<(), String> {
+    let json = serde_json::to_string(&SetupJson {
+        remex_cli_version: EXPECTED_VERSION.to_string(),
+    })
+    .map_err(|e| e.to_string())?;
+    fs::write(setup_json_path(data_dir), &json)
+        .map_err(|e| format!("Failed to write setup.json: {e}"))
+}
+
 pub fn version_is_current(data_dir: &PathBuf) -> bool {
     let path = setup_json_path(data_dir);
     let Ok(contents) = fs::read_to_string(&path) else {
@@ -38,6 +48,127 @@ pub fn version_is_current(data_dir: &PathBuf) -> bool {
         return false;
     };
     json.remex_cli_version == EXPECTED_VERSION
+}
+
+fn classify_uv_error(stderr: &str) -> String {
+    let lower = stderr.to_lowercase();
+    if lower.contains("connect")
+        || lower.contains("network")
+        || lower.contains("timeout")
+        || lower.contains("dns")
+    {
+        "Setup requires an internet connection. Please connect and retry.".to_string()
+    } else {
+        stderr.chars().take(240).collect()
+    }
+}
+
+async fn run_uv(uv_path: &PathBuf, args: &[&str]) -> Result<(), String> {
+    let output = tokio::process::Command::new(uv_path)
+        .args(args)
+        .output()
+        .await
+        .map_err(|e| format!("Failed to run uv: {e}"))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(stderr.trim().to_string());
+    }
+    Ok(())
+}
+
+fn emit_progress(app: &AppHandle, step: &str, index: usize) {
+    let _ = app.emit(
+        "setup://progress",
+        ProgressEvent {
+            step: step.to_string(),
+            index,
+            total: 4,
+        },
+    );
+}
+
+pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
+
+    // Fast path: venv present and version matches
+    if version_is_current(&data_dir) {
+        let remex = venv_remex_path(&data_dir);
+        if remex.exists() {
+            return Ok(remex);
+        }
+    }
+
+    // Setup needed — signal frontend
+    let _ = app.emit("setup://started", ());
+
+    // Wipe stale venv before fresh install
+    let venv_dir = data_dir.join("venv");
+    if venv_dir.exists() {
+        fs::remove_dir_all(&venv_dir)
+            .map_err(|e| format!("Failed to remove old venv: {e}"))?;
+    }
+
+    // Step 0: locate uv.exe from bundled resources
+    emit_progress(app, "Preparing installer…", 0);
+    let resource_dir = app
+        .path()
+        .resource_dir()
+        .map_err(|e| e.to_string())?;
+    let uv_src = resource_dir.join("uv.exe");
+    if !uv_src.exists() {
+        let msg = "Installation tool not found. Please reinstall Remex Studio.".to_string();
+        let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
+        return Err(msg);
+    }
+    let uv_path = std::env::temp_dir().join("remex-uv.exe");
+    fs::copy(&uv_src, &uv_path).map_err(|e| format!("Failed to copy uv.exe: {e}"))?;
+
+    // Step 1: create venv with Python 3.11
+    emit_progress(app, "Installing Python 3.11…", 1);
+    run_uv(
+        &uv_path,
+        &["venv", venv_dir.to_str().unwrap_or(""), "--python", "3.11"],
+    )
+    .await
+    .map_err(|e| {
+        let msg = classify_uv_error(&e);
+        let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
+        msg
+    })?;
+
+    // Step 2: install remex-cli[api] into the venv
+    emit_progress(app, "Installing remex-cli…", 2);
+    let python_path = venv_dir.join("Scripts").join("python.exe");
+    run_uv(
+        &uv_path,
+        &[
+            "pip",
+            "install",
+            &format!("remex-cli[api]=={}", EXPECTED_VERSION),
+            "--python",
+            python_path.to_str().unwrap_or(""),
+        ],
+    )
+    .await
+    .map_err(|e| {
+        let msg = classify_uv_error(&e);
+        let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
+        msg
+    })?;
+
+    // Step 3: write setup.json to mark this version as installed
+    emit_progress(app, "Finalising…", 3);
+    write_setup_json(&data_dir).map_err(|e| {
+        let _ = app.emit("setup://error", ErrorEvent { message: e.clone() });
+        e
+    })?;
+
+    let _ = app.emit("setup://done", ());
+
+    Ok(venv_remex_path(&data_dir))
 }
 
 #[cfg(test)]
