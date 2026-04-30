@@ -18,7 +18,6 @@ const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
   { view: "ingest",      label: "Ingest",      icon: Upload   },
   { view: "collections", label: "Collections", icon: Database },
   { view: "settings",    label: "Settings",    icon: Settings },
-  { view: "logs",        label: "Logs",        icon: ScrollText },
 ];
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
@@ -92,8 +91,8 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
         ))}
       </nav>
 
-      {/* ── Home button ─────────────────────────────────────────────────── */}
-      <div className="px-2 pb-1 shrink-0">
+      {/* ── Home + Logs buttons ─────────────────────────────────────────── */}
+      <div className="px-2 pb-1 shrink-0 flex flex-col gap-0.5">
         <button
           onClick={() => setCurrentDb(null)}
           className="flex items-center gap-3 text-left text-sm px-3 py-2 rounded-md w-full text-muted-foreground hover:bg-accent/50 hover:text-sidebar-foreground transition-all duration-150"
@@ -102,6 +101,32 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
         >
           <House className="w-4 h-4 shrink-0" />
           <span>Home</span>
+        </button>
+        <button
+          onClick={() => onViewChange("logs")}
+          className={cn(
+            "group relative flex items-center gap-3 text-left text-sm px-3 py-2 rounded-md w-full transition-all duration-150",
+            activeView === "logs"
+              ? "bg-accent text-primary font-medium"
+              : "text-muted-foreground hover:bg-accent/50 hover:text-sidebar-foreground"
+          )}
+          aria-current={activeView === "logs" ? "page" : undefined}
+        >
+          <span
+            className={cn(
+              "absolute left-0 inset-y-1.5 w-[3px] rounded-full transition-all duration-200",
+              activeView === "logs" ? "bg-primary opacity-100" : "opacity-0"
+            )}
+          />
+          <ScrollText
+            className={cn(
+              "w-4 h-4 shrink-0 transition-colors duration-150",
+              activeView === "logs"
+                ? "text-primary"
+                : "text-muted-foreground group-hover:text-sidebar-foreground"
+            )}
+          />
+          <span>Logs</span>
         </button>
       </div>
 

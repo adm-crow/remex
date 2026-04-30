@@ -24,10 +24,25 @@ describe("setup store fields", () => {
     expect(useAppStore.getState().setupError).toBe("No internet connection.");
   });
 
-  it("setSidecarStatus accepts setup and setup_error", () => {
+  it("setSidecarStatus accepts setup, setup_config and setup_error", () => {
     useAppStore.getState().setSidecarStatus("setup");
     expect(useAppStore.getState().sidecarStatus).toBe("setup");
+    useAppStore.getState().setSidecarStatus("setup_config");
+    expect(useAppStore.getState().sidecarStatus).toBe("setup_config");
     useAppStore.getState().setSidecarStatus("setup_error");
     expect(useAppStore.getState().sidecarStatus).toBe("setup_error");
+  });
+
+  it("appendSetupLog adds lines and clearSetupLog empties them", () => {
+    useAppStore.getState().appendSetupLog("line 1");
+    useAppStore.getState().appendSetupLog("line 2");
+    expect(useAppStore.getState().setupLogLines).toEqual(["line 1", "line 2"]);
+    useAppStore.getState().clearSetupLog();
+    expect(useAppStore.getState().setupLogLines).toEqual([]);
+  });
+
+  it("setSetupExtras updates selectedExtras", () => {
+    useAppStore.getState().setSetupExtras(["formats", "ai"]);
+    expect(useAppStore.getState().setupExtras).toEqual(["formats", "ai"]);
   });
 });

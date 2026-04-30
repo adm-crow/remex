@@ -47,11 +47,13 @@ export interface AppState {
   recentProjects: RecentProject[];
   queryHistory: string[];
   apiUrl: string;
-  sidecarStatus: "starting" | "connected" | "error" | "setup" | "setup_error";
+  sidecarStatus: "starting" | "connected" | "error" | "setup" | "setup_error" | "setup_config";
   sidecarError: string;
   setupStep: string;
   setupProgress: number;
   setupError: string;
+  setupExtras: string[];
+  setupLogLines: string[];
   darkMode: boolean;
   theme: Theme;
   homeBg: HomeBg;
@@ -103,6 +105,9 @@ export interface AppState {
   setSidecarError: (message: string) => void;
   setSetupProgress: (step: string, index: number) => void;
   setSetupError: (message: string) => void;
+  setSetupExtras: (extras: string[]) => void;
+  appendSetupLog: (line: string) => void;
+  clearSetupLog: () => void;
   setDarkMode: (dark: boolean) => void;
   setTheme: (theme: Theme) => void;
   setHomeBg: (bg: HomeBg) => void;
@@ -172,6 +177,8 @@ export const useAppStore = create<AppState>()(
       setupStep: "",
       setupProgress: 0,
       setupError: "",
+      setupExtras: [],
+      setupLogLines: [],
       sidecarReconnectSeq: 0,
       darkMode: false,
       darkModeAuto: false,
@@ -243,6 +250,9 @@ export const useAppStore = create<AppState>()(
       setSidecarError:         (message) => set({ sidecarError: message }),
       setSetupProgress: (step, index) => set({ setupStep: step, setupProgress: index }),
       setSetupError:    (message)     => set({ setupError: message }),
+      setSetupExtras:   (extras)      => set({ setupExtras: extras }),
+      appendSetupLog:   (line)        => set((s) => ({ setupLogLines: [...s.setupLogLines.slice(-99), line] })),
+      clearSetupLog:    ()            => set({ setupLogLines: [] }),
       triggerSidecarReconnect: ()       => set((s) => ({ sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
       setDarkMode:       (dark)     => set({ darkMode: dark }),
       setDarkModeAuto:   (v)        => set({ darkModeAuto: v }),
@@ -397,6 +407,7 @@ export const useAppStore = create<AppState>()(
         incompleteCollections: state.incompleteCollections,
         onboardingDone:        state.onboardingDone,
         watchFolders:          state.watchFolders,
+        setupExtras:           state.setupExtras,
         // license intentionally NOT persisted — rehydrated from disk via Tauri at startup.
       }),
     }

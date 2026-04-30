@@ -12,6 +12,7 @@ import { useAppStore } from "@/store/app";
 
 beforeEach(() => {
   localStorage.clear();
+  vi.clearAllMocks();
   useAppStore.setState({
     currentDb: null,
     currentCollection: null,
@@ -42,26 +43,43 @@ describe("useSidecar", () => {
     expect(tauriCore.invoke).not.toHaveBeenCalledWith("spawn_sidecar", expect.anything());
   });
 
-  it("calls spawn_sidecar when health fails initially", async () => {
+  it("calls spawn_sidecar when health fails and setup not needed", async () => {
     vi.mocked(tauriCore.invoke).mockImplementation(async (cmd) => {
       if (cmd === "check_sidecar_health") return false;
+      if (cmd === "check_needs_setup") return false;
       return undefined;
     });
 
     renderHook(() => useSidecar());
 
     await waitFor(() => {
-      expect(tauriCore.invoke).toHaveBeenCalledWith("spawn_sidecar", {
+      expect(tauriCore.invoke).toHaveBeenCalledWith("spawn_sidecar", expect.objectContaining({
         host: "127.0.0.1",
         port: 8000,
-      });
+      }));
     });
+  });
+
+  it("sets status to setup_config when check_needs_setup returns true", async () => {
+    vi.mocked(tauriCore.invoke).mockImplementation(async (cmd) => {
+      if (cmd === "check_sidecar_health") return false;
+      if (cmd === "check_needs_setup") return true;
+      return undefined;
+    });
+
+    renderHook(() => useSidecar());
+
+    await waitFor(() => {
+      expect(useAppStore.getState().sidecarStatus).toBe("setup_config");
+    });
+    expect(tauriCore.invoke).not.toHaveBeenCalledWith("spawn_sidecar", expect.anything());
   });
 
   it("sets status to connected after spawn + poll succeeds", async () => {
     let healthCalls = 0;
     vi.mocked(tauriCore.invoke).mockImplementation(async (cmd) => {
       if (cmd === "check_sidecar_health") return ++healthCalls > 1;
+      if (cmd === "check_needs_setup") return false;
       if (cmd === "is_sidecar_alive") return true;
       return undefined; // spawn_sidecar
     });
@@ -75,10 +93,12 @@ describe("useSidecar", () => {
     });
   });
 
-  it("sets status to error when invoke fails", async () => {
+  it("sets status to error when spawn_sidecar fails", async () => {
     vi.mocked(tauriCore.invoke).mockImplementation(async (cmd) => {
       if (cmd === "check_sidecar_health") return false;
-      throw new Error("remex not found");
+      if (cmd === "check_needs_setup") return false;
+      if (cmd === "spawn_sidecar") throw new Error("remex not found");
+      return undefined;
     });
 
     renderHook(() => useSidecar());
@@ -97,6 +117,7 @@ describe("useSidecar", () => {
     });
     vi.mocked(tauriCore.invoke).mockImplementation(async (cmd) => {
       if (cmd === "check_sidecar_health") return false;
+      if (cmd === "check_needs_setup") return false;
       return new Promise(() => {}); // spawn_sidecar hangs
     });
 
@@ -120,6 +141,7 @@ describe("useSidecar", () => {
     });
     vi.mocked(tauriCore.invoke).mockImplementation(async (cmd) => {
       if (cmd === "check_sidecar_health") return false;
+      if (cmd === "check_needs_setup") return false;
       return new Promise(() => {});
     });
 
@@ -144,6 +166,7 @@ describe("useSidecar", () => {
     });
     vi.mocked(tauriCore.invoke).mockImplementation(async (cmd) => {
       if (cmd === "check_sidecar_health") return false;
+      if (cmd === "check_needs_setup") return false;
       return new Promise(() => {});
     });
 

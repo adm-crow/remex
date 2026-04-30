@@ -18,11 +18,18 @@ pub mod watch;
 pub struct SidecarState(pub Mutex<Option<Child>>);
 
 #[tauri::command]
+async fn check_needs_setup(app: AppHandle, extras: Vec<String>) -> bool {
+    let Ok(data_dir) = app.path().app_data_dir() else { return true; };
+    setup::needs_setup(&data_dir, &extras)
+}
+
+#[tauri::command]
 async fn spawn_sidecar(
     app: AppHandle,
     state: State<'_, SidecarState>,
     host: String,
     port: u16,
+    extras: Option<Vec<String>>,
 ) -> Result<(), String> {
     {
         let guard = state.0.lock().map_err(|e| e.to_string())?;
@@ -31,7 +38,8 @@ async fn spawn_sidecar(
         }
     }
 
-    let remex_path = setup::ensure_ready(&app).await?;
+    let extras = extras.unwrap_or_default();
+    let remex_path = setup::ensure_ready(&app, &extras).await?;
 
     // Redirect stderr to a log file so uvicorn output doesn't block on a
     // full pipe, and so we can read the error if the process exits early.
@@ -151,7 +159,7 @@ pub fn run() {
         .manage(SidecarState(Mutex::new(None)))
         .manage(watch::WatchState::new())
         .invoke_handler(tauri::generate_handler![
-            spawn_sidecar, kill_sidecar, is_sidecar_alive, check_sidecar_health,
+            spawn_sidecar, kill_sidecar, is_sidecar_alive, check_sidecar_health, check_needs_setup,
             read_sidecar_log, export_log, write_text_file,
             license::license_activate,
             license::license_status,

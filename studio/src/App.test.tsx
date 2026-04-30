@@ -24,7 +24,7 @@ beforeEach(() => {
     currentCollection: null,
     recentProjects: [],
     apiUrl: "http://localhost:8000",
-    sidecarStatus: "starting",
+    sidecarStatus: "connected",
   });
 });
 
@@ -42,8 +42,20 @@ describe("App", () => {
     expect(screen.queryByTestId("home")).not.toBeInTheDocument();
   });
 
+  it("renders SetupScreen when sidecarStatus is starting", () => {
+    useAppStore.setState({ sidecarStatus: "starting" } as any);
+    render(<App />);
+    expect(screen.getByTestId("setup-screen")).toBeInTheDocument();
+  });
+
+  it("renders SetupScreen when sidecarStatus is setup_config", () => {
+    useAppStore.setState({ sidecarStatus: "setup_config" } as any);
+    render(<App />);
+    expect(screen.getByTestId("setup-screen")).toBeInTheDocument();
+  });
+
   it("renders SetupScreen when sidecarStatus is setup", () => {
-    useAppStore.setState({ sidecarStatus: "setup", setupStep: "Installing Python 3.11…", setupProgress: 1, setupError: "" } as any);
+    useAppStore.setState({ sidecarStatus: "setup", setupStep: "Installing Python 3.13…", setupProgress: 1, setupError: "" } as any);
     render(<App />);
     expect(screen.getByTestId("setup-screen")).toBeInTheDocument();
   });

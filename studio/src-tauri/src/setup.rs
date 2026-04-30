@@ -17,6 +17,8 @@ struct SetupJson {
     remex_cli_version: String,
     #[serde(default)]
     python_version: String,
+    #[serde(default)]
+    extras: Vec<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -28,6 +30,11 @@ pub struct ProgressEvent {
 
 #[derive(Serialize, Clone)]
 pub struct ErrorEvent {
+    pub message: String,
+}
+
+#[derive(Serialize, Clone)]
+pub struct LogEvent {
     pub message: String,
 }
 
@@ -43,17 +50,24 @@ pub fn setup_json_path(data_dir: &Path) -> PathBuf {
     data_dir.join("setup.json")
 }
 
-fn write_setup_json(data_dir: &Path) -> Result<(), String> {
+fn sorted(v: &[String]) -> Vec<String> {
+    let mut s = v.to_vec();
+    s.sort();
+    s
+}
+
+fn write_setup_json(data_dir: &Path, extras: &[String]) -> Result<(), String> {
     let json = serde_json::to_string(&SetupJson {
         remex_cli_version: EXPECTED_VERSION.to_string(),
         python_version: PYTHON_VERSION.to_string(),
+        extras: sorted(extras),
     })
     .map_err(|e| e.to_string())?;
     fs::write(setup_json_path(data_dir), &json)
         .map_err(|e| format!("Failed to write setup.json: {e}"))
 }
 
-pub fn version_is_current(data_dir: &Path) -> bool {
+pub fn version_is_current(data_dir: &Path, extras: &[String]) -> bool {
     let path = setup_json_path(data_dir);
     let Ok(contents) = fs::read_to_string(&path) else {
         return false;
@@ -61,7 +75,13 @@ pub fn version_is_current(data_dir: &Path) -> bool {
     let Ok(json) = serde_json::from_str::<SetupJson>(&contents) else {
         return false;
     };
-    json.remex_cli_version == EXPECTED_VERSION && json.python_version == PYTHON_VERSION
+    json.remex_cli_version == EXPECTED_VERSION
+        && json.python_version == PYTHON_VERSION
+        && sorted(&json.extras) == sorted(extras)
+}
+
+pub fn needs_setup(data_dir: &Path, extras: &[String]) -> bool {
+    !version_is_current(data_dir, extras) || !venv_remex_path(data_dir).exists()
 }
 
 fn classify_uv_error(stderr: &str) -> String {
@@ -77,7 +97,11 @@ fn classify_uv_error(stderr: &str) -> String {
     }
 }
 
-async fn run_uv(uv_path: &Path, args: &[&str]) -> Result<(), String> {
+fn emit_log(app: &AppHandle, message: &str) {
+    let _ = app.emit("setup://log", LogEvent { message: message.to_string() });
+}
+
+async fn run_uv(app: &AppHandle, uv_path: &Path, args: &[&str]) -> Result<(), String> {
     let mut cmd = tokio::process::Command::new(uv_path);
     cmd.args(args);
     #[cfg(target_os = "windows")]
@@ -86,6 +110,17 @@ async fn run_uv(uv_path: &Path, args: &[&str]) -> Result<(), String> {
         .output()
         .await
         .map_err(|e| format!("Failed to run uv: {e}"))?;
+
+    // Emit stdout + stderr lines for display in the setup log tail
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr_out = String::from_utf8_lossy(&output.stderr);
+    for line in stdout.lines().chain(stderr_out.lines()) {
+        let t = line.trim();
+        if !t.is_empty() {
+            emit_log(app, t);
+        }
+    }
+
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(stderr.trim().to_string());
@@ -104,14 +139,14 @@ fn emit_progress(app: &AppHandle, step: &str, index: usize) {
     );
 }
 
-pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
+pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf, String> {
     let data_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?;
 
-    // Fast path: venv present and version matches
-    if version_is_current(&data_dir) {
+    // Fast path: venv present and version + extras match
+    if version_is_current(&data_dir, extras) {
         let remex = venv_remex_path(&data_dir);
         if remex.exists() {
             return Ok(remex);
@@ -138,8 +173,6 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
     let (uv_bin, uv_tmp) = ("uv.exe", "remex-uv.exe");
     #[cfg(not(target_os = "windows"))]
     let (uv_bin, uv_tmp) = ("uv", "remex-uv");
-    // Tauri v2 preserves the source path structure within resource_dir, so
-    // "resources/uv.exe" in tauri.conf.json ends up at resource_dir/resources/uv.exe.
     let uv_src = resource_dir.join("resources").join(uv_bin);
     if !uv_src.exists() {
         let msg = "Installation tool not found. Please reinstall Remex Studio.".to_string();
@@ -151,7 +184,9 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
 
     // Step 1: create venv with Python 3.13
     emit_progress(app, "Installing Python 3.13…", 1);
+    emit_log(app, "Creating virtual environment with Python 3.13…");
     run_uv(
+        app,
         &uv_path,
         &["venv", venv_dir.to_str().unwrap_or(""), "--python", "3.13"],
     )
@@ -162,18 +197,31 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
         msg
     })?;
 
-    // Step 2: install remex-cli[api] into the venv
+    // Step 2: install remex-cli with selected extras into the venv
     emit_progress(app, "Installing remex-cli…", 2);
     #[cfg(target_os = "windows")]
     let python_path = venv_dir.join("Scripts").join("python.exe");
     #[cfg(not(target_os = "windows"))]
     let python_path = venv_dir.join("bin").join("python");
+
+    // Build extras specifier — api is always required
+    let extras_spec: String = if extras.is_empty() {
+        "api".to_string()
+    } else {
+        std::iter::once("api")
+            .chain(extras.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let pkg = format!("remex-cli[{}]=={}", extras_spec, EXPECTED_VERSION);
+    emit_log(app, &format!("Installing {}…", pkg));
     run_uv(
+        app,
         &uv_path,
         &[
             "pip",
             "install",
-            &format!("remex-cli[api]=={}", EXPECTED_VERSION),
+            &pkg,
             "--python",
             python_path.to_str().unwrap_or(""),
         ],
@@ -187,7 +235,7 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
 
     // Step 3: write setup.json to mark this version as installed
     emit_progress(app, "Finalising…", 3);
-    write_setup_json(&data_dir).inspect_err(|e| {
+    write_setup_json(&data_dir, extras).inspect_err(|e| {
         let _ = app.emit("setup://error", ErrorEvent { message: e.clone() });
     })?;
 
@@ -204,14 +252,14 @@ mod tests {
     #[test]
     fn version_is_current_false_when_file_missing() {
         let dir = tempdir().unwrap();
-        assert!(!version_is_current(&dir.path().to_path_buf()));
+        assert!(!version_is_current(dir.path(), &[]));
     }
 
     #[test]
     fn version_is_current_false_when_version_mismatch() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("setup.json"), r#"{"remex_cli_version":"0.9.0"}"#).unwrap();
-        assert!(!version_is_current(&dir.path().to_path_buf()));
+        assert!(!version_is_current(dir.path(), &[]));
     }
 
     #[test]
@@ -222,7 +270,7 @@ mod tests {
             EXPECTED_VERSION, PYTHON_VERSION
         );
         fs::write(dir.path().join("setup.json"), json).unwrap();
-        assert!(version_is_current(&dir.path().to_path_buf()));
+        assert!(version_is_current(dir.path(), &[]));
     }
 
     #[test]
@@ -230,14 +278,37 @@ mod tests {
         let dir = tempdir().unwrap();
         let json = format!(r#"{{"remex_cli_version":"{}","python_version":"3.11"}}"#, EXPECTED_VERSION);
         fs::write(dir.path().join("setup.json"), json).unwrap();
-        assert!(!version_is_current(&dir.path().to_path_buf()));
+        assert!(!version_is_current(dir.path(), &[]));
     }
 
     #[test]
     fn version_is_current_false_when_json_malformed() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("setup.json"), "not json").unwrap();
-        assert!(!version_is_current(&dir.path().to_path_buf()));
+        assert!(!version_is_current(dir.path(), &[]));
+    }
+
+    #[test]
+    fn version_is_current_extras_must_match() {
+        let dir = tempdir().unwrap();
+        let json = format!(
+            r#"{{"remex_cli_version":"{}","python_version":"{}","extras":["formats"]}}"#,
+            EXPECTED_VERSION, PYTHON_VERSION
+        );
+        fs::write(dir.path().join("setup.json"), json).unwrap();
+        assert!(!version_is_current(dir.path(), &[]));
+        assert!(version_is_current(dir.path(), &["formats".to_string()]));
+    }
+
+    #[test]
+    fn version_is_current_extras_order_insensitive() {
+        let dir = tempdir().unwrap();
+        let json = format!(
+            r#"{{"remex_cli_version":"{}","python_version":"{}","extras":["formats","ai"]}}"#,
+            EXPECTED_VERSION, PYTHON_VERSION
+        );
+        fs::write(dir.path().join("setup.json"), json).unwrap();
+        assert!(version_is_current(dir.path(), &["ai".to_string(), "formats".to_string()]));
     }
 
     #[test]

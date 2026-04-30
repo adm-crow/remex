@@ -67,7 +67,7 @@ export function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      {sidecarStatus === "setup" || sidecarStatus === "setup_error" ? (
+      {sidecarStatus === "starting" || sidecarStatus === "setup_config" || sidecarStatus === "setup" || sidecarStatus === "setup_error" ? (
         <SetupScreen />
       ) : currentDb ? (
         <AppShell />
