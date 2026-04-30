@@ -37,6 +37,25 @@ describe("api.getHealth", () => {
   });
 });
 
+describe("normalizeBase (via api.getHealth)", () => {
+  beforeEach(() => mockFetch.mockReturnValue(okJson({ status: "ok", version: "0.0.0" })));
+
+  it("replaces localhost with explicit port", async () => {
+    await api.getHealth("http://localhost:8000");
+    expect(mockFetch).toHaveBeenCalledWith("http://127.0.0.1:8000/health");
+  });
+
+  it("replaces localhost without explicit port", async () => {
+    await api.getHealth("http://localhost");
+    expect(mockFetch).toHaveBeenCalledWith("http://127.0.0.1/health");
+  });
+
+  it("leaves 127.0.0.1 unchanged", async () => {
+    await api.getHealth("http://127.0.0.1:8000");
+    expect(mockFetch).toHaveBeenCalledWith("http://127.0.0.1:8000/health");
+  });
+});
+
 describe("api.getCollections", () => {
   it("encodes db_path in query string", async () => {
     mockFetch.mockReturnValue(okJson(["col1", "col2"]));

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Eye, Plus, X } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
+import { fetch } from "@tauri-apps/plugin-http";
 import { Button } from "@/components/ui/button";
 import { useAppStore, useIsPro } from "@/store/app";
 import { ProBadge } from "@/components/license/ProBadge";
