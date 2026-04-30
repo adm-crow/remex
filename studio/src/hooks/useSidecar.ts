@@ -64,19 +64,19 @@ export function useSidecar() {
           setSidecarStatus("setup_error");
         }
       }),
-      listen("setup://done", () => {
-        // spawn_sidecar resolves shortly after this; status moves to "starting" naturally
-      }),
       listen<{ message: string }>("setup://log", (event) => {
         if (!cancelled) appendSetupLog(event.payload.message);
       }),
     ]);
 
     async function spawnAndPoll() {
+      // Mark as spawning before the await so cleanup can kill the process
+      // even if the effect is cancelled while spawn_sidecar is in-flight.
+      didSpawnRef.current = true;
       try {
         await invoke("spawn_sidecar", { host, port, extras: setupExtras });
-        didSpawnRef.current = true;
       } catch (err) {
+        didSpawnRef.current = false;
         console.error("[useSidecar] spawn_sidecar failed:", err);
         if (!cancelled && useAppStore.getState().sidecarStatus !== "setup_error") {
           setSidecarError(String(err));

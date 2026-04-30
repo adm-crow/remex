@@ -379,7 +379,7 @@ export const useAppStore = create<AppState>()(
         } catch { /* ignore */ }
       },
       addWatchFolder: async (path) => {
-        await invoke("watch_start", { folder: path });
+        await invoke("watch_start", { folder: path }); // throws on Pro gate failure or missing folder
         set((s) => ({ watchFolders: Array.from(new Set([...s.watchFolders, path])) }));
       },
       removeWatchFolder: async (path) => {

@@ -7,7 +7,7 @@ use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, Recursiv
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 
-use crate::license::{read_from, Tier};
+use crate::license::{read_from, LicenseStatus, Tier};
 
 pub struct WatchState(pub Mutex<HashMap<PathBuf, WatcherEntry>>);
 
@@ -45,7 +45,7 @@ pub fn watch_start(app: AppHandle, state: State<WatchState>, folder: String) -> 
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let tier = read_from(&data_dir)
         .map_err(|e| e.to_string())?
-        .map(|f| if f.status == "active" { Tier::Pro } else { Tier::Free })
+        .map(|f| LicenseStatus::from_file(&f).tier)
         .unwrap_or(Tier::Free);
     if tier != Tier::Pro {
         return Err("Pro license required for watch folders".into());

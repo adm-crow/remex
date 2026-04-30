@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Eye, Plus, X } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
@@ -10,6 +10,7 @@ export function WatchFoldersCard() {
   const isPro = useIsPro();
   const { watchFolders, addWatchFolder, removeWatchFolder,
           currentDb, currentCollection, apiUrl, openUpgradeModal } = useAppStore();
+  const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isPro) return;
@@ -27,8 +28,15 @@ export function WatchFoldersCard() {
   }, [isPro, currentDb, currentCollection, apiUrl]);
 
   async function handleAdd() {
+    setAddError(null);
     const chosen = await openDialog({ directory: true, multiple: false });
-    if (typeof chosen === "string" && chosen) await addWatchFolder(chosen);
+    if (typeof chosen === "string" && chosen) {
+      try {
+        await addWatchFolder(chosen);
+      } catch (err) {
+        setAddError(String(err));
+      }
+    }
   }
 
   if (!isPro) {
@@ -79,6 +87,9 @@ export function WatchFoldersCard() {
           </li>
         ))}
       </ul>
+      {addError && (
+        <p className="text-xs text-destructive">{addError}</p>
+      )}
       <Button size="sm" variant="outline" className="w-full" onClick={() => void handleAdd()}>
         <Plus className="w-3 h-3 mr-1.5" /> Add folder
       </Button>

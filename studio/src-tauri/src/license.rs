@@ -167,15 +167,11 @@ pub async fn license_revalidate(app: AppHandle) -> Result<LicenseStatus, String>
     };
     let client = Client::new();
     match client.validate(&lic.key, &lic.instance_id).await {
-        Ok(resp) if resp.valid => {
-            lic.status            = resp.license_key.status;
-            lic.last_validated_at = now_secs();
-            write_to(&dir, &lic).map_err(|e| e.to_string())?;
-            Ok(LicenseStatus::from_file(&lic))
-        }
         Ok(resp) => {
-            // Hard fail: LS conclusively says the key is no longer valid.
-            lic.status = resp.license_key.status;
+            // LS responded — update status regardless of resp.valid.
+            // LicenseStatus::from_file maps status != "active" → Free, so a
+            // revoked/expired key downgrades the tier automatically.
+            lic.status            = resp.license_key.status;
             lic.last_validated_at = now_secs();
             write_to(&dir, &lic).map_err(|e| e.to_string())?;
             Ok(LicenseStatus::from_file(&lic))

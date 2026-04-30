@@ -168,25 +168,29 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
         .resource_dir()
         .map_err(|e| e.to_string())?;
     #[cfg(target_os = "windows")]
-    let (uv_bin, uv_tmp) = ("uv.exe", "remex-uv.exe");
+    let uv_bin = "uv.exe";
     #[cfg(not(target_os = "windows"))]
-    let (uv_bin, uv_tmp) = ("uv", "remex-uv");
+    let uv_bin = "uv";
     let uv_src = resource_dir.join("resources").join(uv_bin);
     if !uv_src.exists() {
         let msg = "Installation tool not found. Please reinstall Remex Studio.".to_string();
         let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
         return Err(msg);
     }
-    let uv_path = std::env::temp_dir().join(uv_tmp);
-    fs::copy(&uv_src, &uv_path).map_err(|e| format!("Failed to copy uv.exe: {e}"))?;
+    // Copy uv into the app data directory (not %TEMP%) so the path is
+    // app-owned and not subject to AV quarantine of world-writable temp dirs.
+    let uv_path = data_dir.join(uv_bin);
+    fs::copy(&uv_src, &uv_path).map_err(|e| format!("Failed to copy uv: {e}"))?;
 
     // Step 1: create venv with Python 3.13
     emit_progress(app, "Installing Python 3.13…", 1);
     emit_log(app, "Creating virtual environment with Python 3.13…");
+    let venv_str = venv_dir.to_str()
+        .ok_or_else(|| "venv path contains non-UTF-8 characters".to_string())?;
     run_uv(
         app,
         &uv_path,
-        &["venv", venv_dir.to_str().unwrap_or(""), "--python", "3.13"],
+        &["venv", venv_str, "--python", "3.13"],
     )
     .await
     .map_err(|e| {
@@ -201,6 +205,8 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
     let python_path = venv_dir.join("Scripts").join("python.exe");
     #[cfg(not(target_os = "windows"))]
     let python_path = venv_dir.join("bin").join("python");
+    let python_str = python_path.to_str()
+        .ok_or_else(|| "python path contains non-UTF-8 characters".to_string())?;
 
     // Build extras specifier — api is always required
     let extras_spec: String = if extras.is_empty() {
@@ -216,13 +222,7 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
     run_uv(
         app,
         &uv_path,
-        &[
-            "pip",
-            "install",
-            &pkg,
-            "--python",
-            python_path.to_str().unwrap_or(""),
-        ],
+        &["pip", "install", &pkg, "--python", python_str],
     )
     .await
     .map_err(|e| {

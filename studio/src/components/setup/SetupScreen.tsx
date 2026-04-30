@@ -100,10 +100,13 @@ export function SetupScreen() {
     const { host, port } = parseUrl(apiUrl);
     try {
       await invoke("spawn_sidecar", { host, port, extras: selectedExtras });
+      // Only reconnect on success — triggering it on failure would snap
+      // the status back to setup_config and hide the error screen.
+      triggerSidecarReconnect();
     } catch {
-      // spawn_sidecar may throw if setup fails; the setup://error event handles UI
+      // setup://error event handles the error UI; just re-enable the button.
+      setInstalling(false);
     }
-    triggerSidecarReconnect();
   }
 
   function formatElapsed(s: number) {

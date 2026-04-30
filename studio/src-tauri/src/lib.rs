@@ -1,6 +1,6 @@
 use std::fs;
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
 use std::time::Duration;
 
 #[cfg(target_os = "windows")]
@@ -15,7 +15,21 @@ pub mod license;
 pub mod setup;
 pub mod watch;
 
-pub struct SidecarState(pub Mutex<Option<Child>>);
+pub struct SidecarState {
+    pub child:     Mutex<Option<Child>>,
+    /// Locked to true while spawn_sidecar is in progress to prevent concurrent spawns.
+    pub spawning:  AtomicBool,
+}
+
+impl SidecarState {
+    pub fn new() -> Self {
+        Self { child: Mutex::new(None), spawning: AtomicBool::new(false) }
+    }
+}
+
+impl Default for SidecarState {
+    fn default() -> Self { Self::new() }
+}
 
 #[tauri::command]
 async fn check_needs_setup(app: AppHandle, extras: Vec<String>) -> bool {
@@ -31,15 +45,31 @@ async fn spawn_sidecar(
     port: u16,
     extras: Option<Vec<String>>,
 ) -> Result<(), String> {
+    // Reject if already running or another spawn is in progress (TOCTOU guard).
     {
-        let guard = state.0.lock().map_err(|e| e.to_string())?;
+        let guard = state.child.lock().map_err(|e| e.to_string())?;
         if guard.is_some() {
-            return Ok(()); // already running
+            return Ok(());
         }
     }
+    if state.spawning.swap(true, Ordering::SeqCst) {
+        return Ok(()); // concurrent spawn_sidecar call in progress
+    }
 
+    let result = do_spawn(&app, &state, host, port, extras).await;
+    state.spawning.store(false, Ordering::SeqCst);
+    result
+}
+
+async fn do_spawn(
+    app: &AppHandle,
+    state: &SidecarState,
+    host: String,
+    port: u16,
+    extras: Option<Vec<String>>,
+) -> Result<(), String> {
     let extras = extras.unwrap_or_default();
-    let remex_path = setup::ensure_ready(&app, &extras).await?;
+    let remex_path = setup::ensure_ready(app, &extras).await?;
 
     // Redirect stderr to a log file so uvicorn output doesn't block on a
     // full pipe, and so we can read the error if the process exits early.
@@ -67,26 +97,31 @@ async fn spawn_sidecar(
             .as_ref()
             .and_then(|p| fs::read_to_string(p).ok())
             .unwrap_or_default();
-        let tail: String = log.lines().rev().take(20).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n");
+        let tail: String = log.lines().rev().take(20).collect::<Vec<_>>()
+            .into_iter().rev().collect::<Vec<_>>().join("\n");
         return Err(format!("Sidecar exited immediately ({status}): {tail}"));
     }
 
-    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    let mut guard = state.child.lock().map_err(|e| e.to_string())?;
     *guard = Some(child);
     Ok(())
 }
 
 #[tauri::command]
 fn is_sidecar_alive(state: State<'_, SidecarState>) -> bool {
-    let mut guard = match state.0.lock() {
+    let mut guard = match state.child.lock() {
         Ok(g) => g,
         Err(_) => return false,
     };
     match guard.as_mut() {
         None => false,
         Some(child) => match child.try_wait() {
-            Ok(None) => true,   // still running
-            _ => false,          // exited or error
+            Ok(None) => true,       // still running
+            _ => {
+                // Reap the dead child so the mutex doesn't hold a stale entry.
+                *guard = None;
+                false
+            }
         },
     }
 }
@@ -126,6 +161,14 @@ fn export_log(path: String, content: String) -> Result<(), String> {
     if !path_buf.is_absolute() {
         return Err("Path must be absolute".to_string());
     }
+    let ext = path_buf
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    if !matches!(ext.as_str(), "log" | "txt") {
+        return Err("Only .log and .txt files are supported".to_string());
+    }
     fs::write(&path_buf, content).map_err(|e| format!("Failed to write log: {e}"))
 }
 
@@ -144,9 +187,11 @@ fn read_sidecar_log(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 fn kill_sidecar(state: State<'_, SidecarState>) -> Result<(), String> {
-    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    let mut guard = state.child.lock().map_err(|e| e.to_string())?;
     if let Some(mut child) = guard.take() {
         child.kill().map_err(|e| format!("Failed to kill sidecar: {e}"))?;
+        // Reap the process to avoid leaving a zombie on Unix.
+        let _ = child.wait();
     }
     Ok(())
 }
@@ -156,7 +201,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
-        .manage(SidecarState(Mutex::new(None)))
+        .manage(SidecarState::new())
         .manage(watch::WatchState::new())
         .invoke_handler(tauri::generate_handler![
             spawn_sidecar, kill_sidecar, is_sidecar_alive, check_sidecar_health, check_needs_setup,
@@ -184,9 +229,10 @@ pub fn run() {
         .run(|app_handle: &AppHandle, event| {
             if let RunEvent::ExitRequested { .. } = event {
                 let state = app_handle.state::<SidecarState>();
-                if let Ok(mut guard) = state.0.lock() {
+                if let Ok(mut guard) = state.child.lock() {
                     if let Some(mut child) = guard.take() {
                         let _ = child.kill();
+                        let _ = child.wait();
                     }
                 };
             }

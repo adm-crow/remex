@@ -192,7 +192,8 @@ async function* readSseStream(
 // On Windows, "localhost" may resolve to ::1 (IPv6) while the sidecar binds to
 // 127.0.0.1 (IPv4), causing "Failed to fetch". Always use the explicit IPv4 address.
 function normalizeBase(base: string): string {
-  return base.replace("://localhost:", "://127.0.0.1:");
+  // Replace localhost regardless of whether an explicit port is present.
+  return base.replace(/^(https?:\/\/)localhost(:\d+|\/|$)/, "$1127.0.0.1$2");
 }
 
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
