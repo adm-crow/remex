@@ -92,10 +92,10 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
       </nav>
 
       {/* ── Home + Logs buttons ─────────────────────────────────────────── */}
-      <div className="px-2 pb-1 shrink-0 flex flex-col gap-0.5">
+      <div className="px-2 pb-2 shrink-0 flex gap-1.5">
         <button
           onClick={() => setCurrentDb(null)}
-          className="flex items-center gap-3 text-left text-sm px-3 py-2 rounded-md w-full text-muted-foreground hover:bg-accent/50 hover:text-sidebar-foreground transition-all duration-150"
+          className="flex-1 flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40 transition-all duration-150"
           title="Back to home"
           aria-label="Back to home"
         >
@@ -105,27 +105,14 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
         <button
           onClick={() => onViewChange("logs")}
           className={cn(
-            "group relative flex items-center gap-3 text-left text-sm px-3 py-2 rounded-md w-full transition-all duration-150",
+            "flex-1 flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border transition-all duration-150",
             activeView === "logs"
-              ? "bg-accent text-primary font-medium"
-              : "text-muted-foreground hover:bg-accent/50 hover:text-sidebar-foreground"
+              ? "border-primary/60 text-primary bg-accent"
+              : "border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40"
           )}
           aria-current={activeView === "logs" ? "page" : undefined}
         >
-          <span
-            className={cn(
-              "absolute left-0 inset-y-1.5 w-[3px] rounded-full transition-all duration-200",
-              activeView === "logs" ? "bg-primary opacity-100" : "opacity-0"
-            )}
-          />
-          <ScrollText
-            className={cn(
-              "w-4 h-4 shrink-0 transition-colors duration-150",
-              activeView === "logs"
-                ? "text-primary"
-                : "text-muted-foreground group-hover:text-sidebar-foreground"
-            )}
-          />
+          <ScrollText className="w-4 h-4 shrink-0" />
           <span>Logs</span>
         </button>
       </div>
