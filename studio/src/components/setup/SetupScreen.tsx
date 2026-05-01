@@ -96,12 +96,15 @@ export function SetupScreen() {
 
   async function handleInstall() {
     setInstalling(true);
-    setSetupExtras(selectedExtras);
     const { host, port } = parseUrl(apiUrl);
     try {
       await invoke("spawn_sidecar", { host, port, extras: selectedExtras });
-      // Only reconnect on success — triggering it on failure would snap
-      // the status back to setup_config and hide the error screen.
+      // Persist the extras selection and trigger reconnect in one batch so the
+      // useSidecar effect only re-runs once — after the install is done and the
+      // server is healthy. Calling setSetupExtras before the invoke would cause
+      // an early effect re-run that races check_needs_setup against setup://started
+      // and can wipe the progress bar.
+      setSetupExtras(selectedExtras);
       triggerSidecarReconnect();
     } catch {
       // setup://error event handles the error UI; just re-enable the button.
