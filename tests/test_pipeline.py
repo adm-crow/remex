@@ -17,6 +17,7 @@ from remex.core.pipeline import (
     query_async,
     reset,
     sources,
+    warmup_collections,
 )
 
 
@@ -1170,3 +1171,47 @@ def test_chat_api_where_too_deep():
     deeply_nested = {"a": {"b": {"c": {"d": {"e": {"f": "too deep"}}}}}}
     with pytest.raises(Exception, match="too deeply nested"):
         ChatRequest(text="q", where=deeply_nested)
+
+
+# --- warmup_collections ---
+
+def test_warmup_collections_loads_unique_models(tmp_path):
+    col_a = MagicMock()
+    col_a.metadata = {"embedding_model": "all-MiniLM-L6-v2"}
+    col_b = MagicMock()
+    col_b.metadata = {"embedding_model": "all-mpnet-base-v2"}
+    col_c = MagicMock()
+    col_c.metadata = {"embedding_model": "all-MiniLM-L6-v2"}  # duplicate — should not load twice
+
+    mock_client = MagicMock()
+    mock_client.list_collections.return_value = [col_a, col_b, col_c]
+
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=mock_client), \
+         patch("remex.core.pipeline._get_ef") as mock_get_ef:
+        result = warmup_collections(str(tmp_path))
+
+    assert result == ["all-MiniLM-L6-v2", "all-mpnet-base-v2"]
+    assert mock_get_ef.call_count == 2
+
+
+def test_warmup_collections_returns_empty_on_db_error(tmp_path):
+    with patch("remex.core.pipeline._get_client", side_effect=Exception("db error")):
+        result = warmup_collections(str(tmp_path))
+    assert result == []
+
+
+def test_warmup_collections_skips_collections_without_model(tmp_path):
+    col_no_model = MagicMock()
+    col_no_model.metadata = {}
+    col_with_model = MagicMock()
+    col_with_model.metadata = {"embedding_model": "all-MiniLM-L6-v2"}
+
+    mock_client = MagicMock()
+    mock_client.list_collections.return_value = [col_no_model, col_with_model]
+
+    with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=mock_client), \
+         patch("remex.core.pipeline._get_ef") as mock_get_ef:
+        result = warmup_collections(str(tmp_path))
+
+    assert result == ["all-MiniLM-L6-v2"]
+    assert mock_get_ef.call_count == 1

@@ -742,6 +742,34 @@ def source_chunk_counts(
     return counts
 
 
+def warmup_collections(db_path: str = "./remex_db") -> list[str]:
+    """Pre-load SentenceTransformer models for all collections into the EF cache.
+
+    Called at Studio startup so the first query isn't blocked waiting for model
+    load. Already-cached models are skipped instantly via the _EF_CACHE fast path.
+    Returns the sorted list of unique model names found. Errors are swallowed —
+    warmup is best-effort and must never crash the server.
+    """
+    try:
+        client = _get_client(db_path)
+        collections = client.list_collections()
+    except Exception:
+        return []
+
+    seen: set[str] = set()
+    for col in collections:
+        try:
+            meta = col.metadata if isinstance(col.metadata, dict) else {}
+            model = meta.get("embedding_model", "")
+            if model and model not in seen:
+                seen.add(model)
+                _get_ef(model)
+        except Exception:
+            pass
+
+    return sorted(seen)
+
+
 def list_collections(db_path: str = "./remex_db") -> list[str]:
     """Return a sorted list of all collection names in a ChromaDB directory.
 

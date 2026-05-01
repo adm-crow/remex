@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppStore } from "@/store/app";
+import { api } from "@/api/client";
 import { Home } from "@/pages/Home";
 import { AppShell } from "@/components/layout/AppShell";
 import { SetupScreen } from "@/components/setup/SetupScreen";
@@ -19,6 +20,7 @@ const queryClient = new QueryClient({
 export function App() {
   const currentDb = useAppStore((s) => s.currentDb);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
+  const apiUrl = useAppStore((s) => s.apiUrl);
   const darkMode = useAppStore((s) => s.darkMode);
   const darkModeAuto = useAppStore((s) => s.darkModeAuto);
   const setDarkMode = useAppStore((s) => s.setDarkMode);
@@ -44,6 +46,13 @@ export function App() {
       html.setAttribute("data-theme", theme);
     }
   }, [darkMode, theme]);
+
+  // Pre-load embedding models as soon as the sidecar connects and a db is selected.
+  // Fire-and-forget — errors are silently ignored.
+  useEffect(() => {
+    if (sidecarStatus !== "connected" || !currentDb) return;
+    api.warmupModels(apiUrl, currentDb).catch(() => {});
+  }, [sidecarStatus, currentDb, apiUrl]);
 
   useEffect(() => {
     const store = useAppStore.getState();

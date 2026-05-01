@@ -1,8 +1,8 @@
 import hashlib
 import os
 import sqlite3
-from fastapi import APIRouter, HTTPException, Query
-from remex.core import collection_stats, delete_source, list_collections, purge, reset, source_chunk_counts, update_collection_description
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from remex.core import collection_stats, delete_source, list_collections, purge, reset, source_chunk_counts, update_collection_description, warmup_collections
 from remex.core.exceptions import CollectionNotFoundError, RemexError
 from remex.core.pipeline import _get_client
 from remex.api.schemas import (
@@ -54,6 +54,21 @@ def list_sqlite_tables(
         if conn:
             conn.close()
     return SQLiteTablesResponse(tables=tables)
+
+
+@router.post("/warmup", status_code=202)
+def warmup_models(
+    background_tasks: BackgroundTasks,
+    db_path: str = Query(default="./remex_db"),
+) -> dict:
+    """Kick off background model loading so the first query is not slow.
+
+    Returns 202 immediately — model loading happens in the background.
+    Large models can take minutes; this endpoint must never block the client.
+    """
+    _require_absolute_db_path(db_path)
+    background_tasks.add_task(warmup_collections, db_path)
+    return {"status": "ok"}
 
 
 @router.get("/{collection}/stats", response_model=CollectionStatsResponse)

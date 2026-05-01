@@ -422,6 +422,12 @@ export const api = {
     );
   },
 
+  warmupModels: (base: string, dbPath: string) =>
+    apiFetch<{ status: string }>(
+      `${base}/collections/warmup?db_path=${encodeURIComponent(dbPath)}`,
+      { method: "POST" }
+    ),
+
   async *ingestFilesStream(
     base: string,
     dbPath: string,

@@ -107,6 +107,18 @@ describe("api.purgeCollection", () => {
   });
 });
 
+describe("api.warmupModels", () => {
+  it("sends POST to warmup endpoint and returns 202 status", async () => {
+    mockFetch.mockReturnValue(okJson({ status: "ok" }));
+    const result = await api.warmupModels("http://localhost:8000", "./remex_db");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://127.0.0.1:8000/collections/warmup?db_path=.%2Fremex_db",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(result).toEqual({ status: "ok" });
+  });
+});
+
 describe("api.ingestFilesStream", () => {
   it("yields progress and done events from SSE stream", async () => {
     const progressEvent = JSON.stringify({

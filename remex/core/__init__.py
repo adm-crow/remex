@@ -20,6 +20,7 @@ from .pipeline import (
     reset,
     source_chunk_counts,
     sources,
+    warmup_collections,
 )
 from .sqlite_ingester import ingest_sqlite
 
@@ -41,6 +42,7 @@ __all__ = [
     "setup_logging",
     "source_chunk_counts",
     "sources",
+    "warmup_collections",
     # config
     "load_config",
     "save_config",
