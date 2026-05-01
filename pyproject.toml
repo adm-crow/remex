@@ -1,6 +1,6 @@
 [project]
 name = "remex-cli"
-version = "1.3.0"
+version = "1.4.0"
 description = "Local-first RAG library — ingest files and SQLite, query semantically, pipe results into any AI agent"
 readme = "README.md"
 requires-python = ">=3.11"

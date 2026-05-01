@@ -8,7 +8,7 @@ All notable changes to `remex` are documented here.
 
 ---
 
-## [1.4.0] — 2026-04-30
+## [1.4.0] — 2026-05-01
 
 ### Added
 - **First-launch bootstrapper** — Studio now auto-installs `remex-cli[api]` on first run; no manual `pip install` step required.
@@ -17,9 +17,24 @@ All notable changes to `remex` are documented here.
   - Subsequent launches hit a fast path (~1 ms version check) and show no setup screen.
   - If setup fails (no network, disk error) an error screen is shown with a **Retry** button.
   - The sidecar is now launched from the venv's full path instead of relying on `PATH`, fixing the "Could not start remex serve" error when Studio is opened from the Start Menu or taskbar.
+- **Embedding model warmup** — Studio pre-loads all embedding models used across collections in the background the moment the sidecar connects. First query after launch no longer waits for model initialisation. Returns HTTP 202 immediately; loading happens asynchronously.
+- **`OLLAMA_HOST` support** — Ollama provider now reads the standard `OLLAMA_HOST` environment variable for custom host/port, matching the Ollama ecosystem convention.
+
+### Changed
+- **Setup screen no longer shows install logs** during normal progress — logs are retained and shown only on the error screen to aid diagnosis. Reduces visual noise during a routine first-time install.
 
 ### Fixed
+- **Progress bar disappeared on first-time install** — `setSetupExtras` was called before `invoke("spawn_sidecar")`, causing the `useSidecar` effect to re-run and race `check_needs_setup` against the `setup://started` event. Fixed by moving the call after the invoke completes.
+- **Watch-folder auto-ingest did not remove deleted-file chunks** — a `POST /purge` call is now issued after each successful auto-ingest, keeping the collection in sync when files are deleted from a watched directory.
 - **`uv.exe` setup process spawns hidden** — the bundled installer runs with `CREATE_NO_WINDOW` on Windows so no terminal flashes during first-launch setup.
+
+### Security / Correctness
+- **Host injection prevented** — `spawn_sidecar` and `check_sidecar_health` now reject any host that is not a loopback address (`127.0.0.1`, `::1`, `localhost`).
+- **Extras injection prevented** — extras passed to `spawn_sidecar` are validated against an allowlist before being used as pip specifiers.
+- **`SpawningGuard` RAII struct** — `spawning` `AtomicBool` is now reset via a drop guard, guaranteeing cleanup even if `do_spawn` panics.
+- **Double-check locking race fixed** — `_get_client` in `pipeline.py` always acquires the lock before reading the cache, eliminating a data race under concurrent requests.
+- **SSE background task leak fixed** — `asyncio.create_task` for both the run and disconnect-monitor tasks is now created inside the `_stream()` generator, preventing leaked tasks when the ASGI layer raises before iteration begins.
+- **`row_template` length capped** — API schema now enforces a 4 096-character limit.
 
 ---
 
