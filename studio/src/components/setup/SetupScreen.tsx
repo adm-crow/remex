@@ -60,6 +60,8 @@ export function SetupScreen() {
   const setSetupExtras = useAppStore((s) => s.setSetupExtras);
   const setupLogLines = useAppStore((s) => s.setupLogLines);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
+  const clearSetupLog = useAppStore((s) => s.clearSetupLog);
+  const setSetupProgress = useAppStore((s) => s.setSetupProgress);
 
   const [selectedExtras, setSelectedExtras] = useState<string[]>(setupExtras);
   const [installing, setInstalling] = useState(false);
@@ -89,6 +91,8 @@ export function SetupScreen() {
   }
 
   async function handleInstall() {
+    clearSetupLog();
+    setSetupProgress("", 0);
     setInstalling(true);
     const { host, port } = parseUrl(apiUrl);
     try {

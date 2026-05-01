@@ -29,12 +29,10 @@ _MAX_EXTRACT_WORKERS = 4  # threads for parallel file extraction (I/O-bound)
 
 
 def _get_client(db_path: str) -> Any:
-    if db_path in _CLIENT_CACHE:
-        return _CLIENT_CACHE[db_path]
     with _CLIENT_LOCK:
         if db_path not in _CLIENT_CACHE:
             _CLIENT_CACHE[db_path] = chromadb.PersistentClient(path=db_path)
-    return _CLIENT_CACHE[db_path]
+        return _CLIENT_CACHE[db_path]
 
 
 class _RemexEmbeddingFunction(embedding_functions.SentenceTransformerEmbeddingFunction):

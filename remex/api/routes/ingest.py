@@ -120,10 +120,12 @@ async def ingest_files_stream(collection: str, req: IngestRequest, request: Requ
                 return
             await asyncio.sleep(0.1)
 
-    task    = asyncio.create_task(_run())
-    monitor = asyncio.create_task(_monitor_disconnect())
-
     async def _stream() -> AsyncIterator[str]:
+        # Create tasks inside the generator so they are only started when the
+        # response is actually consumed — prevents background task leaks if the
+        # ASGI layer raises before the first iteration.
+        task    = asyncio.create_task(_run())
+        monitor = asyncio.create_task(_monitor_disconnect())
         idle_ticks = 0
         try:
             while True:
@@ -270,10 +272,9 @@ async def ingest_sqlite_stream(
                 return
             await asyncio.sleep(0.1)
 
-    task    = asyncio.create_task(_run())
-    monitor = asyncio.create_task(_monitor_disconnect())
-
     async def _stream() -> AsyncIterator[str]:
+        task    = asyncio.create_task(_run())
+        monitor = asyncio.create_task(_monitor_disconnect())
         idle_ticks = 0
         try:
             while True:

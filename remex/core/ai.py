@@ -27,6 +27,14 @@ _ollama_cache: tuple[float, bool] | None = None
 _OLLAMA_CACHE_TTL = 30.0  # seconds
 
 
+def _ollama_base() -> str:
+    """Return the Ollama base URL, respecting OLLAMA_HOST if set."""
+    host = os.getenv("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    if not host.startswith(("http://", "https://")):
+        host = f"http://{host}"
+    return host
+
+
 def _ollama_available() -> bool:
     """Check whether Ollama is running locally, with a 30-second cache."""
     global _ollama_cache
@@ -34,7 +42,7 @@ def _ollama_available() -> bool:
     if _ollama_cache is not None and now - _ollama_cache[0] < _OLLAMA_CACHE_TTL:
         return _ollama_cache[1]
     try:
-        req = urllib.request.Request("http://localhost:11434/api/tags", method="GET")
+        req = urllib.request.Request(f"{_ollama_base()}/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=2):
             result = True
     except (urllib.error.URLError, OSError):
@@ -144,7 +152,7 @@ def _answer_ollama(question: str, system: str, model: str) -> str:
         }
     ).encode()
     req = urllib.request.Request(
-        "http://localhost:11434/api/generate",
+        f"{_ollama_base()}/api/generate",
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST",

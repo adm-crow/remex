@@ -17,13 +17,20 @@ export function WatchFoldersCard() {
     if (!isPro) return;
     const unsub = listen<{ folder: string; paths: string[] }>("watch:changed", async (evt) => {
       if (!currentDb || !currentCollection) return;
-      await fetch(`${apiUrl}/collections/${encodeURIComponent(currentCollection)}/ingest`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ db_path: currentDb, source_dir: evt.payload.folder, incremental: true }),
-      }).then((resp) => {
-        if (!resp.ok) console.error("[watch] auto-ingest failed: HTTP", resp.status);
-      }).catch((err) => console.error("[watch] auto-ingest failed:", err));
+      const ingestResp = await fetch(
+        `${apiUrl}/collections/${encodeURIComponent(currentCollection)}/ingest`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ db_path: currentDb, source_dir: evt.payload.folder, incremental: true }),
+        }
+      ).catch((err) => { console.error("[watch] auto-ingest failed:", err); return null; });
+      if (!ingestResp) return;
+      if (!ingestResp.ok) { console.error("[watch] auto-ingest failed: HTTP", ingestResp.status); return; }
+      await fetch(
+        `${apiUrl}/collections/${encodeURIComponent(currentCollection)}/purge?db_path=${encodeURIComponent(currentDb)}`,
+        { method: "POST" }
+      ).catch((err) => console.error("[watch] purge failed:", err));
     });
     return () => { void unsub.then((fn) => fn()); };
   }, [isPro, currentDb, currentCollection, apiUrl]);

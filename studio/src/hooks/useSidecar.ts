@@ -14,7 +14,7 @@ export function parseUrl(apiUrl: string): { host: string; port: number } {
     const hostname = u.hostname === "localhost" ? "127.0.0.1" : (u.hostname || "127.0.0.1");
     return {
       host: hostname,
-      port: u.port ? parseInt(u.port) : 8000,
+      port: u.port ? parseInt(u.port, 10) : 8000,
     };
   } catch {
     return { host: "127.0.0.1", port: 8000 };

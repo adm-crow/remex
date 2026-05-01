@@ -31,6 +31,18 @@ impl Default for SidecarState {
     fn default() -> Self { Self::new() }
 }
 
+/// RAII guard that resets the spawning flag when dropped.
+/// Ensures the flag is cleared even if do_spawn panics or returns early.
+struct SpawningGuard<'a>(&'a AtomicBool);
+impl Drop for SpawningGuard<'_> {
+    fn drop(&mut self) { self.0.store(false, Ordering::SeqCst); }
+}
+
+/// Return true only for loopback addresses we expect the sidecar to bind on.
+fn is_loopback(host: &str) -> bool {
+    matches!(host, "127.0.0.1" | "::1" | "localhost")
+}
+
 #[tauri::command]
 async fn check_needs_setup(app: AppHandle, extras: Vec<String>) -> bool {
     let Ok(data_dir) = app.path().app_data_dir() else { return true; };
@@ -45,6 +57,9 @@ async fn spawn_sidecar(
     port: u16,
     extras: Option<Vec<String>>,
 ) -> Result<(), String> {
+    if !is_loopback(&host) {
+        return Err("host must be a loopback address (127.0.0.1, ::1, or localhost)".into());
+    }
     // Reject if already running or another spawn is in progress (TOCTOU guard).
     {
         let guard = state.child.lock().map_err(|e| e.to_string())?;
@@ -55,10 +70,9 @@ async fn spawn_sidecar(
     if state.spawning.swap(true, Ordering::SeqCst) {
         return Ok(()); // concurrent spawn_sidecar call in progress
     }
-
-    let result = do_spawn(&app, &state, host, port, extras).await;
-    state.spawning.store(false, Ordering::SeqCst);
-    result
+    // Guard resets spawning to false on drop, even if do_spawn panics.
+    let _guard = SpawningGuard(&state.spawning);
+    do_spawn(&app, &state, host, port, extras).await
 }
 
 async fn do_spawn(
@@ -69,6 +83,12 @@ async fn do_spawn(
     extras: Option<Vec<String>>,
 ) -> Result<(), String> {
     let extras = extras.unwrap_or_default();
+    // Allowlist extras to prevent injection into the pip specifier string.
+    for extra in &extras {
+        if !matches!(extra.as_str(), "formats" | "ai" | "sentence") {
+            return Err(format!("Unknown extra: {extra}"));
+        }
+    }
     let remex_path = setup::ensure_ready(app, &extras).await?;
 
     // Redirect stderr to a log file so uvicorn output doesn't block on a
@@ -145,6 +165,9 @@ fn write_text_file(path: String, content: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn check_sidecar_health(host: String, port: u16) -> bool {
+    if !is_loopback(&host) {
+        return false;
+    }
     let url = format!("http://{}:{}/health", host, port);
     let Ok(client) = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(3))

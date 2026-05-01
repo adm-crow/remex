@@ -83,7 +83,7 @@ class IngestSQLiteRequest(BaseModel):
     db_path: str = "./remex_db"
     columns: Optional[list[str]] = None
     id_column: str = Field(default="id", max_length=256)
-    row_template: Optional[str] = None
+    row_template: Optional[str] = Field(default=None, max_length=4096)
     embedding_model: str = _EMBEDDING_MODEL_FIELD
     chunk_size: int = Field(default=1000, ge=1)
     overlap: int = Field(default=200, ge=0)
