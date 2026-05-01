@@ -64,11 +64,21 @@ describe("SetupScreen", () => {
     expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
   });
 
-  it("shows log lines when present during setup", () => {
+  it("does not show log lines during normal setup progress", () => {
     useAppStore.setState({ setupLogLines: ["Downloading remex-cli…", "Done."] } as any);
     renderWithProviders(<SetupScreen />);
+    expect(screen.queryByText("Downloading remex-cli…")).not.toBeInTheDocument();
+  });
+
+  it("shows log lines on error screen to help diagnose failures", () => {
+    useAppStore.setState({
+      sidecarStatus: "setup_error",
+      setupError: "Network error",
+      setupLogLines: ["Downloading remex-cli…", "Connection refused"],
+    } as any);
+    renderWithProviders(<SetupScreen />);
     expect(screen.getByText("Downloading remex-cli…")).toBeInTheDocument();
-    expect(screen.getByText("Done.")).toBeInTheDocument();
+    expect(screen.getByText("Connection refused")).toBeInTheDocument();
   });
 
   it("shows error message and retry button on setup_error", () => {

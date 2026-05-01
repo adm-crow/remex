@@ -65,7 +65,6 @@ export function SetupScreen() {
   const [installing, setInstalling] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const startTimeRef = useRef<number | null>(null);
-  const logEndRef = useRef<HTMLDivElement>(null);
 
   // Start elapsed timer when installation begins
   useEffect(() => {
@@ -82,11 +81,6 @@ export function SetupScreen() {
       setElapsed(0);
     }
   }, [sidecarStatus]);
-
-  // Auto-scroll log tail
-  useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [setupLogLines]);
 
   function toggleExtra(id: string) {
     setSelectedExtras((prev) =>
@@ -232,15 +226,6 @@ export function SetupScreen() {
           <span>Step {setupProgress} / {STEPS.length}</span>
           {elapsed > 0 && <span>Elapsed: {formatElapsed(elapsed)}</span>}
         </div>
-
-        {setupLogLines.length > 0 && (
-          <div className="w-full max-h-48 overflow-y-auto rounded-md bg-muted p-3 text-left font-mono text-xs text-muted-foreground space-y-0.5">
-            {setupLogLines.map((line, i) => (
-              <div key={i}>{line}</div>
-            ))}
-            <div ref={logEndRef} />
-          </div>
-        )}
 
         <p className="text-xs text-muted-foreground">
           This only runs once. Requires an internet connection.
