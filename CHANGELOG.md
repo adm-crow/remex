@@ -8,6 +8,14 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.4.1] — 2026-05-05
+
+### Fixed
+- **Setup re-ran on every launch** — `EXPECTED_VERSION` was still `1.3.0` after the v1.4.0 Python package bump, causing a full reinstall loop on each app start
+- **Installer now explicitly per-user** — NSIS `installMode` set to `currentUser`; installs to `%LOCALAPPDATA%`, no UAC prompt, uninstaller registered under `HKCU` — works on standard (non-admin) Windows accounts
+
+---
+
 ## [1.4.0] — 2026-05-01
 
 ### Added
