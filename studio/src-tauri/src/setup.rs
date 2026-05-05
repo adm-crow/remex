@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // Must match the remex-cli version published to PyPI.
-pub const EXPECTED_VERSION: &str = "1.3.0";
+pub const EXPECTED_VERSION: &str = "1.4.0";
 pub const PYTHON_VERSION: &str = "3.13";
 
 #[derive(Serialize, Deserialize)]
