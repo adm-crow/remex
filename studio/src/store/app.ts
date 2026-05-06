@@ -106,6 +106,7 @@ export interface AppState {
   setSetupProgress: (step: string, index: number) => void;
   setSetupError: (message: string) => void;
   setSetupExtras: (extras: string[]) => void;
+  completeSetup: (extras: string[]) => void;
   appendSetupLog: (line: string) => void;
   clearSetupLog: () => void;
   setDarkMode: (dark: boolean) => void;
@@ -251,6 +252,7 @@ export const useAppStore = create<AppState>()(
       setSetupProgress: (step, index) => set({ setupStep: step, setupProgress: index }),
       setSetupError:    (message)     => set({ setupError: message }),
       setSetupExtras:   (extras)      => set({ setupExtras: extras }),
+      completeSetup:    (extras)      => set((s) => ({ setupExtras: extras, sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
       appendSetupLog:   (line)        => set((s) => ({ setupLogLines: [...s.setupLogLines.slice(-99), line] })),
       clearSetupLog:    ()            => set({ setupLogLines: [] }),
       triggerSidecarReconnect: ()       => set((s) => ({ sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),

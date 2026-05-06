@@ -10,13 +10,15 @@ import { ProBadge } from "@/components/license/ProBadge";
 export function WatchFoldersCard() {
   const isPro = useIsPro();
   const { watchFolders, addWatchFolder, removeWatchFolder,
-          currentDb, currentCollection, apiUrl, openUpgradeModal } = useAppStore();
+          currentDb, currentCollection, apiUrl, openUpgradeModal,
+          setLastIngestResult, setIngestDoneUnread } = useAppStore();
   const [addError, setAddError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isPro) return;
     const unsub = listen<{ folder: string; paths: string[] }>("watch:changed", async (evt) => {
       if (!currentDb || !currentCollection) return;
+      const startedAt = new Date().toISOString();
       const ingestResp = await fetch(
         `${apiUrl}/collections/${encodeURIComponent(currentCollection)}/ingest`,
         {
@@ -27,13 +29,28 @@ export function WatchFoldersCard() {
       ).catch((err) => { console.error("[watch] auto-ingest failed:", err); return null; });
       if (!ingestResp) return;
       if (!ingestResp.ok) { console.error("[watch] auto-ingest failed: HTTP", ingestResp.status); return; }
+      const result = await ingestResp.json().catch(() => null);
+      if (result) {
+        setLastIngestResult({
+          collection: currentCollection,
+          sourcePath: evt.payload.folder,
+          startedAt,
+          completedAt: new Date().toISOString(),
+          sourcesFound: result.sources_found ?? 0,
+          sourcesIngested: result.sources_ingested ?? 0,
+          sourcesSkipped: result.sources_skipped ?? 0,
+          chunksStored: result.chunks_stored ?? 0,
+          skippedReasons: result.skipped_reasons ?? [],
+        });
+        setIngestDoneUnread(true);
+      }
       await fetch(
         `${apiUrl}/collections/${encodeURIComponent(currentCollection)}/purge?db_path=${encodeURIComponent(currentDb)}`,
         { method: "POST" }
       ).catch((err) => console.error("[watch] purge failed:", err));
     });
     return () => { void unsub.then((fn) => fn()); };
-  }, [isPro, currentDb, currentCollection, apiUrl]);
+  }, [isPro, currentDb, currentCollection, apiUrl, setLastIngestResult, setIngestDoneUnread]);
 
   async function handleAdd() {
     setAddError(null);

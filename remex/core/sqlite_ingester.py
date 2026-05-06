@@ -177,11 +177,21 @@ def ingest_sqlite(
                             _skip_reason = "hash_match"
                             result.sources_skipped += 1
                             continue
-                        # Hash changed — delete all old chunks
+                        # Hash changed — delete all old chunks.
+                        # Use n_chunks for the fast path; fall back to a metadata
+                        # query to catch any orphaned chunks from a partial ingest
+                        # where n_chunks was not written or is stale.
                         n_old = int(existing["metadatas"][0].get("n_chunks", 1))
-                        collection.delete(
-                            ids=[_make_sqlite_id(db_path, table, row_id, i) for i in range(n_old)]
+                        predicted_ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(n_old)]
+                        collection.delete(ids=predicted_ids)
+                        # Clean up any extras beyond n_chunks (partial-ingest orphans)
+                        orphan_check = collection.get(
+                            where={"$and": [{"source": source_str}, {"row_id": str(row_id)}]},
+                            include=[],
                         )
+                        extras = [id_ for id_ in orphan_check["ids"] if id_ not in set(predicted_ids)]
+                        if extras:
+                            collection.delete(ids=extras)
 
                 chunks = chunk_text(
                     text,

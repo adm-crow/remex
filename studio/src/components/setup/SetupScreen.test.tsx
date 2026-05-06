@@ -21,6 +21,9 @@ beforeEach(() => {
     sidecarReconnectSeq: 0,
     triggerSidecarReconnect: vi.fn(),
     setSetupExtras: vi.fn(),
+    completeSetup: vi.fn(),
+    clearSetupLog: vi.fn(),
+    setSetupProgress: vi.fn(),
   } as any);
 });
 
@@ -105,16 +108,16 @@ describe("SetupScreen", () => {
     expect(reconnect).toHaveBeenCalledOnce();
   });
 
-  it("calls invoke and triggerSidecarReconnect on install click", async () => {
+  it("calls invoke and completeSetup on install click", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
-    const reconnect = vi.fn();
+    const completeSetup = vi.fn();
     useAppStore.setState({
       sidecarStatus: "setup_config",
-      triggerSidecarReconnect: reconnect,
+      completeSetup,
     } as any);
     renderWithProviders(<SetupScreen />);
     fireEvent.click(screen.getByRole("button", { name: /install/i }));
-    await waitFor(() => expect(reconnect).toHaveBeenCalledOnce());
+    await waitFor(() => expect(completeSetup).toHaveBeenCalledOnce());
     expect(invoke).toHaveBeenCalledWith("spawn_sidecar", expect.objectContaining({ host: "127.0.0.1", port: 8000 }));
   });
 });

@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 // Must match the remex-cli version published to PyPI.
-pub const EXPECTED_VERSION: &str = "1.4.0";
+pub const EXPECTED_VERSION: &str = "1.4.1";
 pub const PYTHON_VERSION: &str = "3.13";
 
 #[derive(Serialize, Deserialize)]
@@ -91,7 +91,7 @@ fn classify_uv_error(stderr: &str) -> String {
     {
         "Setup requires an internet connection. Please connect and retry.".to_string()
     } else {
-        stderr.chars().take(240).collect()
+        stderr.chars().take(500).collect()
     }
 }
 
@@ -236,8 +236,6 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
     write_setup_json(&data_dir, extras).inspect_err(|e| {
         let _ = app.emit("setup://error", ErrorEvent { message: e.clone() });
     })?;
-
-    let _ = app.emit("setup://done", ());
 
     Ok(venv_remex_path(&data_dir))
 }

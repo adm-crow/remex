@@ -1,12 +1,23 @@
 use std::fs;
 use std::process::{Child, Command, Stdio};
-use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{Mutex, OnceLock, atomic::{AtomicBool, Ordering}};
 use std::time::Duration;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
-use tauri::{AppHandle, Manager, RunEvent, State};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
+
+static HEALTH_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+
+fn health_client() -> &'static reqwest::Client {
+    HEALTH_CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .timeout(Duration::from_secs(3))
+            .build()
+            .expect("failed to build health check client")
+    })
+}
 
 #[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
@@ -124,6 +135,9 @@ async fn do_spawn(
 
     let mut guard = state.child.lock().map_err(|e| e.to_string())?;
     *guard = Some(child);
+    // Signal install complete only after the process is confirmed alive so the
+    // frontend progress bar reaches 100% at the right moment.
+    let _ = app.emit("setup://done", ());
     Ok(())
 }
 
@@ -169,13 +183,7 @@ async fn check_sidecar_health(host: String, port: u16) -> bool {
         return false;
     }
     let url = format!("http://{}:{}/health", host, port);
-    let Ok(client) = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(3))
-        .build()
-    else {
-        return false;
-    };
-    client.get(&url).send().await.map(|r| r.status().is_success()).unwrap_or(false)
+    health_client().get(&url).send().await.map(|r| r.status().is_success()).unwrap_or(false)
 }
 
 #[tauri::command]

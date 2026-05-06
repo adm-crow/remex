@@ -213,12 +213,12 @@ def rename_collection(
             pass
 
     original_count = old_col.count()
-    if original_count > 100_000:
+    if original_count > 10_000:
         raise HTTPException(
             status_code=413,
             detail=(
                 f"Collection has {original_count:,} chunks — too large to rename in-memory "
-                "(limit: 100,000). Use the CLI to reset and re-ingest under the new name."
+                "(limit: 10,000). Use the CLI to reset and re-ingest under the new name."
             ),
         )
 

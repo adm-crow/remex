@@ -60,6 +60,7 @@ export function SetupScreen() {
   const setSetupExtras = useAppStore((s) => s.setSetupExtras);
   const setupLogLines = useAppStore((s) => s.setupLogLines);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
+  const completeSetup = useAppStore((s) => s.completeSetup);
   const clearSetupLog = useAppStore((s) => s.clearSetupLog);
   const setSetupProgress = useAppStore((s) => s.setSetupProgress);
 
@@ -102,8 +103,7 @@ export function SetupScreen() {
       // server is healthy. Calling setSetupExtras before the invoke would cause
       // an early effect re-run that races check_needs_setup against setup://started
       // and can wipe the progress bar.
-      setSetupExtras(selectedExtras);
-      triggerSidecarReconnect();
+      completeSetup(selectedExtras);
     } catch {
       // setup://error event handles the error UI; just re-enable the button.
       setInstalling(false);
