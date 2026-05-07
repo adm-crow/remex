@@ -165,6 +165,12 @@ def ingest_sqlite(
                     for k in selected
                     if k in row_dict and (row_template or k != id_column)
                 }
+                if not text_dict and not row_template:
+                    _skip_reason = "empty_text"
+                    result.sources_skipped += 1
+                    if verbose:
+                        logger.debug("[skip] %s[%s]: no content columns populated", table, row_id)
+                    continue
                 text = _row_to_text(text_dict, row_template)
                 source_str = f"{Path(db_path).resolve()}::{table}"
                 row_hash = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:16]
@@ -233,12 +239,12 @@ def ingest_sqlite(
                 if verbose:
                     logger.warning("[skip] %s[%s]: %s", table, row_id, e)
                 result.sources_skipped += 1
-                result.skipped_reasons.append(f"{table}[{row_id}]: extract_error: {e}")
+                result.add_skip_reason(f"{table}[{row_id}]: extract_error: {e}")
                 _status = "error"
 
             finally:
                 if _skip_reason:
-                    result.skipped_reasons.append(f"{table}[{row_id}]: {_skip_reason}")
+                    result.add_skip_reason(f"{table}[{row_id}]: {_skip_reason}")
                 if on_progress:
                     on_progress(IngestProgress(
                         filename=f"{table}[{row_id}]",

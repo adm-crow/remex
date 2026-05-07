@@ -22,7 +22,7 @@ router = APIRouter(prefix="/collections", tags=["collections"])
 
 def _require_absolute_db_path(db_path: str) -> str:
     """Reject relative paths to prevent directory-traversal into unintended locations."""
-    if db_path != "./remex_db" and not os.path.isabs(db_path):
+    if not os.path.isabs(db_path):
         raise HTTPException(status_code=400, detail="db_path must be an absolute path")
     return db_path
 

@@ -58,7 +58,15 @@ class IngestResult:
     skipped_reasons: list[str] = field(default_factory=list)
     """Human-readable reason for each skipped source, e.g. ``"doc.txt: empty"``
     or ``"report.pdf: extract_error: …"``. One entry per skipped file, in
-    the order they were encountered."""
+    the order they were encountered. Capped at 500 entries."""
+
+    _SKIP_REASON_LIMIT: int = field(default=500, init=False, repr=False, compare=False)
+
+    def add_skip_reason(self, reason: str) -> None:
+        if len(self.skipped_reasons) < self._SKIP_REASON_LIMIT:
+            self.skipped_reasons.append(reason)
+        elif len(self.skipped_reasons) == self._SKIP_REASON_LIMIT:
+            self.skipped_reasons.append(f"(truncated — more than {self._SKIP_REASON_LIMIT} skipped entries)")
 
 
 @dataclass

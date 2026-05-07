@@ -419,7 +419,7 @@ def _process_file_list(
                 logger.exception("[skip] %s: unexpected error", file_path.name)
         finally:
             if _skip_reason:
-                result.skipped_reasons.append(f"{file_path.name}: {_skip_reason}")
+                result.add_skip_reason(f"{file_path.name}: {_skip_reason}")
             if on_progress:
                 on_progress(IngestProgress(
                     filename=file_path.name,

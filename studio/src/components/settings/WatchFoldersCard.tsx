@@ -17,14 +17,19 @@ export function WatchFoldersCard() {
   useEffect(() => {
     if (!isPro) return;
     const unsub = listen<{ folder: string; paths: string[] }>("watch:changed", async (evt) => {
-      if (!currentDb || !currentCollection) return;
+      // Capture project state at event time — these can change while the async
+      // ingest is in-flight and using the closure values would attribute results
+      // to the wrong collection.
+      const db = currentDb;
+      const col = currentCollection;
+      if (!db || !col) return;
       const startedAt = new Date().toISOString();
       const ingestResp = await fetch(
-        `${apiUrl}/collections/${encodeURIComponent(currentCollection)}/ingest`,
+        `${apiUrl}/collections/${encodeURIComponent(col)}/ingest`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ db_path: currentDb, source_dir: evt.payload.folder, incremental: true }),
+          body: JSON.stringify({ db_path: db, source_dir: evt.payload.folder, incremental: true }),
         }
       ).catch((err) => { console.error("[watch] auto-ingest failed:", err); return null; });
       if (!ingestResp) return;
@@ -32,7 +37,7 @@ export function WatchFoldersCard() {
       const result = await ingestResp.json().catch(() => null);
       if (result) {
         setLastIngestResult({
-          collection: currentCollection,
+          collection: col,
           sourcePath: evt.payload.folder,
           startedAt,
           completedAt: new Date().toISOString(),
@@ -45,7 +50,7 @@ export function WatchFoldersCard() {
         setIngestDoneUnread(true);
       }
       await fetch(
-        `${apiUrl}/collections/${encodeURIComponent(currentCollection)}/purge?db_path=${encodeURIComponent(currentDb)}`,
+        `${apiUrl}/collections/${encodeURIComponent(col)}/purge?db_path=${encodeURIComponent(db)}`,
         { method: "POST" }
       ).catch((err) => console.error("[watch] purge failed:", err));
     });

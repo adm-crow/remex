@@ -90,8 +90,12 @@ fn classify_uv_error(stderr: &str) -> String {
         || lower.contains("dns")
     {
         "Setup requires an internet connection. Please connect and retry.".to_string()
+    } else if lower.contains("permission") || lower.contains("access is denied") {
+        "Installation failed: permission denied. Try running as the current user or check antivirus settings.".to_string()
+    } else if lower.contains("no space") || lower.contains("disk full") {
+        "Installation failed: not enough disk space.".to_string()
     } else {
-        stderr.chars().take(500).collect()
+        "Installation failed. Please reinstall Remex Studio or check your internet connection.".to_string()
     }
 }
 

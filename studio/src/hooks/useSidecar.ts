@@ -89,22 +89,29 @@ export function useSidecar() {
       setSidecarStatus("starting");
 
       const deadline = Date.now() + TIMEOUT_MS;
+      let pollInFlight = false;
       const timerId = setInterval(async () => {
         if (cancelled) { clearInterval(timerId); return; }
+        if (pollInFlight) return;
         if (Date.now() > deadline) {
           clearInterval(timerId);
-          if (!cancelled) setSidecarStatus("error");
+          setSidecarStatus("error");
           return;
         }
-        const alive = await invoke<boolean>("is_sidecar_alive").catch(() => false);
-        if (!alive) {
-          clearInterval(timerId);
-          if (!cancelled) setSidecarStatus("error");
-          return;
-        }
-        if (await checkHealth()) {
-          clearInterval(timerId);
-          if (!cancelled) setSidecarStatus("connected");
+        pollInFlight = true;
+        try {
+          const alive = await invoke<boolean>("is_sidecar_alive").catch(() => false);
+          if (!alive) {
+            clearInterval(timerId);
+            if (!cancelled) setSidecarStatus("error");
+            return;
+          }
+          if (await checkHealth()) {
+            clearInterval(timerId);
+            if (!cancelled) setSidecarStatus("connected");
+          }
+        } finally {
+          pollInFlight = false;
         }
       }, POLL_INTERVAL_MS);
       intervalRef.current = timerId;
