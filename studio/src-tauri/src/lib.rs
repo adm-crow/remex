@@ -112,6 +112,9 @@ async fn do_spawn(
 
     let mut cmd = Command::new(&remex_path);
     cmd.args(["serve", "--host", &host, "--port", &port.to_string()]);
+    // Suppress the HuggingFace Hub symlink warning that appears on Windows when
+    // Developer Mode is off. The degraded cache mode still works correctly.
+    cmd.env("HF_HUB_DISABLE_SYMLINKS_WARNING", "1");
     match log_file {
         Some(f) => { cmd.stderr(f); }
         None    => { cmd.stderr(Stdio::null()); }

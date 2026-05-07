@@ -30,6 +30,8 @@ export function AppShell() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const sidecarError = useAppStore((s) => s.sidecarError);
+  const currentDb = useAppStore((s) => s.currentDb);
+  const apiUrl = useAppStore((s) => s.apiUrl);
   const shortcutsOpen = useAppStore((s) => s.shortcutsOpen);
   const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
@@ -40,6 +42,16 @@ export function AppShell() {
   const requestedView = useAppStore((s) => s.requestedView);
   const setRequestedView = useAppStore((s) => s.setRequestedView);
   const isDragging = useRef(false);
+
+  // Pre-warm the embedding model as soon as the sidecar is healthy and a
+  // project is selected. The warmup endpoint returns 202 immediately and
+  // loads the model in the background, so the first ingest doesn't block
+  // on a cold model download.
+  useEffect(() => {
+    if (sidecarStatus !== "connected" || !currentDb) return;
+    fetch(`${apiUrl}/collections/warmup?db_path=${encodeURIComponent(currentDb)}`, { method: "POST" })
+      .catch(() => {}); // non-critical — ingest works even without warmup
+  }, [sidecarStatus, currentDb, apiUrl]);
 
   useEffect(() => {
     if (licensePromptSeq === 0) return;

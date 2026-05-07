@@ -60,6 +60,7 @@ export function FilesTab() {
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
   const [wasCancelled,   setWasCancelled]   = useState(false);
   const [eta,            setEta]            = useState<string | null>(null);
+  const [showModelHint,  setShowModelHint]  = useState(false);
   const abortRef    = useRef<AbortController | null>(null);
   const abortedRef  = useRef(false);
   const startTimeRef = useRef<number | null>(null);
@@ -94,6 +95,17 @@ export function FilesTab() {
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
   }, [ingestRunning, ingestFilesDone, ingestFilesTotal]);
+
+  // After 5 s with no file-count progress, show a hint that the embedding
+  // model is being downloaded (only happens on first use per model).
+  useEffect(() => {
+    if (!ingestRunning || ingestFilesTotal > 0) {
+      setShowModelHint(false);
+      return;
+    }
+    const id = setTimeout(() => setShowModelHint(true), 5000);
+    return () => clearTimeout(id);
+  }, [ingestRunning, ingestFilesTotal]);
 
   const effectiveCollection = appendModel
     ? `${collectionName}-${embeddingModel}`.replace(/[^a-zA-Z0-9_-]/g, "-")
@@ -421,7 +433,9 @@ export function FilesTab() {
               <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-primary" />
               <span className="truncate flex-1">
                 {ingestFilesTotal === 0
-                  ? "Starting ingestion…"
+                  ? showModelHint
+                    ? "Downloading embedding model… (first use only)"
+                    : "Starting ingestion…"
                   : ingestFilesDone >= ingestFilesTotal
                     ? "Storing embeddings…"
                     : `Processing file ${ingestFilesDone} of ${ingestFilesTotal}…`}
