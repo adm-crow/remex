@@ -171,16 +171,15 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
     let uv_bin = "uv.exe";
     #[cfg(not(target_os = "windows"))]
     let uv_bin = "uv";
-    let uv_src = resource_dir.join("resources").join(uv_bin);
-    if !uv_src.exists() {
+    // Run uv directly from the resource bundle — the file is already inside the
+    // app's install directory and trusted by Windows Defender. Copying it to
+    // %APPDATA% triggered a multi-minute AV scan on first run, blocking progress.
+    let uv_path = resource_dir.join("resources").join(uv_bin);
+    if !uv_path.exists() {
         let msg = "Installation tool not found. Please reinstall Remex Studio.".to_string();
         let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
         return Err(msg);
     }
-    // Copy uv into the app data directory (not %TEMP%) so the path is
-    // app-owned and not subject to AV quarantine of world-writable temp dirs.
-    let uv_path = data_dir.join(uv_bin);
-    fs::copy(&uv_src, &uv_path).map_err(|e| format!("Failed to copy uv: {e}"))?;
 
     // Step 1: create venv with Python 3.13
     emit_progress(app, "Installing Python 3.13…", 1);
