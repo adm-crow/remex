@@ -57,7 +57,6 @@ export function SetupScreen() {
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const setupError = useAppStore((s) => s.setupError);
   const setupExtras = useAppStore((s) => s.setupExtras);
-  const setSetupExtras = useAppStore((s) => s.setSetupExtras);
   const setupLogLines = useAppStore((s) => s.setupLogLines);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
   const completeSetup = useAppStore((s) => s.completeSetup);
