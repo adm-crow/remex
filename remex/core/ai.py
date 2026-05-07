@@ -2,6 +2,7 @@
 
 import json
 import os
+import threading
 import time as _time
 import urllib.error
 import urllib.request
@@ -24,6 +25,7 @@ _SYSTEM_PROMPT = (
 )
 
 _ollama_cache: tuple[float, bool] | None = None
+_ollama_cache_lock = threading.Lock()
 _OLLAMA_CACHE_TTL = 30.0  # seconds
 
 
@@ -39,15 +41,17 @@ def _ollama_available() -> bool:
     """Check whether Ollama is running locally, with a 30-second cache."""
     global _ollama_cache
     now = _time.monotonic()
-    if _ollama_cache is not None and now - _ollama_cache[0] < _OLLAMA_CACHE_TTL:
-        return _ollama_cache[1]
+    with _ollama_cache_lock:
+        if _ollama_cache is not None and now - _ollama_cache[0] < _OLLAMA_CACHE_TTL:
+            return _ollama_cache[1]
     try:
         req = urllib.request.Request(f"{_ollama_base()}/api/tags", method="GET")
         with urllib.request.urlopen(req, timeout=2):
             result = True
     except (urllib.error.URLError, OSError):
         result = False
-    _ollama_cache = (now, result)
+    with _ollama_cache_lock:
+        _ollama_cache = (now, result)
     return result
 
 
