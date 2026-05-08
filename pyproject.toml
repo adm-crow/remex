@@ -1,6 +1,6 @@
 [project]
 name = "remex-cli"
-version = "1.4.1"
+version = "1.5.0"
 description = "Local-first RAG library — ingest files and SQLite, query semantically, pipe results into any AI agent"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,7 @@ classifiers = [
 ]
 dependencies = [
     "chromadb",
-    "sentence-transformers",
+    "fastembed",
     "pypdf",
     "python-docx",
     "click",
