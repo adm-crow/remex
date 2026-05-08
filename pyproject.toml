@@ -19,7 +19,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "chromadb",
+    "chromadb>=1.5,<2",
     "fastembed",
     "pypdf",
     "python-docx",

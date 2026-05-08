@@ -69,7 +69,7 @@ jobs:
           $url = "https://chroma-onnx-models.s3.amazonaws.com/all-MiniLM-L6-v2/onnx.tar.gz"
           Invoke-WebRequest -Uri $url -OutFile "onnx.tar.gz" -UseBasicParsing
           New-Item -ItemType Directory -Force -Path "studio/src-tauri/resources/onnx/all-MiniLM-L6-v2" | Out-Null
-          tar -xzf onnx.tar.gz -C studio/src-tauri/resources/onnx/all-MiniLM-L6-v2
+          tar -xzf onnx.tar.gz --strip-components=1 -C studio/src-tauri/resources/onnx/all-MiniLM-L6-v2
           Remove-Item "onnx.tar.gz" -Force
           $files = Get-ChildItem "studio/src-tauri/resources/onnx/all-MiniLM-L6-v2" -File
           Write-Host "ONNX model files: $($files.Count) files"

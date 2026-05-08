@@ -595,15 +595,19 @@ def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> 
 
 
 def _seed_bundled_model() -> None:
-    bundled = os.environ.get("REMEX_BUNDLED_ONNX_PATH")
-    if not bundled:
-        return
-    dest = Path.home() / ".cache" / "chroma" / "onnx_models" / "all-MiniLM-L6-v2" / "onnx"
-    if dest.exists():
-        return
-    dest.mkdir(parents=True, exist_ok=True)
-    for f in Path(bundled).iterdir():
-        shutil.copy2(f, dest / f.name)
+    try:
+        bundled = os.environ.get("REMEX_BUNDLED_ONNX_PATH")
+        if not bundled:
+            return
+        dest = Path.home() / ".cache" / "chroma" / "onnx_models" / "all-MiniLM-L6-v2" / "onnx"
+        if dest.exists():
+            return
+        dest.mkdir(parents=True, exist_ok=True)
+        for f in Path(bundled).iterdir():
+            if f.is_file():
+                shutil.copy2(f, dest / f.name)
+    except Exception:
+        pass  # non-critical — model will be downloaded from Chroma S3 as fallback
 
 
 @cli.command(name="serve")
