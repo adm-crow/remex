@@ -418,7 +418,7 @@ def ingest(
         chunk_size:           Target character count per chunk.
         overlap:              Character overlap between consecutive chunks.
         min_chunk_size:       Discard chunks shorter than this (chars).
-        embedding_model:      SentenceTransformer model name.
+        embedding_model:      Embedding model name.
         incremental:          Skip files whose content hash hasn't changed since
                               the last ingest. Changed files are re-ingested.
         chunking:             "word" (default) or "sentence" (requires nltk).
@@ -486,7 +486,7 @@ def query(
         db_path:           Path to the ChromaDB directory.
         collection_name:   Name of the ChromaDB collection (single-collection mode).
         n_results:         Maximum number of results to return.
-        embedding_model:   SentenceTransformer model name (must match ingest).
+        embedding_model:   Embedding model name (must match ingest).
         where:             Optional ChromaDB metadata filter dict.
                            Example: ``{"source_type": {"$eq": "file"}}``
                            See the ChromaDB docs for the full filter syntax.
@@ -897,7 +897,7 @@ def ingest_many(
         chunk_size:          Target character count per chunk.
         overlap:             Character overlap between consecutive chunks.
         min_chunk_size:      Discard chunks shorter than this (chars).
-        embedding_model:     SentenceTransformer model name.
+        embedding_model:     Embedding model name.
         chunking:            ``"word"`` (default) or ``"sentence"`` (requires nltk).
         verbose:             Emit progress via the remex.core logger.
         incremental:         Skip files whose content hash hasn't changed since the

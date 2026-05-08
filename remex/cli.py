@@ -99,7 +99,7 @@ def cli() -> None:
     "--embedding-model",
     default="all-MiniLM-L6-v2",
     show_default=True,
-    help="SentenceTransformer model name for embeddings.",
+    help="Embedding model name (default: all-MiniLM-L6-v2 via ONNX).",
 )
 def ingest_cmd(
     source_dir: str,
@@ -191,7 +191,7 @@ def ingest_cmd(
     "--embedding-model",
     default="all-MiniLM-L6-v2",
     show_default=True,
-    help="SentenceTransformer model name for embeddings.",
+    help="Embedding model name (default: all-MiniLM-L6-v2 via ONNX).",
 )
 def ingest_sqlite_cmd(
     db_path: str,
@@ -288,7 +288,7 @@ def ingest_sqlite_cmd(
     "--embedding-model",
     default="all-MiniLM-L6-v2",
     show_default=True,
-    help="SentenceTransformer model name (must match the model used at ingest).",
+    help="Embedding model name (must match the model used at ingest).",
 )
 @click.option(
     "--min-score",

@@ -67,7 +67,7 @@ def ingest_sqlite(
         chunk_size:       Target characters per chunk.
         overlap:          Character overlap between consecutive chunks.
         min_chunk_size:   Discard chunks shorter than this.
-        embedding_model:  SentenceTransformer model name.
+        embedding_model:  Embedding model name.
         chunking:         "word" (default) or "sentence" (requires nltk).
         verbose:          Emit progress via the remex.core logger.
         on_progress:      Optional callback invoked after each row is processed.
