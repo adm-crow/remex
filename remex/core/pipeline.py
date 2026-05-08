@@ -176,8 +176,6 @@ def _ingest_file_streaming(
 
 
 _BATCH_LIMIT = 2048  # max chunks per ChromaDB upsert call (cross-file batching)
-# Larger batches let sentence_transformers sort sequences by length before encoding,
-# which reduces wasted padding tokens — ~10-20% fewer FLOPs for variable-length text.
 
 
 def _parallel_extract(

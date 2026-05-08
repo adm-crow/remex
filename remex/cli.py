@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 
 from remex.core import __version__
+from remex.core.logger import logger
 from remex.core.ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
 from remex.core.config import load_config
 from remex.core.exceptions import RemexError
@@ -606,8 +607,8 @@ def _seed_bundled_model() -> None:
         for f in Path(bundled).iterdir():
             if f.is_file():
                 shutil.copy2(f, dest / f.name)
-    except Exception:
-        pass  # non-critical — model will be downloaded from Chroma S3 as fallback
+    except Exception as exc:
+        logger.debug("Bundled ONNX seed skipped: %s", exc)
 
 
 @cli.command(name="serve")

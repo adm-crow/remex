@@ -95,6 +95,7 @@ async fn do_spawn(
 ) -> Result<(), String> {
     let extras = extras.unwrap_or_default();
     // Allowlist extras to prevent injection into the pip specifier string.
+    // "sentence" installs nltk for sentence-boundary chunking (not sentence-transformers).
     for extra in &extras {
         if !matches!(extra.as_str(), "formats" | "ai" | "sentence") {
             return Err(format!("Unknown extra: {extra}"));
