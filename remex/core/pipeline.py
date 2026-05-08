@@ -702,10 +702,10 @@ def source_chunk_counts(
 
 
 def warmup_collections(db_path: str = "./remex_db") -> list[str]:
-    """Pre-load SentenceTransformer models for all collections into the EF cache.
+    """Pre-load embedding models for all collections into the embedding cache.
 
     Called at Studio startup so the first query isn't blocked waiting for model
-    load. Already-cached models are skipped instantly via the _EF_CACHE fast path.
+    load. Already-loaded models are returned from the embedding module's cache.
     Returns the sorted list of unique model names found. Errors are swallowed —
     warmup is best-effort and must never crash the server.
     """
