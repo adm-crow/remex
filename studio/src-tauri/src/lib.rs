@@ -115,6 +115,28 @@ async fn do_spawn(
     // Suppress the HuggingFace Hub symlink warning that appears on Windows when
     // Developer Mode is off. The degraded cache mode still works correctly.
     cmd.env("HF_HUB_DISABLE_SYMLINKS_WARNING", "1");
+
+    // Forward proxy env vars so the sidecar can reach the internet through
+    // corporate proxies. requests/httpx/huggingface_hub all read these automatically.
+    for var in &[
+        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+        "http_proxy", "https_proxy", "no_proxy",
+    ] {
+        if let Ok(val) = std::env::var(var) {
+            cmd.env(var, val);
+        }
+    }
+
+    // If the bundled ONNX model was included in the installer, point the sidecar
+    // to it so _seed_bundled_model() can copy it to the ChromaDB cache without
+    // a network call.
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let bundled_onnx = resource_dir.join("onnx").join("all-MiniLM-L6-v2");
+        if bundled_onnx.exists() {
+            cmd.env("REMEX_BUNDLED_ONNX_PATH", &bundled_onnx);
+        }
+    }
+
     match log_file {
         Some(f) => { cmd.stderr(f); }
         None    => { cmd.stderr(Stdio::null()); }
