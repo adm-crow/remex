@@ -27,7 +27,7 @@ def mock_chroma():
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         yield collection
 
 
@@ -336,7 +336,7 @@ def test_ingest_sqlite_incremental_skips_unchanged_row(tmp_path):
     }
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         result = ingest_sqlite(
             db_path=db, table="articles",
             chroma_path=str(tmp_path / "db"), verbose=False,
@@ -369,7 +369,7 @@ def test_ingest_sqlite_incremental_reingest_changed_row(tmp_path):
     }
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         result = ingest_sqlite(
             db_path=db, table="articles",
             chroma_path=str(tmp_path / "db"), verbose=False,
@@ -396,7 +396,7 @@ def test_ingest_sqlite_incremental_new_row_always_ingested(tmp_path):
     collection.get.return_value = {"ids": [], "metadatas": []}
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         result = ingest_sqlite(
             db_path=db, table="articles",
             chroma_path=str(tmp_path / "db"), verbose=False,

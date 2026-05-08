@@ -7,19 +7,14 @@ from typing import Any, Callable, cast
 
 import chromadb
 from chromadb.errors import NotFoundError as ChromaNotFoundError
-from chromadb.utils import embedding_functions
 
 from .chunker import chunk_text
+from .embedding import get_embedding_function
 from .exceptions import CollectionNotFoundError, SourceNotFoundError
 from .extractors import extract, extract_metadata, extract_streaming, is_supported, supports_streaming
 from .logger import logger
 from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, QueryResult
 
-
-# Cache SentenceTransformerEmbeddingFunction instances by model name so the
-# model is loaded from disk only once per process, not on every ingest() call.
-_EF_CACHE: dict[str, Any] = {}
-_EF_LOCK = threading.Lock()  # guards concurrent first-load across asyncio.to_thread workers
 
 # ChromaDB PersistentClient is reused per db_path to avoid re-opening the SQLite WAL on every call.
 _CLIENT_CACHE: dict[str, Any] = {}
@@ -33,40 +28,6 @@ def _get_client(db_path: str) -> Any:
         if db_path not in _CLIENT_CACHE:
             _CLIENT_CACHE[db_path] = chromadb.PersistentClient(path=db_path)
         return _CLIENT_CACHE[db_path]
-
-
-class _RemexEmbeddingFunction(embedding_functions.SentenceTransformerEmbeddingFunction):
-    """Subclass that overrides __call__ to use batch_size=128.
-
-    ChromaDB's built-in SentenceTransformerEmbeddingFunction hard-codes
-    batch_size=32.  Encoding in larger batches lets sentence_transformers sort
-    sequences by length to minimise padding waste — ~15% fewer FLOPs for
-    variable-length text on CPU, more on GPU.
-    """
-
-    def __call__(self, input: list[str]) -> list[Any]:  # type: ignore[override]
-        import numpy as np
-
-        # _model and normalize_embeddings are private attrs set by the parent __init__.
-        embeddings = self._model.encode(
-            list(input),
-            batch_size=128,
-            convert_to_numpy=True,
-            normalize_embeddings=self.normalize_embeddings,
-            show_progress_bar=False,
-        )
-        return [np.array(e, dtype=np.float32) for e in embeddings]
-
-
-def _get_ef(model_name: str) -> Any:
-    # Fast path — no lock needed once cached.
-    if model_name in _EF_CACHE:
-        return _EF_CACHE[model_name]
-    with _EF_LOCK:
-        # Re-check inside the lock to prevent duplicate loads from concurrent threads.
-        if model_name not in _EF_CACHE:
-            _EF_CACHE[model_name] = _RemexEmbeddingFunction(model_name)
-    return _EF_CACHE[model_name]
 
 
 def _extract_file_safe(file_path: Path) -> tuple[str | None, Exception | None]:
@@ -103,7 +64,7 @@ def _get_source_chunks(collection: Any, source_str: str) -> dict[str, Any]:
 def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True) -> Any:
     """Get or create a ChromaDB collection with the given embedding model."""
     client = _get_client(db_path)
-    ef = _get_ef(embedding_model)
+    ef = get_embedding_function(embedding_model)
     if create:
         collection = client.get_or_create_collection(
             name=collection_name,
@@ -135,7 +96,7 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
     ) or embedding_model
     return client.get_collection(  # type: ignore[return-value]
         name=collection_name,
-        embedding_function=_get_ef(stored_model),  # type: ignore[arg-type]
+        embedding_function=get_embedding_function(stored_model),  # type: ignore[arg-type]
     )
 
 
@@ -761,7 +722,7 @@ def warmup_collections(db_path: str = "./remex_db") -> list[str]:
             model = meta.get("embedding_model", "")
             if model and model not in seen:
                 seen.add(model)
-                _get_ef(model)
+                get_embedding_function(model)
         except Exception:
             pass
 

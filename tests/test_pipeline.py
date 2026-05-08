@@ -40,7 +40,7 @@ def mock_chroma():
     client.get_collection.return_value = collection  # used by query()
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         yield collection
 
 
@@ -350,7 +350,7 @@ def test_query_raises_if_collection_not_found(tmp_path):
     client.get_collection.side_effect = ValueError("Collection not found")
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         with pytest.raises(CollectionNotFoundError):
             query(text="test", db_path=str(tmp_path / "db"))
 
@@ -361,7 +361,7 @@ def test_query_raises_collection_not_found_on_chroma_not_found_error(tmp_path):
     client.get_collection.side_effect = ChromaNotFoundError("Collection nonexistent does not exist")
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         with pytest.raises(CollectionNotFoundError):
             query(text="test", db_path=str(tmp_path / "db"))
 
@@ -385,7 +385,7 @@ def test_incremental_skips_unchanged_file(tmp_path):
     client.get_or_create_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     collection.upsert.assert_not_called()
@@ -406,7 +406,7 @@ def test_incremental_reingests_changed_file(tmp_path):
     client.get_or_create_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     collection.delete.assert_called_once_with(ids=["old_id0"])
@@ -423,7 +423,7 @@ def test_incremental_ingests_new_file(tmp_path):
     client.get_or_create_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     collection.delete.assert_not_called()
@@ -440,7 +440,7 @@ def test_incremental_stores_hash_in_metadata(tmp_path):
     client.get_or_create_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     metadatas = collection.upsert.call_args.kwargs["metadatas"]
@@ -485,7 +485,7 @@ def test_query_clamps_n_results_to_collection_size(tmp_path):
     client.get_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         results = query(text="test", db_path=str(tmp_path / "db"), n_results=10)
 
     called_n = collection.query.call_args.kwargs["n_results"]
@@ -511,7 +511,7 @@ def test_query_returns_empty_on_empty_collection(tmp_path):
     client.get_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         results = query(text="test", db_path=str(tmp_path / "db"))
 
     collection.query.assert_not_called()
@@ -574,7 +574,7 @@ def test_ingest_skipped_reasons_hash_match(tmp_path):
     client.get_or_create_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"):
+         patch("remex.core.pipeline.get_embedding_function"):
         result = ingest(source_dir=docs, db_path=str(tmp_path / "db"), incremental=True, verbose=False)
 
     assert len(result.skipped_reasons) == 1
@@ -704,7 +704,7 @@ def test_get_collection_warns_on_model_mismatch(tmp_path):
     client.get_or_create_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
+         patch("remex.core.pipeline.get_embedding_function"), \
          patch.object(pipeline_logger, "warning") as mock_warn:
         _get_collection(str(tmp_path / "db"), "remex", "all-MiniLM-L6-v2")
 
@@ -722,7 +722,7 @@ def test_get_collection_no_warn_on_model_match(tmp_path):
     client.get_or_create_collection.return_value = collection
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
-         patch("remex.core.pipeline.embedding_functions.SentenceTransformerEmbeddingFunction"), \
+         patch("remex.core.pipeline.get_embedding_function"), \
          patch.object(pipeline_logger, "warning") as mock_warn:
         _get_collection(str(tmp_path / "db"), "remex", "all-MiniLM-L6-v2")
 
@@ -1187,7 +1187,7 @@ def test_warmup_collections_loads_unique_models(tmp_path):
     mock_client.list_collections.return_value = [col_a, col_b, col_c]
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=mock_client), \
-         patch("remex.core.pipeline._get_ef") as mock_get_ef:
+         patch("remex.core.pipeline.get_embedding_function") as mock_get_ef:
         result = warmup_collections(str(tmp_path))
 
     assert result == ["all-MiniLM-L6-v2", "all-mpnet-base-v2"]
@@ -1210,7 +1210,7 @@ def test_warmup_collections_skips_collections_without_model(tmp_path):
     mock_client.list_collections.return_value = [col_no_model, col_with_model]
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=mock_client), \
-         patch("remex.core.pipeline._get_ef") as mock_get_ef:
+         patch("remex.core.pipeline.get_embedding_function") as mock_get_ef:
         result = warmup_collections(str(tmp_path))
 
     assert result == ["all-MiniLM-L6-v2"]
