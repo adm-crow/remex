@@ -34,14 +34,16 @@ def extract_csv(path: Path) -> str:
         return "\n".join(", ".join(row) for row in reader)
 
 
-def _flatten_json(obj) -> str:
+def _flatten_json(obj, _depth: int = 0) -> str:
     """Recursively extract all string values from a parsed JSON object."""
+    if _depth > 64:
+        return ""
     if isinstance(obj, str):
         return obj
     if isinstance(obj, dict):
-        return " ".join(_flatten_json(v) for v in obj.values() if v is not None)
+        return " ".join(_flatten_json(v, _depth + 1) for v in obj.values() if v is not None)
     if isinstance(obj, list):
-        return " ".join(_flatten_json(item) for item in obj)
+        return " ".join(_flatten_json(item, _depth + 1) for item in obj)
     return str(obj) if obj is not None else ""
 
 
@@ -294,7 +296,10 @@ def extract_metadata(path: Path) -> dict[str, str]:
                 meta["doc_title"] = soup.title.string.strip()
             author_tag = soup.find("meta", attrs={"name": "author"})
             if author_tag:
-                meta["doc_author"] = author_tag.get("content", "")  # type: ignore[arg-type]
+                content = author_tag.get("content", "")
+                if isinstance(content, list):
+                    content = " ".join(content)
+                meta["doc_author"] = content  # type: ignore[assignment]
         except Exception as e:
             logger.debug("Could not read HTML metadata from %s: %s", path.name, e)
 

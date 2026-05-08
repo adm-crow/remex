@@ -11,7 +11,7 @@ from typing import Optional
 PROVIDERS = ("anthropic", "openai", "ollama")
 
 DEFAULT_MODELS: dict[str, str] = {
-    "anthropic": "claude-sonnet-4-5",
+    "anthropic": "claude-sonnet-4-7",
     "openai": "gpt-4o",
     "ollama": "llama3",
 }

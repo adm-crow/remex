@@ -592,7 +592,8 @@ def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> 
     if deleted:
         click.echo(f"Deleted {deleted} chunk(s).")
     else:
-        click.echo("No chunks found for that source.")
+        click.echo("No chunks found for that source.", err=True)
+        raise SystemExit(1)
 
 
 def _seed_bundled_model() -> None:

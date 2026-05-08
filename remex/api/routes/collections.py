@@ -177,7 +177,6 @@ def rename_collection(
     req: RenameRequest,
     db_path: str = Query(default="./remex_db"),
 ) -> RenamedResponse:
-    _require_absolute_db_path(db_path)
     """Rename a ChromaDB collection via a sentinel-copy pattern.
 
     Steps:
@@ -191,6 +190,7 @@ def rename_collection(
     sentinel survive — no data is lost.  On the next request the stale sentinel
     is cleaned up automatically.
     """
+    _require_absolute_db_path(db_path)
     client = _get_client(db_path)
     try:
         old_col = client.get_collection(collection)
@@ -242,12 +242,11 @@ def rename_collection(
         client.delete_collection(collection)
         new_col = client.create_collection(req.new_name, metadata=old_col.metadata or {})
         if original_count:
-            sentinel_data = sentinel.get(include=["documents", "metadatas", "embeddings"])
             new_col.upsert(
-                ids=sentinel_data["ids"],
-                documents=sentinel_data["documents"],
-                metadatas=sentinel_data["metadatas"],
-                embeddings=sentinel_data["embeddings"],
+                ids=all_data["ids"],
+                documents=all_data["documents"],
+                metadatas=all_data["metadatas"],
+                embeddings=all_data["embeddings"],
             )
         client.delete_collection(sentinel_name)
     except Exception as e:

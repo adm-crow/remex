@@ -235,6 +235,8 @@ def ingest_sqlite(
                 result.chunks_stored += len(chunks)
                 _status = "ingested"
 
+            except (InterruptedError, KeyboardInterrupt):
+                raise
             except Exception as e:
                 if verbose:
                     logger.warning("[skip] %s[%s]: %s", table, row_id, e)

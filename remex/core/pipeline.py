@@ -370,6 +370,8 @@ def _process_file_list(
                 if verbose:
                     logger.info("  -> %d chunks stored", len(chunks))
 
+        except (InterruptedError, KeyboardInterrupt):
+            raise
         except Exception as e:
             _status = "error"
             _skip_reason = f"unexpected_error: {e}"
