@@ -1,4 +1,6 @@
 import json
+import os
+import shutil
 from pathlib import Path
 
 import click
@@ -592,12 +594,25 @@ def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> 
         click.echo("No chunks found for that source.")
 
 
+def _seed_bundled_model() -> None:
+    bundled = os.environ.get("REMEX_BUNDLED_ONNX_PATH")
+    if not bundled:
+        return
+    dest = Path.home() / ".cache" / "chroma" / "onnx_models" / "all-MiniLM-L6-v2" / "onnx"
+    if dest.exists():
+        return
+    dest.mkdir(parents=True, exist_ok=True)
+    for f in Path(bundled).iterdir():
+        shutil.copy2(f, dest / f.name)
+
+
 @cli.command(name="serve")
 @click.option("--host", default="127.0.0.1", show_default=True, help="Bind host.")
 @click.option("--port", default=8000, show_default=True, type=int, help="Bind port.")
 @click.option("--reload", is_flag=True, help="Enable auto-reload (development only).")
 def serve_cmd(host: str, port: int, reload: bool) -> None:
     """Start the remex FastAPI sidecar."""
+    _seed_bundled_model()
     try:
         import uvicorn
     except ImportError:
