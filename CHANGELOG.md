@@ -8,6 +8,33 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.5.0] — 2026-05-08
+
+### ⚠ Breaking change — re-ingest required
+
+The embedding backend has changed from SentenceTransformers (PyTorch) to
+ONNX Runtime. Existing collections produce incorrect or empty results until
+re-ingested. Delete your collection and run ingest again with the same
+source directory.
+
+### Changed
+
+- **Embedding backend replaced:** SentenceTransformers + PyTorch →
+  ONNX Runtime. Venv install size drops from ~2 GB to ~300 MB and
+  install time is significantly faster.
+- **Default model downloads from Chroma S3** (`all-MiniLM-L6-v2`) instead of
+  HuggingFace CDN — works on corporate networks that block `huggingface.co`
+  under "Generative AI and ML Applications" categories.
+- **Default model bundled in installer** — first ingest needs no internet
+  connection for the default model.
+- **HTTP_PROXY / HTTPS_PROXY / NO_PROXY** env vars are now forwarded to the
+  sidecar process — supports corporate proxy environments.
+- **Updated model presets:** replaced `intfloat/e5-base-v2` and `intfloat/e5-large-v2`
+  (not supported by FastEmbed) with `BAAI/bge-base-en-v1.5` and
+  `nomic-ai/nomic-embed-text-v1.5-Q`.
+
+---
+
 ## [1.4.1] — 2026-05-05
 
 ### Fixed
