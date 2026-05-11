@@ -59,11 +59,9 @@ function shortName(model: string): string {
 function PresetList({
   value,
   onChange,
-  inputId,
 }: {
   value: string;
   onChange: (v: string) => void;
-  inputId: string;
 }) {
   const isPro = useIsPro();
   const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
@@ -168,6 +166,7 @@ function CompactPicker({
             type="button"
             data-testid="model-segment-extra"
             className={cn(segBase, "bg-primary text-primary-foreground")}
+            onClick={() => { if (extraPreset) onChange(extraPreset.model); }}
           >
             <span className="text-[10px] font-bold leading-none whitespace-nowrap truncate w-full text-center px-0.5">
               {extraPreset ? extraPreset.tag : shortName(value)}
@@ -196,7 +195,7 @@ function CompactPicker({
 
       {expanded && (
         <div className="border border-border rounded-md p-2 space-y-2 bg-primary/5">
-          <PresetList value={value} onChange={onChange} inputId={inputId} />
+          <PresetList value={value} onChange={onChange} />
           <div className="space-y-1 pt-1.5 border-t border-border">
             <Label htmlFor={inputId} className="text-xs">Custom model</Label>
             <Input
@@ -233,7 +232,7 @@ export function EmbeddingModelField({
         className="h-8 text-xs"
       />
       <div className="flex flex-col gap-1 pt-0.5">
-        <PresetList value={value} onChange={onChange} inputId={inputId} />
+        <PresetList value={value} onChange={onChange} />
       </div>
     </div>
   );

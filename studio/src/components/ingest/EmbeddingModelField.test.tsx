@@ -98,6 +98,22 @@ describe("EmbeddingModelField — compact mode", () => {
     expect(screen.getByTestId("model-segment-extra")).toBeInTheDocument();
   });
 
+  it("clicking the 5th segment for a Pro model calls onChange with that model", () => {
+    let selected = "";
+    useAppStore.setState({
+      license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
+    });
+    render(
+      <EmbeddingModelField
+        value="BAAI/bge-large-en-v1.5"
+        onChange={(v) => { selected = v; }}
+        compact
+      />
+    );
+    fireEvent.click(screen.getByTestId("model-segment-extra"));
+    expect(selected).toBe("BAAI/bge-large-en-v1.5");
+  });
+
   it("Pro preset in expansion panel triggers upgrade modal for free tier", () => {
     render(<EmbeddingModelField value="all-MiniLM-L6-v2" onChange={() => {}} compact />);
     fireEvent.click(screen.getByRole("button", { name: /more/i }));
