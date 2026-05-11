@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +38,8 @@ const PRESETS: Preset[] = [
     speed: "~6× slower", pro: true },
 ];
 
+const SEGMENT_PRESETS = PRESETS.slice(0, 3);
+
 const LINKS = [
   { label: "FastEmbed models", href: "https://qdrant.github.io/fastembed/examples/Supported_Models/" },
   { label: "HuggingFace",      href: "https://huggingface.co/models?pipeline_tag=sentence-similarity&sort=downloads" },
@@ -46,22 +49,27 @@ interface EmbeddingModelFieldProps {
   value: string;
   onChange: (value: string) => void;
   inputId?: string;
+  compact?: boolean;
 }
 
-export function EmbeddingModelField({ value, onChange, inputId = "embedding-model" }: EmbeddingModelFieldProps) {
+function shortName(model: string): string {
+  return model.includes("/") ? model.split("/").pop()! : model;
+}
+
+function PresetList({
+  value,
+  onChange,
+  inputId,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  inputId: string;
+}) {
   const isPro = useIsPro();
   const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
-
   return (
-    <div className="space-y-1.5">
-      <Label htmlFor={inputId} className="text-xs">Embedding model</Label>
-      <Input
-        id={inputId}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-7 text-xs"
-      />
-      <div className="flex flex-col gap-1 pt-0.5">
+    <>
+      <div className="flex flex-col gap-1">
         {PRESETS.map(({ tag, tagColor, model, desc, speed, pro }) => {
           const locked = pro && !isPro;
           const isSelected = value === model;
@@ -83,13 +91,9 @@ export function EmbeddingModelField({ value, onChange, inputId = "embedding-mode
                 onChange(model);
               }}
             >
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${tagColor}`}>
-                {tag}
-              </span>
-              <span className="text-[11px] font-mono text-muted-foreground flex-1 truncate min-w-0">
-                {model}
-              </span>
-              <span className="text-[10px] text-muted-foreground/60 shrink-0">{speed}</span>
+              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${tagColor}`}>{tag}</span>
+              <span className="text-xs font-mono text-muted-foreground flex-1 truncate min-w-0">{model}</span>
+              <span className="text-xs text-muted-foreground/60 shrink-0">{speed}</span>
               {locked && <ProBadge />}
             </button>
           );
@@ -102,12 +106,134 @@ export function EmbeddingModelField({ value, onChange, inputId = "embedding-mode
             href={href}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-[11px] text-primary hover:underline"
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
           >
-            <ExternalLink className="w-3 h-3 shrink-0" />
+            <ExternalLink className="w-3.5 h-3.5 shrink-0" />
             {label}
           </a>
         ))}
+      </div>
+    </>
+  );
+}
+
+function CompactPicker({
+  value,
+  onChange,
+  inputId,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  inputId: string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
+  const inSegment = SEGMENT_PRESETS.some((p) => p.model === value);
+  const extraPreset = inSegment ? null : PRESETS.find((p) => p.model === value);
+
+  const segBase =
+    "flex-1 flex flex-col items-center justify-center border-r border-border px-1 py-1.5 gap-0.5 transition-colors min-w-0";
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs">Embedding model</Label>
+
+      <div className="flex border border-border rounded-md overflow-hidden bg-background">
+        {SEGMENT_PRESETS.map((preset) => (
+          <button
+            key={preset.model}
+            type="button"
+            className={cn(
+              segBase,
+              value === preset.model
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted/50"
+            )}
+            onClick={() => onChange(preset.model)}
+          >
+            <span className="text-[10px] font-bold leading-none whitespace-nowrap">
+              {preset.tag}
+            </span>
+            <span className={cn(
+              "text-[8.5px] font-mono leading-none w-full text-center truncate px-0.5",
+              value === preset.model ? "opacity-85" : "text-muted-foreground opacity-70"
+            )}>
+              {shortName(preset.model)}
+            </span>
+          </button>
+        ))}
+
+        {!inSegment && (
+          <button
+            type="button"
+            data-testid="model-segment-extra"
+            className={cn(segBase, "bg-primary text-primary-foreground")}
+          >
+            <span className="text-[10px] font-bold leading-none whitespace-nowrap truncate w-full text-center px-0.5">
+              {extraPreset ? extraPreset.tag : shortName(value)}
+            </span>
+            {extraPreset && (
+              <span className="text-[8.5px] font-mono leading-none w-full text-center truncate px-0.5 opacity-85">
+                {shortName(extraPreset.model)}
+              </span>
+            )}
+          </button>
+        )}
+
+        <button
+          type="button"
+          className={cn(
+            "flex items-center justify-center px-2.5 text-[10px] font-semibold whitespace-nowrap transition-colors border-l border-border",
+            expanded
+              ? "bg-primary text-primary-foreground"
+              : "text-primary hover:bg-muted/30"
+          )}
+          onClick={() => setExpanded((e) => !e)}
+        >
+          {expanded ? "More ▴" : "More…"}
+        </button>
+      </div>
+
+      {expanded && (
+        <div className="border border-border rounded-md p-2 space-y-2 bg-primary/5">
+          <PresetList value={value} onChange={onChange} inputId={inputId} />
+          <div className="space-y-1 pt-1.5 border-t border-border">
+            <Label htmlFor={inputId} className="text-xs">Custom model</Label>
+            <Input
+              id={inputId}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              className="h-8 text-xs"
+              placeholder="org/model-name"
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function EmbeddingModelField({
+  value,
+  onChange,
+  inputId = "embedding-model",
+  compact = false,
+}: EmbeddingModelFieldProps) {
+  if (compact) {
+    return <CompactPicker value={value} onChange={onChange} inputId={inputId} />;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={inputId} className="text-xs">Embedding model</Label>
+      <Input
+        id={inputId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 text-xs"
+      />
+      <div className="flex flex-col gap-1 pt-0.5">
+        <PresetList value={value} onChange={onChange} inputId={inputId} />
       </div>
     </div>
   );
