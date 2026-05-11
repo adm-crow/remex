@@ -125,6 +125,8 @@ function CompactPicker({
   inputId: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const isPro = useIsPro();
+  const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
 
   const inSegment = SEGMENT_PRESETS.some((p) => p.model === value);
   const extraPreset = inSegment ? null : PRESETS.find((p) => p.model === value);
@@ -162,21 +164,42 @@ function CompactPicker({
         ))}
 
         {!inSegment && (
-          <button
-            type="button"
-            data-testid="model-segment-extra"
-            className={cn(segBase, "bg-primary text-primary-foreground")}
-            onClick={() => { if (extraPreset) onChange(extraPreset.model); }}
-          >
-            <span className="text-[10px] font-bold leading-none whitespace-nowrap truncate w-full text-center px-0.5">
-              {extraPreset ? extraPreset.tag : shortName(value)}
-            </span>
-            {extraPreset && (
+          extraPreset === undefined ? (
+            // Custom model string not in PRESETS — render as non-interactive display
+            <div
+              role="presentation"
+              aria-label="Custom model (active)"
+              data-testid="model-segment-extra"
+              className={cn(segBase, "bg-primary text-primary-foreground")}
+            >
+              <span className="text-[10px] font-bold leading-none whitespace-nowrap truncate w-full text-center px-0.5">
+                {shortName(value)}
+              </span>
+            </div>
+          ) : (
+            // Known preset (possibly Pro-locked) — render as interactive button
+            <button
+              type="button"
+              data-testid="model-segment-extra"
+              className={cn(segBase, "bg-primary text-primary-foreground relative")}
+              onClick={() => {
+                if (extraPreset?.pro && !isPro) { openUpgradeModal("embedding-model"); return; }
+                onChange(extraPreset.model);
+              }}
+            >
+              <span className="text-[10px] font-bold leading-none whitespace-nowrap truncate w-full text-center px-0.5">
+                {extraPreset.tag}
+              </span>
               <span className="text-[8.5px] font-mono leading-none w-full text-center truncate px-0.5 opacity-85">
                 {shortName(extraPreset.model)}
               </span>
-            )}
-          </button>
+              {extraPreset.pro && !isPro && (
+                <span className="absolute top-0.5 right-0.5">
+                  <ProBadge />
+                </span>
+              )}
+            </button>
+          )
         )}
 
         <button

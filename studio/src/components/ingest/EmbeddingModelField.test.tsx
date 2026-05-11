@@ -114,6 +114,16 @@ describe("EmbeddingModelField — compact mode", () => {
     expect(selected).toBe("BAAI/bge-large-en-v1.5");
   });
 
+  it("5th segment for a locked Pro model triggers upgrade modal on free tier", () => {
+    // useAppStore already set to free tier in beforeEach
+    render(
+      <EmbeddingModelField value="BAAI/bge-large-en-v1.5" onChange={() => {}} compact />
+    );
+    fireEvent.click(screen.getByTestId("model-segment-extra"));
+    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
+    expect(useAppStore.getState().upgradeModalContext).toBe("embedding-model");
+  });
+
   it("Pro preset in expansion panel triggers upgrade modal for free tier", () => {
     render(<EmbeddingModelField value="all-MiniLM-L6-v2" onChange={() => {}} compact />);
     fireEvent.click(screen.getByRole("button", { name: /more/i }));
