@@ -244,24 +244,33 @@ describe("FilesTab", () => {
     renderWithProviders(<FilesTab />);
     fireEvent.change(screen.getByRole("textbox", { name: /source directory/i }), { target: { value: "/docs" } });
 
-    // Open Advanced section
-    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
-
-    // Find and click the incremental toggle
-    const toggle = await screen.findByRole("switch", { name: /incremental/i });
+    const toggle = screen.getByRole("switch", { name: /incremental/i });
     fireEvent.click(toggle);
 
-    // Start ingest
     fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
-
     await waitFor(() => {
       expect(vi.mocked(api.ingestFilesStream)).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(String),
-        expect.any(String),
+        expect.any(String), expect.any(String), expect.any(String),
         expect.objectContaining({ incremental: true }),
         expect.any(AbortSignal)
       );
     });
+  });
+
+  it("incremental toggle is visible without opening Advanced", () => {
+    renderWithProviders(<FilesTab />);
+    expect(screen.getByRole("switch", { name: /incremental/i })).toBeInTheDocument();
+  });
+
+  it("embedding model segmented control is visible without opening Advanced", () => {
+    renderWithProviders(<FilesTab />);
+    expect(screen.getByRole("button", { name: /light/i })).toBeInTheDocument();
+  });
+
+  it("toggling append-model shows the effective collection name preview", () => {
+    renderWithProviders(<FilesTab />);
+    expect(screen.queryByText(/will ingest into/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("switch", { name: /append embedding model/i }));
+    expect(screen.getByText(/will ingest into/i)).toBeInTheDocument();
   });
 });

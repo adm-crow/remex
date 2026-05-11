@@ -19,6 +19,7 @@ import { EmbeddingModelField } from "./EmbeddingModelField";
 import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
 import { formatDuration } from "@/lib/formatDuration";
+import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
 
 const STATUS_VARIANT = {
   ingested: "default" as const,
@@ -55,7 +56,7 @@ export function FilesTab() {
   const [appendModel,    setAppendModel]    = useState(false);
   const [chunkSize,      setChunkSize]      = useState(1000);
   const [overlap,        setOverlap]        = useState(200);
-  const [embeddingModel, setEmbeddingModel] = useState("all-MiniLM-L6-v2");
+  const [embeddingModel, setEmbeddingModel] = useState(DEFAULT_EMBEDDING_MODEL);
   const [incremental,    setIncremental]    = useState(false);
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
   const [wasCancelled,   setWasCancelled]   = useState(false);
@@ -224,20 +225,33 @@ export function FilesTab() {
             value={sourcePath}
             onChange={(e) => setSourcePath(e.target.value)}
             placeholder="/path/to/docs"
-            className="flex-1"
+            className="flex-1 h-8"
             aria-label="Source directory"
           />
-          <Button variant="outline" onClick={handleBrowse} aria-label="Browse">
+          <Button variant="outline" size="sm" onClick={handleBrowse} aria-label="Browse">
             Browse
           </Button>
         </div>
       </div>
 
-      {/* Collection name */}
+      {/* Collection name — append-model toggle merged into label row */}
       <div className="space-y-1">
-        <Label htmlFor="collection-name" className="text-xs text-muted-foreground">
-          Collection name
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="collection-name" className="text-xs text-muted-foreground">
+            Collection name
+          </Label>
+          <div className="flex items-center gap-1.5">
+            <Switch
+              id="append-model"
+              checked={appendModel}
+              onCheckedChange={setAppendModel}
+              aria-label="Append embedding model to collection name"
+            />
+            <Label htmlFor="append-model" className="text-xs text-muted-foreground cursor-pointer">
+              +model suffix
+            </Label>
+          </div>
+        </div>
         <Input
           id="collection-name"
           value={collectionName}
@@ -245,31 +259,24 @@ export function FilesTab() {
           placeholder={currentCollection ?? "collection"}
           className="h-8 text-sm"
         />
+        {appendModel && (
+          <p className="text-xs text-muted-foreground">
+            Will ingest into:{" "}
+            <span className="font-mono font-medium text-foreground">
+              {effectiveCollection || "—"}
+            </span>
+          </p>
+        )}
       </div>
 
-      {/* Append model toggle */}
-      <div className="flex items-center gap-2">
-        <Switch
-          id="append-model"
-          checked={appendModel}
-          onCheckedChange={setAppendModel}
-          aria-label="Append embedding model to collection name"
-        />
-        <Label htmlFor="append-model" className="text-sm">
-          Append embedding model to name
-        </Label>
-      </div>
+      {/* Embedding model — compact segmented control, promoted out of Advanced */}
+      <EmbeddingModelField
+        value={embeddingModel}
+        onChange={setEmbeddingModel}
+        compact
+      />
 
-      {appendModel && (
-        <p className="text-xs text-muted-foreground -mt-2">
-          Will ingest into:{" "}
-          <span className="font-mono font-medium text-foreground">
-            {effectiveCollection || "—"}
-          </span>
-        </p>
-      )}
-
-      {/* Advanced settings */}
+      {/* Advanced — chunk size + overlap only */}
       <Collapsible>
         <div className="flex items-center gap-2">
           <CollapsibleTrigger asChild>
@@ -279,8 +286,8 @@ export function FilesTab() {
           </CollapsibleTrigger>
           <div className="h-px bg-border flex-1" />
         </div>
-        <CollapsibleContent className="space-y-3 mt-2 bg-primary/5 rounded-lg p-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <CollapsibleContent className="mt-2 bg-primary/5 rounded-lg p-3">
+          <div className="flex items-center gap-x-4">
             <div className="flex items-center gap-1.5">
               <Label htmlFor="chunk-size" className="text-xs whitespace-nowrap">Chunk size</Label>
               <Input
@@ -288,7 +295,7 @@ export function FilesTab() {
                 type="number"
                 value={chunkSize}
                 onChange={(e) => setChunkSize(Number(e.target.value))}
-                className="h-7 w-20 text-xs"
+                className="h-8 w-20 text-xs"
               />
             </div>
             <div className="flex items-center gap-1.5">
@@ -298,27 +305,24 @@ export function FilesTab() {
                 type="number"
                 value={overlap}
                 onChange={(e) => setOverlap(Number(e.target.value))}
-                className="h-7 w-20 text-xs"
+                className="h-8 w-20 text-xs"
               />
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Switch
-                id="incremental"
-                checked={incremental}
-                onCheckedChange={setIncremental}
-                aria-label="Incremental ingest"
-              />
-              <Label htmlFor="incremental" className="text-xs">Incremental</Label>
             </div>
           </div>
-          <EmbeddingModelField
-            value={embeddingModel}
-            onChange={setEmbeddingModel}
-          />
         </CollapsibleContent>
       </Collapsible>
 
-      <div className="flex gap-2">
+      {/* Incremental toggle + Start/Stop on same row */}
+      <div className="flex items-center gap-2">
+        <Switch
+          id="incremental"
+          checked={incremental}
+          onCheckedChange={setIncremental}
+          aria-label="Incremental ingest"
+        />
+        <Label htmlFor="incremental" className="text-xs text-muted-foreground whitespace-nowrap">
+          Incremental
+        </Label>
         <Button
           onClick={handleStart}
           disabled={ingestRunning || !sourcePath || !effectiveCollection}
