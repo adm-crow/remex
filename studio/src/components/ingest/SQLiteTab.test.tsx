@@ -30,7 +30,7 @@ describe("SQLiteTab", () => {
     renderWithProviders(<SQLiteTab />);
     expect(screen.getByRole("textbox", { name: /sqlite database path/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /browse/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /run ingest/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /start ingest/i })).toBeDisabled();
   });
 
   it("loads tables when path is entered", async () => {
@@ -68,7 +68,7 @@ describe("SQLiteTab", () => {
       expect(api.listSqliteTables).toHaveBeenCalled();
     });
     // Tables are loaded but none selected yet — run button must stay disabled.
-    expect(screen.getByRole("button", { name: /run ingest/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /start ingest/i })).toBeDisabled();
   });
 
   it("incremental toggle is visible without opening Advanced", () => {

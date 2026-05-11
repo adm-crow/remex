@@ -71,10 +71,10 @@ describe("SQLiteTab — cancel / stop-button", () => {
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "posts" } });
 
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: /run ingest/i })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: /start ingest/i })).not.toBeDisabled();
     });
 
-    fireEvent.click(screen.getByRole("button", { name: /run ingest/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start ingest/i }));
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();

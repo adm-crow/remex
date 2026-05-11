@@ -422,7 +422,7 @@ export function SQLiteTab() {
         <Label htmlFor="sqlite-incremental" className="text-xs text-muted-foreground whitespace-nowrap">
           Incremental
         </Label>
-        <Button onClick={handleRun} disabled={!canRun} aria-label="Run ingest" className="flex-1">
+        <Button onClick={handleRun} disabled={!canRun} aria-label="Start ingest" className="flex-1">
           <Play className="w-4 h-4 mr-2" />
           {sqliteIngestRunning ? "Ingesting…" : "Start ingest"}
         </Button>
