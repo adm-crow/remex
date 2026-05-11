@@ -70,4 +70,14 @@ describe("SQLiteTab", () => {
     // Tables are loaded but none selected yet — run button must stay disabled.
     expect(screen.getByRole("button", { name: /run ingest/i })).toBeDisabled();
   });
+
+  it("incremental toggle is visible without opening Advanced", () => {
+    renderWithProviders(<SQLiteTab />);
+    expect(screen.getByRole("switch", { name: /incremental/i })).toBeInTheDocument();
+  });
+
+  it("embedding model segmented control is visible without opening Advanced", () => {
+    renderWithProviders(<SQLiteTab />);
+    expect(screen.getByRole("button", { name: /light/i })).toBeInTheDocument();
+  });
 });

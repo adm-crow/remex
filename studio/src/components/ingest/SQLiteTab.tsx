@@ -23,6 +23,7 @@ import { api } from "@/api/client";
 import { useAppStore } from "@/store/app";
 import type { IngestResultResponse } from "@/api/client";
 import { formatDuration } from "@/lib/formatDuration";
+import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
 
 /** Sentinel value that can never be a real SQLite table name. */
 const ALL_TABLES = "\x00__all__";
@@ -59,7 +60,7 @@ export function SQLiteTab() {
   const [columns,         setColumns]         = useState("");
   const [idColumn,        setIdColumn]        = useState("id");
   const [rowTemplate,     setRowTemplate]     = useState("");
-  const [embeddingModel,  setEmbeddingModel]  = useState("all-MiniLM-L6-v2");
+  const [embeddingModel,  setEmbeddingModel]  = useState(DEFAULT_EMBEDDING_MODEL);
   const [incremental,     setIncremental]     = useState(false);
   const [result,          setResult]          = useState<IngestResultResponse | null>(null);
   const [duration,        setDuration]        = useState<string | null>(null);
@@ -321,11 +322,24 @@ export function SQLiteTab() {
         </div>
       </div>
 
-      {/* Collection name */}
+      {/* Collection name — append-model toggle merged into label row */}
       <div className="space-y-1">
-        <Label htmlFor="sqlite-collection" className="text-xs text-muted-foreground">
-          Collection name
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="sqlite-collection" className="text-xs text-muted-foreground">
+            Collection name
+          </Label>
+          <div className="flex items-center gap-1.5">
+            <Switch
+              id="sqlite-append-model"
+              checked={appendModel}
+              onCheckedChange={setAppendModel}
+              aria-label="Append embedding model to collection name"
+            />
+            <Label htmlFor="sqlite-append-model" className="text-xs text-muted-foreground cursor-pointer">
+              +model suffix
+            </Label>
+          </div>
+        </div>
         <Input
           id="sqlite-collection"
           value={collectionName}
@@ -334,28 +348,23 @@ export function SQLiteTab() {
           className="h-8 text-sm"
           aria-label="SQLite collection"
         />
+        {appendModel && (
+          <p className="text-xs text-muted-foreground">
+            Will ingest into:{" "}
+            <span className="font-mono font-medium text-foreground">
+              {effectiveCollection || "—"}
+            </span>
+          </p>
+        )}
       </div>
 
-      {/* Append model toggle */}
-      <div className="flex items-center gap-2">
-        <Switch
-          id="sqlite-append-model"
-          checked={appendModel}
-          onCheckedChange={setAppendModel}
-          aria-label="Append embedding model to collection name"
-        />
-        <Label htmlFor="sqlite-append-model" className="text-sm">
-          Append embedding model to name
-        </Label>
-      </div>
-      {appendModel && (
-        <p className="text-xs text-muted-foreground -mt-1">
-          Will ingest into:{" "}
-          <span className="font-mono font-medium text-foreground">
-            {effectiveCollection || "—"}
-          </span>
-        </p>
-      )}
+      {/* Embedding model — compact segmented control, promoted out of Advanced */}
+      <EmbeddingModelField
+        inputId="sqlite-embedding-model"
+        value={embeddingModel}
+        onChange={setEmbeddingModel}
+        compact
+      />
 
       {/* Advanced */}
       <Collapsible>
@@ -376,7 +385,7 @@ export function SQLiteTab() {
                 value={columns}
                 onChange={(e) => setColumns(e.target.value)}
                 placeholder="title, body, author"
-                className="h-7 text-xs"
+                className="h-8 text-xs"
               />
             </div>
             <div className="w-24 space-y-1">
@@ -386,40 +395,33 @@ export function SQLiteTab() {
                 value={idColumn}
                 onChange={(e) => setIdColumn(e.target.value)}
                 placeholder="id"
-                className="h-7 text-xs"
+                className="h-8 text-xs"
               />
             </div>
           </div>
-          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-            <div className="flex-1 min-w-[120px] space-y-1">
-              <Label htmlFor="sqlite-template" className="text-xs">Row template (optional)</Label>
-              <Input
-                id="sqlite-template"
-                value={rowTemplate}
-                onChange={(e) => setRowTemplate(e.target.value)}
-                placeholder="{title}: {body}"
-                className="h-7 text-xs"
-              />
-            </div>
-            <div className="flex items-center gap-1.5 pb-0.5">
-              <Switch
-                id="sqlite-incremental"
-                checked={incremental}
-                onCheckedChange={setIncremental}
-                aria-label="Incremental ingest"
-              />
-              <Label htmlFor="sqlite-incremental" className="text-xs whitespace-nowrap">Incremental</Label>
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="sqlite-template" className="text-xs">Row template (optional)</Label>
+            <Input
+              id="sqlite-template"
+              value={rowTemplate}
+              onChange={(e) => setRowTemplate(e.target.value)}
+              placeholder="{title}: {body}"
+              className="h-8 text-xs"
+            />
           </div>
-          <EmbeddingModelField
-            inputId="sqlite-embedding-model"
-            value={embeddingModel}
-            onChange={setEmbeddingModel}
-          />
         </CollapsibleContent>
       </Collapsible>
 
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
+        <Switch
+          id="sqlite-incremental"
+          checked={incremental}
+          onCheckedChange={setIncremental}
+          aria-label="Incremental ingest"
+        />
+        <Label htmlFor="sqlite-incremental" className="text-xs text-muted-foreground whitespace-nowrap">
+          Incremental
+        </Label>
         <Button onClick={handleRun} disabled={!canRun} aria-label="Run ingest" className="flex-1">
           <Play className="w-4 h-4 mr-2" />
           {sqliteIngestRunning ? "Ingesting…" : "Start ingest"}
