@@ -933,14 +933,21 @@ def test_collection_stats_returns_correct_values(tmp_path):
     from remex.core.models import CollectionStats
 
     collection = MagicMock()
-    collection.count.return_value = 10
     collection.metadata = {"embedding_model": "all-MiniLM-L6-v2"}
+    # collection_stats counts chunks from get()["ids"], not collection.count()
     collection.get.return_value = {
-        "ids": ["id1", "id2", "id3"],
+        "ids": [f"id{i}" for i in range(10)],
         "metadatas": [
             {"source": "/docs/a.txt"},
             {"source": "/docs/b.txt"},
-            {"source": "/docs/a.txt"},  # duplicate
+            {"source": "/docs/a.txt"},
+            {"source": "/docs/b.txt"},
+            {"source": "/docs/a.txt"},
+            {"source": "/docs/b.txt"},
+            {"source": "/docs/a.txt"},
+            {"source": "/docs/b.txt"},
+            {"source": "/docs/a.txt"},
+            {"source": "/docs/b.txt"},
         ],
     }
     client = MagicMock()

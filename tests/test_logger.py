@@ -38,7 +38,10 @@ def test_setup_logging_replaces_handlers():
 def test_setup_logging_adds_file_handler(tmp_path):
     log_file = str(tmp_path / "test.log")
     setup_logging(log_file=log_file)
-    assert len(logger.handlers) == 2
+    # When log_file is set the Rust launcher already redirects stderr to that
+    # file, so only a FileHandler is added (no StreamHandler) to avoid duplicates.
+    assert len(logger.handlers) == 1
+    assert any(isinstance(h, logging.FileHandler) for h in logger.handlers)
 
 
 def test_setup_logging_file_is_written(tmp_path):
