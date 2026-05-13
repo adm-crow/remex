@@ -56,9 +56,9 @@ Native desktop app for Windows. No terminal required.
 | 🔎 **Chunk viewer** | Expand any result to read the full chunk, navigate with keyboard arrows |
 | 📦 **Collections manager** | Rename, describe, purge, bulk-delete sources, one-click re-ingest |
 | 📤 **Export** | JSON · CSV · Markdown · BibTeX · RIS · CSL-JSON · Obsidian vault |
-| 🌙 **Themes** | Light, dark, auto (follows OS) + ten accent colours |
+| 🌙 **Themes** | Light, dark, auto (follows OS) + eight accent colours |
 | ⌨️ **Keyboard-driven** | Press `?` anywhere in Studio for the full shortcuts reference |
-| 📦 **Optional packages** | Install extra file formats, AI integrations, or sentence chunking from `Settings → General` at any time |
+| ⚙️ **Optional packages** | Install extra file formats, AI integrations, or sentence chunking from `Settings → General` at any time |
 
 <br/>
 
@@ -85,7 +85,7 @@ Free Remex covers the full local-first workflow. **Remex Pro** unlocks power-use
 | **Extra accent themes** (8 additional) | — | ✓ |
 | **Priority email support** (48-hour business-day SLA) | — | ✓ |
 
-Activate in `Settings → License` inside Studio. Licenses are issued and validated offline via [Lemon Squeezy](https://lemonsqueezy.com/).
+Activate in `Settings → License` inside Studio. Licenses are issued and validated via [Lemon Squeezy](https://lemonsqueezy.com/).
 
 <br/>
 
@@ -132,7 +132,7 @@ remex query "how does authentication work?" --ai
 | `remex purge` | Remove chunks whose source file no longer exists on disk |
 | `remex reset` | Wipe an entire collection |
 | `remex list-collections` | List all collections in a database |
-| `remex serve` | Start the FastAPI sidecar on `localhost:8745` |
+| `remex serve` | Start the FastAPI sidecar on `localhost:8000` |
 
 ```bash
 remex <command> --help    # full option reference for any command
@@ -188,7 +188,7 @@ CLI flags always override `remex.toml` values.
 | **Multilingual** | `paraphrase-multilingual-MiniLM-L12-v2` | 470 MB | 50+ languages |
 | **Large** *(Pro)* | `BAAI/bge-large-en-v1.5` | 1.3 GB | Best English accuracy |
 | **E5 Large** *(Pro)* | `intfloat/e5-large-v2` | 1.3 GB | Strong retrieval benchmark |
-| **Long ctx** *(Pro)* | `nomic-ai/nomic-embed-text-v1.5` | 547 MB | 8 192-token context window |
+| **Long ctx** *(Pro)* | `nomic-ai/nomic-embed-text-v1.5` | 547 MB | 8,192-token context window |
 
 Any model from [SBERT](https://www.sbert.net/docs/pretrained_models.html), [HuggingFace sentence-similarity](https://huggingface.co/models?pipeline_tag=sentence-similarity), or [Ollama](https://ollama.com/search?c=embedding) can be used by typing the model name directly.
 
