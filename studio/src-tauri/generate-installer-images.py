@@ -15,22 +15,39 @@ from PIL import Image, ImageDraw, ImageFont
 
 OUT_DIR = Path(__file__).parent
 
-BRAND_GREEN  = (28, 172, 120)   # #1CAC78
-BRAND_LIME   = (126, 189, 1)    # #7EBD01
-BG_DARK      = (13, 22, 15)
-WHITE        = (255, 255, 255)
-GRAY_LIGHT   = (160, 170, 162)
-TEXT_DARK    = (13, 22, 15)
-TEXT_GRAY    = (100, 110, 105)
+# Brand colours
+BRAND_GREEN = (28, 172, 120)    # #1CAC78
+BRAND_LIME  = (126, 189, 1)     # #7EBD01
+BG_DARK     = (13, 22, 15)
+WHITE       = (255, 255, 255)
+GRAY_LIGHT  = (160, 170, 162)
+TEXT_DARK   = (13, 22, 15)
+TEXT_GRAY   = (100, 110, 105)
 
 
-def _lerp_color(a, b, t):
-    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _lerp(a, b, t):
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(len(a)))
+
+
+def _qbez(p0, p1, p2, steps=120):
+    """Sample `steps` points on the quadratic Bézier p0→p1→p2."""
+    pts = []
+    for i in range(steps + 1):
+        t  = i / steps
+        mt = 1 - t
+        x  = mt * mt * p0[0] + 2 * mt * t * p1[0] + t * t * p2[0]
+        y  = mt * mt * p0[1] + 2 * mt * t * p1[1] + t * t * p2[1]
+        pts.append((x, y))
+    return pts
 
 
 def _gradient_strip(draw, x0, y0, x1, height, c_top, c_bot):
     for y in range(height):
-        draw.line([(x0, y0 + y), (x1, y0 + y)], fill=_lerp_color(c_top, c_bot, y / height))
+        draw.line([(x0, y0 + y), (x1, y0 + y)], fill=_lerp(c_top, c_bot, y / height))
 
 
 def _try_font(size, bold=False):
@@ -46,24 +63,63 @@ def _try_font(size, bold=False):
                 return ImageFont.truetype(p, size)
             except Exception:
                 pass
-    return None  # caller falls back to default
+    return None
 
 
-def _draw_logo(draw, cx, cy, unit, color_top, color_bot):
-    """Draw a simplified two-arc Remex logo centred at (cx, cy).
+# ---------------------------------------------------------------------------
+# Actual Remex logo renderer
+#
+# SVG path (viewBox 0 0 8 16):
+#   M0 0 Q0 8 8 8  Q8 0 0 0          ← shape 1, top half
+#   M0 8 Q8 8 8 16 Q0 16 0 8         ← shape 2, bottom half (relative → absolute)
+#
+# Both shapes are filled with the brand gradient (#1CAC78 → #7EBD01).
+# ---------------------------------------------------------------------------
 
-    The original SVG is two quarter-circle arcs stacked vertically.
-    We approximate them with thick arcs using PIL's arc().
-    """
-    r = unit
-    w = max(2, unit // 3)
-    # top arc: top-right quarter of a circle whose centre is at (cx, cy)
-    top_box = [cx - r, cy - r, cx + r, cy]
-    draw.arc(top_box,   start=-90, end=0,   fill=color_top, width=w)
-    # bottom arc: bottom-left quarter, offset one unit down
-    bot_box = [cx - r, cy,       cx + r, cy + r]
-    draw.arc(bot_box,   start=90,  end=180, fill=color_bot, width=w)
+def _make_logo(pixel_height: int) -> Image.Image:
+    """Return an RGBA image containing the Remex logo at the given height."""
+    scale     = pixel_height / 16          # 16 SVG units → pixel_height px
+    logo_w    = round(8  * scale)
+    logo_h    = round(16 * scale)
 
+    def s(lx, ly):
+        return (lx * scale, ly * scale)
+
+    # --- build a 1-bit mask for each shape via polygon ---
+    mask = Image.new("L", (logo_w, logo_h), 0)
+    md   = ImageDraw.Draw(mask)
+
+    # Shape 1: M(0,0) Q(0,8)(8,8) Q(8,0)(0,0)
+    poly1 = (
+        _qbez(s(0,0), s(0,8), s(8,8)) +
+        _qbez(s(8,8), s(8,0), s(0,0))
+    )
+    md.polygon(poly1, fill=255)
+
+    # Shape 2 (absolute coords): M(0,8) Q(8,8)(8,16) Q(0,16)(0,8)
+    poly2 = (
+        _qbez(s(0,8), s(8,8),  s(8,16)) +
+        _qbez(s(8,16), s(0,16), s(0,8))
+    )
+    md.polygon(poly2, fill=255)
+
+    # --- diagonal gradient (matches the SVG linearGradient 0%→100%) ---
+    gradient = Image.new("RGBA", (logo_w, logo_h))
+    gd       = ImageDraw.Draw(gradient)
+    for row in range(logo_h):
+        for col in range(logo_w):
+            t     = (col + row) / (logo_w + logo_h - 2) if (logo_w + logo_h) > 2 else 0
+            color = _lerp(BRAND_GREEN, BRAND_LIME, t) + (255,)
+            gradient.putpixel((col, row), color)
+
+    # Apply the shape mask as the alpha channel
+    gradient.putalpha(mask)
+    return gradient
+
+
+# ---------------------------------------------------------------------------
+# Image builders
+# ---------------------------------------------------------------------------
 
 def make_sidebar():
     """164x314 BMP — shown on Welcome and Finish installer pages."""
@@ -71,33 +127,40 @@ def make_sidebar():
     img  = Image.new("RGB", (W, H), BG_DARK)
     draw = ImageDraw.Draw(img)
 
-    # Brand gradient strip on the left edge
+    # Brand gradient strip — left edge
     _gradient_strip(draw, 0, 0, 4, H, BRAND_GREEN, BRAND_LIME)
 
-    # Logo (two arcs, centred horizontally, upper third of the image)
-    unit = 22
-    _draw_logo(draw, W // 2, H // 4, unit, BRAND_GREEN, BRAND_LIME)
+    # Remex logo — centred horizontally, upper third of the image
+    logo_h  = 72                        # px tall — 16 SVG units
+    logo    = _make_logo(logo_h)
+    logo_x  = (W - logo.width)  // 2
+    logo_y  = H // 5
+    img.paste(logo, (logo_x, logo_y), logo)
 
-    # Product name
-    font_title = _try_font(18, bold=True)
+    # Text
+    font_title = _try_font(17, bold=True)
     font_sub   = _try_font(9)
+
+    ty = logo_y + logo_h + 18
 
     title = "Remex Studio"
     tag   = "Your files. Searchable with AI."
 
     if font_title:
         bbox = draw.textbbox((0, 0), title, font=font_title)
-        tw = bbox[2] - bbox[0]
-        draw.text(((W - tw) // 2, H // 4 + unit + 18), title, font=font_title, fill=WHITE)
+        tw   = bbox[2] - bbox[0]
+        draw.text(((W - tw) // 2, ty), title, font=font_title, fill=WHITE)
+        ty  += bbox[3] - bbox[1] + 8
     else:
-        draw.text((20, H // 4 + unit + 18), title, fill=WHITE)
+        draw.text((20, ty), title, fill=WHITE)
+        ty += 22
 
     if font_sub:
         bbox = draw.textbbox((0, 0), tag, font=font_sub)
-        tw = bbox[2] - bbox[0]
-        draw.text(((W - tw) // 2, H // 4 + unit + 44), tag, font=font_sub, fill=GRAY_LIGHT)
+        tw   = bbox[2] - bbox[0]
+        draw.text(((W - tw) // 2, ty), tag, font=font_sub, fill=GRAY_LIGHT)
     else:
-        draw.text((20, H // 4 + unit + 44), tag, fill=GRAY_LIGHT)
+        draw.text((20, ty), tag, fill=GRAY_LIGHT)
 
     out = OUT_DIR / "installer-sidebar.bmp"
     img.save(out, format="BMP")
@@ -110,40 +173,39 @@ def make_header():
     img  = Image.new("RGB", (W, H), WHITE)
     draw = ImageDraw.Draw(img)
 
-    # Brand gradient strip on the left edge
+    # Brand gradient strip — left edge
     _gradient_strip(draw, 0, 0, 4, H, BRAND_GREEN, BRAND_LIME)
 
-    # Logo (small, left-aligned)
-    unit = 10
-    _draw_logo(draw, 18, H // 2, unit, BRAND_GREEN, BRAND_LIME)
+    # Remex logo — left side, vertically centred
+    logo_h = 36
+    logo   = _make_logo(logo_h)
+    logo_x = 12
+    logo_y = (H - logo.height) // 2
+    img.paste(logo, (logo_x, logo_y), logo)
 
-    # Product name + tagline
+    # Text — right of logo
     font_title = _try_font(13, bold=True)
     font_sub   = _try_font(8)
-    x_text = 18 + unit + 10
+    x_text = logo_x + logo.width + 10
 
     if font_title:
-        draw.text((x_text, 10), "Remex Studio", font=font_title, fill=TEXT_DARK)
+        draw.text((x_text, 11), "Remex Studio", font=font_title, fill=TEXT_DARK)
     else:
-        draw.text((x_text, 10), "Remex Studio", fill=TEXT_DARK)
+        draw.text((x_text, 11), "Remex Studio", fill=TEXT_DARK)
 
     if font_sub:
-        draw.text((x_text, 34), "Your files. Searchable with AI.", font=font_sub, fill=TEXT_GRAY)
+        draw.text((x_text, 35), "Your files. Searchable with AI.", font=font_sub, fill=TEXT_GRAY)
     else:
-        draw.text((x_text, 34), "Your files. Searchable with AI.", fill=TEXT_GRAY)
+        draw.text((x_text, 35), "Your files. Searchable with AI.", fill=TEXT_GRAY)
 
     out = OUT_DIR / "installer-header.bmp"
     img.save(out, format="BMP")
     print(f"  {out}")
 
 
-if __name__ == "__main__":
-    try:
-        from PIL import Image, ImageDraw, ImageFont  # noqa: F811
-    except ImportError:
-        print("Pillow not installed. Run: pip install pillow", file=sys.stderr)
-        sys.exit(1)
+# ---------------------------------------------------------------------------
 
+if __name__ == "__main__":
     print("Generating installer images...")
     make_sidebar()
     make_header()
