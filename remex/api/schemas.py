@@ -137,6 +137,7 @@ class ChatRequest(BaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+    system_prompt: Optional[str] = Field(default=None, max_length=32768)
 
     @field_validator("db_path")
     @classmethod
@@ -213,6 +214,7 @@ class MultiChatRequest(BaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = None
+    system_prompt: Optional[str] = Field(default=None, max_length=32768)
 
     @field_validator("db_path")
     @classmethod

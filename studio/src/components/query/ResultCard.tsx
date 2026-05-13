@@ -17,13 +17,13 @@ export function ResultCard({ result, onOpenViewer }: Props) {
     navigator.clipboard.writeText(result.text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    }).catch((err) => console.error("[ResultCard] Clipboard write failed:", err));
+    }).catch(() => setCopied(false));
   }
 
   return (
     <div
       className={cn(
-        "group rounded-lg border bg-card p-4 space-y-2.5 transition-all duration-150",
+        "group rounded-lg border bg-card p-4 space-y-3 transition-all duration-150",
         "hover:border-primary/30 hover:shadow-sm hover:shadow-primary/5"
       )}
     >

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Play, AlertCircle, AlertTriangle, CheckCircle2, X } from "lucide-react";
+import { Play, AlertCircle, AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +19,22 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { api } from "@/api/client";
+import { useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import type { IngestResultResponse } from "@/api/client";
 import { formatDuration } from "@/lib/formatDuration";
 import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
+import { formatBytes, STATUS_VARIANT } from "./ingestShared";
 
-/** Sentinel value that can never be a real SQLite table name. */
-const ALL_TABLES = "\x00__all__";
+type TableProgress = {
+  table: string;
+  status: keyof typeof STATUS_VARIANT;
+  rowsIngested: number;
+  chunksStored: number;
+};
 
 export function SQLiteTab() {
   const {
@@ -61,16 +69,18 @@ export function SQLiteTab() {
   const [idColumn,        setIdColumn]        = useState("id");
   const [rowTemplate,     setRowTemplate]     = useState("");
   const [embeddingModel,  setEmbeddingModel]  = useState(DEFAULT_EMBEDDING_MODEL);
-  const [incremental,     setIncremental]     = useState(false);
-  const [result,          setResult]          = useState<IngestResultResponse | null>(null);
-  const [duration,        setDuration]        = useState<string | null>(null);
-  const [eta,             setEta]             = useState<string | null>(null);
-  const [showDoneAlert,   setShowDoneAlert]   = useState(false);
-  const [wasCancelled,    setWasCancelled]    = useState(false);
+  const [incremental,        setIncremental]        = useState(false);
+  const [result,             setResult]             = useState<IngestResultResponse | null>(null);
+  const [duration,           setDuration]           = useState<string | null>(null);
+  const [eta,                setEta]                = useState<string | null>(null);
+  const [showDoneAlert,      setShowDoneAlert]      = useState(false);
+  const [wasCancelled,       setWasCancelled]       = useState(false);
+  const [currentIngestTable, setCurrentIngestTable] = useState<string | null>(null);
+  const [tableProgress,      setTableProgress]      = useState<TableProgress[]>([]);
+  const [modelDownload,      setModelDownload]      = useState<{ downloaded: number; total: number } | null>(null);
 
   const loadAbortRef  = useRef<AbortController | null>(null);
   const runAbortRef   = useRef<AbortController | null>(null);
-  const abortedRef    = useRef(false);
   const startTimeRef  = useRef<number | null>(null);
   // Tracks live progress outside React state so the cancel handler (a stale closure) reads the correct value.
   const rowsDoneRef   = useRef(0);
@@ -79,6 +89,9 @@ export function SQLiteTab() {
   const effectiveCollection = appendModel
     ? `${collectionName}-${embeddingModel}`.replace(/[^a-zA-Z0-9_-]/g, "-")
     : collectionName;
+
+  const { data: existingCollections = [] } = useCollections(apiUrl, currentDb ?? "");
+  const collectionExists = !!effectiveCollection && existingCollections.includes(effectiveCollection);
 
   // ETA ticker — recalculates every second while running.
   useEffect(() => {
@@ -162,7 +175,10 @@ export function SQLiteTab() {
       },
       signal,
     )) {
-      if (event.type === "progress") {
+      if (event.type === "model_download") {
+        setModelDownload({ downloaded: event.downloaded_bytes, total: event.total_bytes });
+      } else if (event.type === "progress") {
+        setModelDownload(null);
         setSqliteIngestRowsDone(rowOffset + event.files_done);
         rowsDoneRef.current = rowOffset + event.files_done;
         setSqliteIngestRowsTotal(rowOffset + event.files_total);
@@ -178,91 +194,83 @@ export function SQLiteTab() {
   async function handleRun() {
     if (!sqlitePath || !selectedTable || !effectiveCollection || !currentDb) return;
 
-    const tablesToIngest = selectedTable === ALL_TABLES ? tables : [selectedTable];
-    if (tablesToIngest.length === 0) return;
-
     resetSqliteIngestSession();
+    setModelDownload(null);
     setSqliteIngestRunning(true);
     setResult(null);
     setDuration(null);
     rowsDoneRef.current = 0;
-    abortedRef.current = false;
     setEta(null);
     setShowDoneAlert(false);
     setWasCancelled(false);
+    setCurrentIngestTable(null);
+    setTableProgress([]);
     startTimeRef.current = Date.now();
     const t0 = startTimeRef.current;
     const startedAt = new Date(t0).toISOString();
     runAbortRef.current = new AbortController();
 
-    // Accumulate results across tables
-    let totalFound = 0;
-    let totalIngested = 0;
-    let totalSkipped = 0;
-    let totalChunks = 0;
-    const allSkippedReasons: string[] = [];
-
     try {
-      let rowOffset = 0;
-      for (const table of tablesToIngest) {
-        const tableResult = await ingestOneTable(
-          table, runAbortRef.current.signal, rowOffset,
-        );
-        if (tableResult) {
-          totalFound    += tableResult.sources_found;
-          totalIngested += tableResult.sources_ingested;
-          totalSkipped  += tableResult.sources_skipped;
-          totalChunks   += tableResult.chunks_stored;
-          allSkippedReasons.push(...tableResult.skipped_reasons);
-          rowOffset += tableResult.sources_found;
-        }
-      }
+      setCurrentIngestTable(selectedTable);
+      const tableResult = await ingestOneTable(
+        selectedTable, runAbortRef.current.signal, 0,
+      );
 
-      // Build merged result
-      if (abortedRef.current) return; // guard against late events
-      const merged: IngestResultResponse = {
-        sources_found: totalFound,
-        sources_ingested: totalIngested,
-        sources_skipped: totalSkipped,
-        chunks_stored: totalChunks,
-        skipped_reasons: allSkippedReasons,
+      const merged: IngestResultResponse = tableResult ?? {
+        sources_found: 0, sources_ingested: 0,
+        sources_skipped: 0, chunks_stored: 0, skipped_reasons: [],
       };
+      if (tableResult) {
+        setTableProgress([{
+          table: selectedTable,
+          status: tableResult.sources_ingested > 0 ? "ingested"
+                : tableResult.sources_skipped  > 0 ? "skipped"
+                : "error",
+          rowsIngested: tableResult.sources_ingested,
+          chunksStored: tableResult.chunks_stored,
+        }]);
+      }
       const completedAt = new Date().toISOString();
       setDuration(formatDuration(Date.now() - t0));
       setResult(merged);
-      if (totalIngested > 0) {
+      if (merged.sources_ingested > 0) {
         setCollectionType(currentDb, effectiveCollection, "sqlite");
         clearIncompleteCollection(currentDb, effectiveCollection);
       }
       queryClient.invalidateQueries({ queryKey: ["sources", apiUrl, currentDb, effectiveCollection] });
       queryClient.invalidateQueries({ queryKey: ["collections", apiUrl, currentDb] });
-      if (totalIngested > 0) {
+      if (merged.sources_ingested > 0) {
         setLastIngestResult({
           collection: effectiveCollection,
           sourcePath: sqlitePath,
           startedAt,
           completedAt,
-          sourcesFound:    totalFound,
-          sourcesIngested: totalIngested,
-          sourcesSkipped:  totalSkipped,
-          chunksStored:    totalChunks,
-          skippedReasons:  allSkippedReasons,
+          sourcesFound:    merged.sources_found,
+          sourcesIngested: merged.sources_ingested,
+          sourcesSkipped:  merged.sources_skipped,
+          chunksStored:    merged.chunks_stored,
+          skippedReasons:  merged.skipped_reasons,
         });
         setShowDoneAlert(true);
         setIngestDoneUnread(true);
       }
     } catch (e) {
-      abortedRef.current = true;
-      if (e instanceof DOMException && e.name === "AbortError") {
+      const wasAborted = runAbortRef.current?.signal.aborted === true;
+      if (wasAborted) {
         if (rowsDoneRef.current > 0) {
           setWasCancelled(true);
-          if (currentDb) setIncompleteCollection(currentDb, effectiveCollection);
+          if (currentDb) {
+            setIncompleteCollection(currentDb, effectiveCollection);
+            setCollectionType(currentDb, effectiveCollection, "sqlite");
+          }
+          queryClient.invalidateQueries({ queryKey: ["collections", apiUrl, currentDb] });
         }
       } else {
         setSqliteIngestStreamError(e instanceof Error ? e.message : String(e));
       }
     } finally {
       setSqliteIngestRunning(false);
+      setCurrentIngestTable(null);
     }
   }
 
@@ -308,11 +316,6 @@ export function SQLiteTab() {
               />
             </SelectTrigger>
             <SelectContent>
-              {tables.length > 1 && (
-                <SelectItem value={ALL_TABLES} className="font-medium">
-                  All tables ({tables.length})
-                </SelectItem>
-              )}
               {tables.map((t) => (
                 <SelectItem key={t} value={t}>{t}</SelectItem>
               ))}
@@ -322,38 +325,42 @@ export function SQLiteTab() {
         </div>
       </div>
 
-      {/* Collection name — append-model toggle merged into label row */}
+      {/* Collection name — append-model toggle on same row as input */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="sqlite-collection" className="text-xs text-muted-foreground">
-            Collection name
+        <Label htmlFor="sqlite-collection" className="text-xs text-muted-foreground">
+          Collection name
+        </Label>
+        <div className="flex items-center gap-2">
+          <Input
+            id="sqlite-collection"
+            value={collectionName}
+            onChange={(e) => setCollectionName(e.target.value)}
+            placeholder={currentCollection ?? "collection"}
+            className="h-8 text-sm flex-1"
+            aria-label="SQLite collection"
+          />
+          <Switch
+            id="sqlite-append-model"
+            checked={appendModel}
+            onCheckedChange={setAppendModel}
+            aria-label="Append embedding model to collection name"
+          />
+          <Label htmlFor="sqlite-append-model" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+            +model suffix
           </Label>
-          <div className="flex items-center gap-1.5">
-            <Switch
-              id="sqlite-append-model"
-              checked={appendModel}
-              onCheckedChange={setAppendModel}
-              aria-label="Append embedding model to collection name"
-            />
-            <Label htmlFor="sqlite-append-model" className="text-xs text-muted-foreground cursor-pointer">
-              +model suffix
-            </Label>
-          </div>
         </div>
-        <Input
-          id="sqlite-collection"
-          value={collectionName}
-          onChange={(e) => setCollectionName(e.target.value)}
-          placeholder={currentCollection ?? "collection"}
-          className="h-8 text-sm"
-          aria-label="SQLite collection"
-        />
         {appendModel && (
           <p className="text-xs text-muted-foreground">
             Will ingest into:{" "}
             <span className="font-mono font-medium text-foreground">
               {effectiveCollection || "—"}
             </span>
+          </p>
+        )}
+        {collectionExists && !sqliteIngestRunning && (
+          <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-3 h-3 shrink-0" />
+            Collection already exists — ingesting will append to it.
           </p>
         )}
       </div>
@@ -443,10 +450,12 @@ export function SQLiteTab() {
       {(sqliteIngestRunning || (sqliteIngestRowsTotal > 0 && !sqliteIngestStreamError)) && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{sqliteIngestRunning ? "Ingesting…" : "Done"}</span>
+            <span>{sqliteIngestRunning ? (sqliteIngestRowsTotal === 0 ? "Loading model…" : "Ingesting…") : "Done"}</span>
             <span className="tabular-nums">
               {sqliteIngestRowsTotal === 0
-                ? "Loading model…"
+                ? modelDownload && modelDownload.total > 0
+                  ? `${formatBytes(modelDownload.downloaded)} / ${formatBytes(modelDownload.total)}`
+                  : "—"
                 : `${sqliteIngestRowsDone} / ${sqliteIngestRowsTotal}`}
             </span>
           </div>
@@ -455,6 +464,11 @@ export function SQLiteTab() {
               <div
                 className="h-full rounded-full bg-primary transition-all duration-300"
                 style={{ width: `${Math.round((sqliteIngestRowsDone / sqliteIngestRowsTotal) * 100)}%` }}
+              />
+            ) : modelDownload && modelDownload.total > 0 ? (
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${Math.min(99, Math.round((modelDownload.downloaded / modelDownload.total) * 100))}%` }}
               />
             ) : (
               <div className="h-full rounded-full bg-primary animate-indeterminate" />
@@ -504,6 +518,29 @@ export function SQLiteTab() {
             <X className="w-4 h-4" />
           </button>
         </div>
+      )}
+
+      {/* Per-table progress list */}
+      {(tableProgress.length > 0 || sqliteIngestRunning) && (
+        <ScrollArea className="flex-1">
+          <div className="flex flex-col gap-1">
+            {tableProgress.map((p, i) => (
+              <div key={`${p.table}-${i}`} className="flex items-center gap-2 text-xs p-1">
+                <Badge variant={STATUS_VARIANT[p.status]} className="text-xs shrink-0">
+                  {p.status}
+                </Badge>
+                <span className="font-mono truncate flex-1">{p.table}</span>
+                <span className="text-muted-foreground shrink-0">{p.chunksStored} chunks</span>
+              </div>
+            ))}
+            {sqliteIngestRunning && currentIngestTable && (
+              <div className="flex items-center gap-2 text-xs p-1 text-muted-foreground">
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-primary" />
+                <span className="font-mono truncate flex-1">{currentIngestTable}</span>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
       )}
 
       {/* Done alert — mirrors FilesTab */}

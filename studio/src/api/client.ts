@@ -63,6 +63,7 @@ export interface ChatRequest extends QueryRequest {
   provider?: string;
   model?: string;
   api_key?: string;
+  system_prompt?: string;
 }
 
 export interface IngestRequest {
@@ -126,10 +127,17 @@ export interface IngestErrorEvent {
   detail: string;
 }
 
+export interface ModelDownloadEvent {
+  type: "model_download";
+  downloaded_bytes: number;
+  total_bytes: number;
+}
+
 export type IngestStreamEvent =
   | IngestProgressEvent
   | IngestDoneEvent
-  | IngestErrorEvent;
+  | IngestErrorEvent
+  | ModelDownloadEvent;
 
 // ---- SSE stream helpers ----
 
@@ -155,13 +163,14 @@ async function* readSseStream(
     idleTimer = setTimeout(() => abort.abort(new Error("SSE idle timeout")), SSE_IDLE_TIMEOUT_MS);
   };
 
+  const abortPromise = new Promise<never>((_, reject) => {
+    abort.signal.addEventListener("abort", () => reject(abort.signal.reason), { once: true });
+  });
+
   try {
     resetIdle();
     outer: while (true) {
       if (abort.signal.aborted) throw abort.signal.reason;
-      const abortPromise = new Promise<never>((_, reject) => {
-        abort.signal.addEventListener("abort", () => reject(abort.signal.reason), { once: true });
-      });
       const { done, value } = await Promise.race([reader.read(), abortPromise]);
       if (done) break;
       resetIdle();

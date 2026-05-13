@@ -86,23 +86,23 @@ export function Home() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Remex Studio</h1>
             <p className="text-sm text-muted-foreground mt-1 whitespace-nowrap">
-              Your private knowledge base — fully offline, never leaves your machine.
+              Unleash the power of your files with local AI.
             </p>
           </div>
         </div>
 
         {/* ── Feature pills ───────────────────────────────────────────── */}
-        <div className="grid grid-cols-4 gap-3 w-full max-w-lg">
+        <div className="grid grid-cols-4 gap-3 w-full max-w-2xl">
           {FEATURES.map(({ icon: Icon, label, desc }) => (
             <div
               key={label}
-              className="flex flex-col items-center gap-1.5 rounded-xl border bg-card/80 backdrop-blur-sm px-3 py-3 text-center"
+              className="flex flex-col items-center gap-2 rounded-xl border bg-card/80 backdrop-blur-sm px-4 py-4 text-center"
             >
               <div className="size-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <Icon className="w-3.5 h-3.5 text-primary" />
               </div>
               <p className="text-xs font-semibold leading-none">{label}</p>
-              <p className="text-[10px] text-muted-foreground leading-tight">{desc}</p>
+              <p className="text-xs text-muted-foreground leading-tight">{desc}</p>
             </div>
           ))}
         </div>
@@ -118,8 +118,8 @@ export function Home() {
       {/* ── Recent projects — reserved slot at bottom, scrollable ──────── */}
       <div className="relative z-10 shrink-0 h-48 flex flex-col justify-end pb-5">
         {recentProjects.length > 0 && (
-          <div className="w-full max-w-sm mx-auto space-y-2 overflow-y-auto max-h-full">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-widest px-1">
+          <div className="w-full max-w-2xl mx-auto space-y-2 overflow-y-auto max-h-full">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-widest px-1">
               Recent
             </p>
             <div className="space-y-1">
@@ -137,7 +137,7 @@ export function Home() {
                     aria-label={`Open ${p.path}`}
                   >
                     <p className="text-xs font-mono truncate">{p.path}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {new Date(p.lastOpened).toLocaleDateString(undefined, {
                         year: "numeric",
                         month: "short",

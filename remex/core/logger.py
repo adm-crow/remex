@@ -31,52 +31,21 @@ logger = logging.getLogger("remex.core")
 logger.setLevel(logging.INFO)
 logger.propagate = False  # prevent double output when the root logger has handlers
 
-# Default: colored output to stdout (preserves existing verbose=True behaviour)
-_default_handler = logging.StreamHandler(sys.stdout)
-_default_handler.setFormatter(CustomFormatter())
-logger.addHandler(_default_handler)
-
 
 def setup_logging(
     level: int = logging.INFO,
     log_file: Optional[str] = None,
 ) -> None:
-    """
-    Configure remex.core logging output.
-
-    By default remex.core writes colored INFO messages to stdout.
-    Call this function to change the level, silence output, or add a log file.
-
-    Args:
-        level:    Logging level, e.g. ``logging.DEBUG`` or ``logging.WARNING``.
-                  Pass ``logging.CRITICAL`` to silence all output.
-        log_file: Optional path to a log file. Messages are written there in
-                  addition to stdout (plain text, no ANSI colour codes).
-
-    Example::
-
-        import logging
-        import remex.core
-
-        # Colored stdout + persistent log file
-        remex.core.setup_logging(level=logging.DEBUG, log_file="ingest.log")
-
-        # Silence all remex.core output
-        remex.core.setup_logging(level=logging.CRITICAL)
-    """
+    """Configure remex.core logging. Call once at startup."""
     logger.setLevel(level)
     for handler in logger.handlers[:]:
         handler.close()
     logger.handlers.clear()
 
-    # Console handler with colours
-    ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(level)
-    ch.setFormatter(CustomFormatter())
-    logger.addHandler(ch)
-
-    # Optional plain-text file handler
     if log_file:
+        # When a dedicated log file is set (Tauri sidecar), write directly to it.
+        # Stderr is already redirected to the same file by the Rust launcher, so
+        # skipping the StreamHandler here prevents every line appearing twice.
         fh = logging.FileHandler(log_file, encoding="utf-8")
         fh.setLevel(level)
         fh.setFormatter(logging.Formatter(
@@ -84,3 +53,9 @@ def setup_logging(
             "%Y-%m-%d %H:%M:%S",
         ))
         logger.addHandler(fh)
+    else:
+        # Console handler (stderr) for CLI / library usage.
+        ch = logging.StreamHandler(sys.stderr)
+        ch.setLevel(level)
+        ch.setFormatter(CustomFormatter())
+        logger.addHandler(ch)

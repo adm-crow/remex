@@ -17,17 +17,26 @@ from .models import CollectionStats, IngestProgress, IngestResult, PurgeResult, 
 
 
 # ChromaDB PersistentClient is reused per db_path to avoid re-opening the SQLite WAL on every call.
-_CLIENT_CACHE: dict[str, Any] = {}
+# Capped at 3 entries (LRU) so long-running servers don't accumulate open file handles indefinitely.
+_CLIENT_CACHE: dict[str, Any] = {}  # insertion-ordered; oldest entry evicted when over cap
 _CLIENT_LOCK = threading.Lock()
+_CLIENT_CACHE_MAX = 3
 
 _MAX_EXTRACT_WORKERS = 4  # threads for parallel file extraction (I/O-bound)
 
 
 def _get_client(db_path: str) -> Any:
     with _CLIENT_LOCK:
-        if db_path not in _CLIENT_CACHE:
-            _CLIENT_CACHE[db_path] = chromadb.PersistentClient(path=db_path)
-        return _CLIENT_CACHE[db_path]
+        if db_path in _CLIENT_CACHE:
+            # Move to end (most-recently-used) without re-opening.
+            _CLIENT_CACHE[db_path] = _CLIENT_CACHE.pop(db_path)
+            return _CLIENT_CACHE[db_path]
+        client = chromadb.PersistentClient(path=db_path)
+        _CLIENT_CACHE[db_path] = client
+        if len(_CLIENT_CACHE) > _CLIENT_CACHE_MAX:
+            # Evict the least-recently-used entry.
+            _CLIENT_CACHE.pop(next(iter(_CLIENT_CACHE)))
+        return client
 
 
 def _extract_file_safe(file_path: Path) -> tuple[str | None, Exception | None]:
@@ -723,8 +732,8 @@ def warmup_collections(db_path: str = "./remex_db") -> list[str]:
             if model and model not in seen:
                 seen.add(model)
                 get_embedding_function(model)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to warm up embedding model '%s': %s", model, e)
 
     return sorted(seen)
 
@@ -771,8 +780,8 @@ def collection_stats(
             f"Collection '{collection_name}' not found in '{db_path}'."
         ) from None
 
-    total_chunks = collection.count()
     results = collection.get(include=["metadatas"])
+    total_chunks = len(results["ids"] or [])
     unique_sources = len({
         str(meta.get("source", ""))
         for meta in (results["metadatas"] or [])

@@ -17,15 +17,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EmbeddingModelField } from "./EmbeddingModelField";
 import { api } from "@/api/client";
+import { useCollections } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { formatDuration } from "@/lib/formatDuration";
 import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
-
-const STATUS_VARIANT = {
-  ingested: "default" as const,
-  skipped:  "secondary" as const,
-  error:    "destructive" as const,
-};
+import { formatBytes, STATUS_VARIANT } from "./ingestShared";
 
 export function FilesTab() {
   const queryClient = useQueryClient();
@@ -61,9 +57,8 @@ export function FilesTab() {
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
   const [wasCancelled,   setWasCancelled]   = useState(false);
   const [eta,            setEta]            = useState<string | null>(null);
-  const [showModelHint,  setShowModelHint]  = useState(false);
+  const [modelDownload,  setModelDownload]  = useState<{ downloaded: number; total: number } | null>(null);
   const abortRef    = useRef<AbortController | null>(null);
-  const abortedRef  = useRef(false);
   const startTimeRef = useRef<number | null>(null);
   const { isDragging } = useDragDrop((path) => setSourcePath(path));
 
@@ -97,20 +92,17 @@ export function FilesTab() {
     return () => clearInterval(id);
   }, [ingestRunning, ingestFilesDone, ingestFilesTotal]);
 
-  // After 5 s with no file-count progress, show a hint that the embedding
-  // model is being downloaded (only happens on first use per model).
+  // Clear download progress once the ingest itself starts reporting file counts.
   useEffect(() => {
-    if (!ingestRunning || ingestFilesTotal > 0) {
-      setShowModelHint(false);
-      return;
-    }
-    const id = setTimeout(() => setShowModelHint(true), 5000);
-    return () => clearTimeout(id);
-  }, [ingestRunning, ingestFilesTotal]);
+    if (ingestFilesTotal > 0) setModelDownload(null);
+  }, [ingestFilesTotal]);
 
   const effectiveCollection = appendModel
     ? `${collectionName}-${embeddingModel}`.replace(/[^a-zA-Z0-9_-]/g, "-")
     : collectionName;
+
+  const { data: existingCollections = [] } = useCollections(apiUrl, currentDb ?? "");
+  const collectionExists = !!effectiveCollection && existingCollections.includes(effectiveCollection);
 
   async function handleBrowse() {
     const selected = await open({
@@ -124,11 +116,10 @@ export function FilesTab() {
     if (!sourcePath || !currentDb || !effectiveCollection) return;
     setShowDoneAlert(false);
     setWasCancelled(false);
-    setIngestDoneUnread(false);
+    setModelDownload(null);
     resetIngestSession();
     setIngestRunning(true);
     abortRef.current = new AbortController();
-    abortedRef.current = false;
     startTimeRef.current = Date.now();
     const startedAt = new Date().toISOString();
 
@@ -146,7 +137,9 @@ export function FilesTab() {
         },
         abortRef.current.signal
       )) {
-        if (event.type === "progress") {
+        if (event.type === "model_download") {
+          setModelDownload({ downloaded: event.downloaded_bytes, total: event.total_bytes });
+        } else if (event.type === "progress") {
           setIngestFilesDone(event.files_done);
           setIngestFilesTotal(event.files_total);
           appendIngestProgress({
@@ -155,7 +148,6 @@ export function FilesTab() {
             chunks_stored: event.chunks_stored,
           });
         } else if (event.type === "done") {
-          if (abortedRef.current) continue; // ignore late events after abort
           if (event.result.sources_ingested > 0) {
             setCollectionType(currentDb, effectiveCollection, "files");
             clearIncompleteCollection(currentDb, effectiveCollection);
@@ -196,8 +188,7 @@ export function FilesTab() {
         }
       }
     } catch (e) {
-      abortedRef.current = true;
-      if (e instanceof DOMException && e.name === "AbortError") {
+      if (abortRef.current?.signal.aborted === true) {
         if (useAppStore.getState().ingestFilesDone > 0) {
           setWasCancelled(true);
           if (currentDb) setIncompleteCollection(currentDb, effectiveCollection);
@@ -225,7 +216,7 @@ export function FilesTab() {
             value={sourcePath}
             onChange={(e) => setSourcePath(e.target.value)}
             placeholder="/path/to/docs"
-            className="flex-1 h-8"
+            className="flex-1 h-8 text-sm"
             aria-label="Source directory"
           />
           <Button variant="outline" size="sm" onClick={handleBrowse} aria-label="Browse">
@@ -234,37 +225,41 @@ export function FilesTab() {
         </div>
       </div>
 
-      {/* Collection name — append-model toggle merged into label row */}
+      {/* Collection name — append-model toggle on same row as input */}
       <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <Label htmlFor="collection-name" className="text-xs text-muted-foreground">
-            Collection name
+        <Label htmlFor="collection-name" className="text-xs text-muted-foreground">
+          Collection name
+        </Label>
+        <div className="flex items-center gap-2">
+          <Input
+            id="collection-name"
+            value={collectionName}
+            onChange={(e) => setCollectionName(e.target.value)}
+            placeholder={currentCollection ?? "collection"}
+            className="h-8 text-sm flex-1"
+          />
+          <Switch
+            id="append-model"
+            checked={appendModel}
+            onCheckedChange={setAppendModel}
+            aria-label="Append embedding model to collection name"
+          />
+          <Label htmlFor="append-model" className="text-xs text-muted-foreground cursor-pointer whitespace-nowrap">
+            +model suffix
           </Label>
-          <div className="flex items-center gap-1.5">
-            <Switch
-              id="append-model"
-              checked={appendModel}
-              onCheckedChange={setAppendModel}
-              aria-label="Append embedding model to collection name"
-            />
-            <Label htmlFor="append-model" className="text-xs text-muted-foreground cursor-pointer">
-              +model suffix
-            </Label>
-          </div>
         </div>
-        <Input
-          id="collection-name"
-          value={collectionName}
-          onChange={(e) => setCollectionName(e.target.value)}
-          placeholder={currentCollection ?? "collection"}
-          className="h-8 text-sm"
-        />
         {appendModel && (
           <p className="text-xs text-muted-foreground">
             Will ingest into:{" "}
             <span className="font-mono font-medium text-foreground">
               {effectiveCollection || "—"}
             </span>
+          </p>
+        )}
+        {collectionExists && !ingestRunning && (
+          <p className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="w-3 h-3 shrink-0" />
+            Collection already exists — ingesting will append to it.
           </p>
         )}
       </div>
@@ -348,10 +343,12 @@ export function FilesTab() {
       {(ingestRunning || (ingestFilesTotal > 0 && !ingestStreamError)) && (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{ingestRunning ? "Ingesting…" : "Done"}</span>
+            <span>{ingestRunning ? (ingestFilesTotal === 0 ? "Loading model…" : "Ingesting…") : "Done"}</span>
             <span className="tabular-nums">
               {ingestFilesTotal === 0
-                ? "Loading model…"
+                ? modelDownload && modelDownload.total > 0
+                  ? `${formatBytes(modelDownload.downloaded)} / ${formatBytes(modelDownload.total)}`
+                  : "—"
                 : `${ingestFilesDone} / ${ingestFilesTotal}`}
             </span>
           </div>
@@ -368,7 +365,9 @@ export function FilesTab() {
               style={{
                 width: ingestFilesTotal > 0
                   ? `${Math.round((ingestFilesDone / ingestFilesTotal) * 100)}%`
-                  : ingestRunning ? "5%" : "0%",
+                  : modelDownload && modelDownload.total > 0
+                    ? `${Math.min(99, Math.round((modelDownload.downloaded / modelDownload.total) * 100))}%`
+                    : ingestRunning ? "3%" : "0%",
               }}
             />
           </div>
@@ -437,7 +436,7 @@ export function FilesTab() {
               <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-primary" />
               <span className="truncate flex-1">
                 {ingestFilesTotal === 0
-                  ? showModelHint
+                  ? modelDownload
                     ? "Downloading embedding model… (first use only)"
                     : "Starting ingestion…"
                   : ingestFilesDone >= ingestFilesTotal

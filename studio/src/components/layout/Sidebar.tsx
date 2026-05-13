@@ -1,11 +1,11 @@
-import { Search, Upload, Database, Settings, RotateCcw, House, ScrollText } from "lucide-react";
+import { Search, Upload, Database, Settings, RotateCcw, House } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CollectionSwitcher } from "./CollectionSwitcher";
 import { useAppStore, useIsPro } from "@/store/app";
 import { ProBadge } from "@/components/license/ProBadge";
 
-export type View = "query" | "ingest" | "collections" | "settings" | "logs";
+export type View = "query" | "ingest" | "collections" | "settings";
 
 interface SidebarProps {
   activeView: View;
@@ -37,7 +37,7 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
         </p>
         {currentDb && (
           <p
-            className="text-[11px] text-muted-foreground truncate leading-tight mt-0.5 font-mono"
+            className="text-xs text-muted-foreground truncate leading-tight mt-0.5 font-mono"
             title={currentDb}
             aria-label="Current database"
           >
@@ -91,29 +91,16 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
         ))}
       </nav>
 
-      {/* ── Home + Logs buttons ─────────────────────────────────────────── */}
-      <div className="px-2 pb-2 shrink-0 flex gap-1.5">
+      {/* ── Home button ─────────────────────────────────────────────────── */}
+      <div className="px-2 pb-2 shrink-0">
         <button
           onClick={() => setCurrentDb(null)}
-          className="flex-1 flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40 transition-all duration-150"
+          className="w-full flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40 transition-all duration-150"
           title="Back to home"
           aria-label="Back to home"
         >
           <House className="w-4 h-4 shrink-0" />
           <span>Home</span>
-        </button>
-        <button
-          onClick={() => onViewChange("logs")}
-          className={cn(
-            "flex-1 flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border transition-all duration-150",
-            activeView === "logs"
-              ? "border-primary/60 text-primary bg-accent"
-              : "border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40"
-          )}
-          aria-current={activeView === "logs" ? "page" : undefined}
-        >
-          <ScrollText className="w-4 h-4 shrink-0" />
-          <span>Logs</span>
         </button>
       </div>
 
@@ -136,8 +123,8 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
           <p className="text-xs font-medium capitalize text-sidebar-foreground leading-none">
             {sidecarStatus}
           </p>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1">
-            Remex serve
+          <p className="text-xs text-muted-foreground leading-none mt-1">
+            Remex server
           </p>
         </div>
         {sidecarStatus !== "starting" && (

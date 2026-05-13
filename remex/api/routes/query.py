@@ -1,10 +1,13 @@
 import asyncio
+import logging
 
 from fastapi import APIRouter, HTTPException
 
 from remex.core import DEFAULT_MODELS, detect_provider, generate_answer, query
 from remex.core.exceptions import RemexError
 from remex.api.schemas import ChatRequest, ChatResponse, QueryRequest, QueryResultItem, MultiChatRequest, MultiChatResponse
+
+_logger = logging.getLogger("remex.core")
 
 router = APIRouter(prefix="/collections", tags=["query"])
 
@@ -13,6 +16,7 @@ router = APIRouter(prefix="/collections", tags=["query"])
 async def query_collection(
     collection: str, req: QueryRequest
 ) -> list[QueryResultItem]:
+    _logger.info("[QUERY] collection=%s n=%d q=%.120s", collection, req.n_results, req.text)
     try:
         results = await asyncio.to_thread(
             query,
@@ -26,6 +30,7 @@ async def query_collection(
         )
     except (RemexError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
+    _logger.info("[QUERY] -> %d results", len(results))
     return list(results)
 
 
@@ -57,6 +62,7 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
 
     resolved_model = req.model or DEFAULT_MODELS.get(provider, "")
     context = "\n\n".join(r["text"] for r in results)
+    _logger.info("[CHAT] collection=%s provider=%s model=%s q=%.120s", collection, provider, resolved_model, req.text)
 
     try:
         answer = await asyncio.to_thread(
@@ -66,12 +72,14 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
             provider=provider,
             model=resolved_model,
             api_key=req.api_key if req.api_key else None,
+            system_prompt=req.system_prompt or None,
         )
     except (ValueError, ImportError) as e:
         # Missing API key, unknown provider, or SDK not installed — user config error.
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
         # Downstream API error (auth failure, rate limit, network, etc.).
+        _logger.warning("[CHAT] provider error: %s", e)
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -124,6 +132,7 @@ async def multi_chat(req: MultiChatRequest) -> MultiChatResponse:
 
     resolved_model = req.model or DEFAULT_MODELS.get(provider, "")
     context = "\n\n".join(r["text"] for r in merged)
+    _logger.info("[CHAT/MULTI] collections=%s provider=%s model=%s q=%.120s", req.collections, provider, resolved_model, req.text)
 
     try:
         answer = await asyncio.to_thread(
@@ -133,10 +142,12 @@ async def multi_chat(req: MultiChatRequest) -> MultiChatResponse:
             provider=provider,
             model=resolved_model,
             api_key=req.api_key if req.api_key else None,
+            system_prompt=req.system_prompt or None,
         )
     except (ValueError, ImportError) as e:
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
+        _logger.warning("[CHAT/MULTI] provider error: %s", e)
         raise HTTPException(status_code=502, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

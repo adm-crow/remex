@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle, FileText, Database, Pencil, RotateCcw, MessageSquare } from "lucide-react";
+
+const errMsg = (e: unknown) => e instanceof Error ? e.message : String(e);
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -136,7 +138,7 @@ function SourcesList({ apiUrl, dbPath, collection }: SourcesListProps) {
                 onClick={() => setConfirmDelete(item)}
                 aria-label={`Delete ${item.source}`}
               >
-                <Trash2 className="w-3 h-3" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
@@ -288,7 +290,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
           {isCurrent && (
             <Badge
               variant="secondary"
-              className="text-[10px] px-1.5 py-0 shrink-0 bg-primary/10 text-primary border-primary/20"
+              className="text-xs px-1.5 py-0 shrink-0 bg-primary/10 text-primary border-primary/20"
             >
               active
             </Badge>
@@ -296,7 +298,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
           {isIncomplete && (
             <Badge
               variant="secondary"
-              className="text-[10px] px-1.5 py-0 shrink-0 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+              className="text-xs px-1.5 py-0 shrink-0 bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
             >
               Incomplete
             </Badge>
@@ -380,7 +382,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
           </p>
           {deleteMutation.error && (
             <p className="text-xs text-destructive">
-              {deleteMutation.error instanceof Error ? deleteMutation.error.message : String(deleteMutation.error)}
+              {errMsg(deleteMutation.error)}
             </p>
           )}
           <DialogFooter>
@@ -461,11 +463,11 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
               placeholder="e.g. Company knowledge base, Q1 2024 documents…"
               maxLength={500}
             />
-            <p className="text-[10px] text-muted-foreground text-right">{descDraft.length}/500</p>
+            <p className="text-xs text-muted-foreground text-right">{descDraft.length}/500</p>
           </div>
           {descMutation.error && (
             <p className="text-xs text-destructive">
-              {descMutation.error instanceof Error ? descMutation.error.message : String(descMutation.error)}
+              {errMsg(descMutation.error)}
             </p>
           )}
           <DialogFooter>
@@ -499,7 +501,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
               <strong className="text-foreground tabular-nums">{stats.total_sources.toLocaleString()}</strong>{" "}
               {collectionType === "sqlite" ? "tables" : "documents"}
             </span>
-            <span className="font-mono text-[11px]">{stats.embedding_model}</span>
+            <span className="font-mono text-xs">{stats.embedding_model}</span>
           </div>
           {stats.description && (
             <p className="text-xs text-muted-foreground italic">{stats.description}</p>
@@ -515,7 +517,7 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
       )}
       {purgeMutation.error && (
         <div className="px-4 pb-2 text-xs text-destructive border-t pt-2">
-          {purgeMutation.error instanceof Error ? purgeMutation.error.message : String(purgeMutation.error)}
+          {errMsg(purgeMutation.error)}
         </div>
       )}
 
@@ -566,7 +568,7 @@ export function SourcesPane() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-4 border-b flex items-center justify-between shrink-0">
+      <div className="px-4 py-4 border-b flex items-center justify-between shrink-0">
         <div>
           <h2 className="font-semibold text-sm">Collections</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -576,7 +578,7 @@ export function SourcesPane() {
       </div>
 
       {collections.length === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-2 px-8 text-center">
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="text-sm font-medium text-foreground">No collections yet</p>
           <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
             Go to the <strong>Ingest</strong> tab, select a source directory, enter a collection

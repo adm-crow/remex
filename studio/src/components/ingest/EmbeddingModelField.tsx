@@ -111,6 +111,7 @@ function PresetList({
           </a>
         ))}
       </div>
+
     </>
   );
 }
@@ -135,7 +136,7 @@ function CompactPicker({
     "flex-1 flex flex-col items-center justify-center border-r border-border px-1 py-1.5 gap-0.5 transition-colors min-w-0";
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Label className="text-xs">Embedding model</Label>
 
       <div className="flex border border-border rounded-md overflow-hidden bg-background">
@@ -246,7 +247,7 @@ export function EmbeddingModelField({
   }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <Label htmlFor={inputId} className="text-xs">Embedding model</Label>
       <Input
         id={inputId}

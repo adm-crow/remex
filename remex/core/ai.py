@@ -72,10 +72,12 @@ def generate_answer(
     provider: str,
     model: Optional[str] = None,
     api_key: Optional[str] = None,
+    system_prompt: Optional[str] = None,
 ) -> str:
     """Generate an answer using the specified provider and model."""
     model = model or DEFAULT_MODELS.get(provider, "")
-    system = _SYSTEM_PROMPT.format(context=context)
+    base = _SYSTEM_PROMPT.format(context=context)
+    system = f"{system_prompt.strip()}\n\n{base}" if system_prompt and system_prompt.strip() else base
 
     if provider == "anthropic":
         return _answer_anthropic(question, system, model, api_key=api_key)

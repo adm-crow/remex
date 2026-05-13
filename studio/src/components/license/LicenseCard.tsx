@@ -12,7 +12,7 @@ const Card = ({ children, className, id, cardRef }: {
   children: React.ReactNode; className?: string; id?: string;
   cardRef?: React.RefObject<HTMLDivElement | null>;
 }) => (
-  <div ref={cardRef} id={id} className={cn("rounded-xl border bg-primary/10 border-primary/30 p-3 space-y-2.5", className)}>
+  <div ref={cardRef} id={id} className={cn("rounded-xl border bg-primary/10 border-primary/30 p-3 space-y-3", className)}>
     {children}
   </div>
 );
@@ -145,8 +145,8 @@ export function LicenseCard() {
             </Button>
           </div>
           {error && (
-            <div className="flex items-center gap-1.5 text-[11px] text-destructive pt-1">
-              <X className="w-3 h-3 shrink-0" />
+            <div className="flex items-center gap-1.5 text-xs text-destructive pt-1">
+              <X className="w-3.5 h-3.5 shrink-0" />
               <span>{error}</span>
             </div>
           )}

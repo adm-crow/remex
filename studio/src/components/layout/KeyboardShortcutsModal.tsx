@@ -33,7 +33,7 @@ const SHORTCUTS: { group: string; items: Shortcut[] }[] = [
 
 function Kbd({ children }: { children: string }) {
   return (
-    <kbd className="inline-flex items-center justify-center px-1.5 py-0.5 rounded border border-border bg-muted text-[10px] font-mono font-medium text-muted-foreground min-w-[1.4rem]">
+    <kbd className="inline-flex items-center justify-center px-1.5 py-0.5 rounded border border-border bg-muted text-xs font-mono font-medium text-muted-foreground min-w-[1.4rem]">
       {children}
     </kbd>
   );
@@ -54,7 +54,7 @@ export function KeyboardShortcutsModal({ open, onClose }: KeyboardShortcutsModal
         <div className="space-y-4 pt-1">
           {SHORTCUTS.map(({ group, items }) => (
             <div key={group}>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                 {group}
               </p>
               <div className="space-y-2">
@@ -66,7 +66,7 @@ export function KeyboardShortcutsModal({ open, onClose }: KeyboardShortcutsModal
                         <span key={i} className="flex items-center gap-1">
                           <Kbd>{k}</Kbd>
                           {i < keys.length - 1 && (
-                            <span className="text-[10px] text-muted-foreground">+</span>
+                            <span className="text-xs text-muted-foreground">+</span>
                           )}
                         </span>
                       ))}

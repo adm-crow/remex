@@ -42,6 +42,7 @@ impl Default for SidecarState {
     fn default() -> Self { Self::new() }
 }
 
+
 /// RAII guard that resets the spawning flag when dropped.
 /// Ensures the flag is cleared even if do_spawn panics or returns early.
 struct SpawningGuard<'a>(&'a AtomicBool);
@@ -109,7 +110,9 @@ async fn do_spawn(
         let _ = fs::create_dir_all(&d);
         d.join("sidecar.log")
     });
-    let log_file = log_path.as_ref().and_then(|p| fs::File::create(p).ok());
+    let log_file = log_path.as_ref().and_then(|p| {
+        fs::OpenOptions::new().create(true).append(true).open(p).ok()
+    });
 
     let mut cmd = Command::new(&remex_path);
     cmd.args(["serve", "--host", &host, "--port", &port.to_string()]);
@@ -117,11 +120,20 @@ async fn do_spawn(
     // Developer Mode is off. The degraded cache mode still works correctly.
     cmd.env("HF_HUB_DISABLE_SYMLINKS_WARNING", "1");
 
-    // Forward proxy env vars so the sidecar can reach the internet through
-    // corporate proxies. requests/httpx/huggingface_hub all read these automatically.
+    // Tell the sidecar where to write its application log.
+    if let Some(ref p) = log_path {
+        if let Some(s) = p.to_str() {
+            cmd.env("REMEX_LOG_FILE", s);
+        }
+    }
+
+    // Forward proxy and SSL cert env vars so the sidecar can reach the internet
+    // through corporate proxies. requests/httpx/huggingface_hub read these automatically.
     for var in &[
         "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
         "http_proxy", "https_proxy", "no_proxy",
+        // Corporate CA bundle paths (used by requests/httpx/curl as fallback)
+        "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "SSL_CERT_FILE",
     ] {
         if let Ok(val) = std::env::var(var) {
             cmd.env(var, val);
@@ -197,8 +209,8 @@ fn write_text_file(path: String, content: String) -> Result<(), String> {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-    if !matches!(ext.as_str(), "json" | "csv" | "md" | "bib" | "ris") {
-        return Err("Only .json, .csv, .md, .bib, and .ris files are supported".to_string());
+    if !matches!(ext.as_str(), "json" | "csv" | "md" | "bib" | "ris" | "csl") {
+        return Err("Only .json, .csv, .md, .bib, .ris, and .csl files are supported".to_string());
     }
     fs::write(&path, content).map_err(|e| format!("Failed to write file: {e}"))
 }
@@ -213,33 +225,10 @@ async fn check_sidecar_health(host: String, port: u16) -> bool {
 }
 
 #[tauri::command]
-fn export_log(path: String, content: String) -> Result<(), String> {
-    let path_buf = std::path::PathBuf::from(&path);
-    if !path_buf.is_absolute() {
-        return Err("Path must be absolute".to_string());
-    }
-    let ext = path_buf
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    if !matches!(ext.as_str(), "log" | "txt") {
-        return Err("Only .log and .txt files are supported".to_string());
-    }
-    fs::write(&path_buf, content).map_err(|e| format!("Failed to write log: {e}"))
-}
-
-#[tauri::command]
-fn read_sidecar_log(app: AppHandle) -> Result<String, String> {
-    let path = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("sidecar.log");
-    if !path.exists() {
-        return Ok(String::new());
-    }
-    fs::read_to_string(&path).map_err(|e| format!("Failed to read log: {e}"))
+fn get_fastembed_cache_path() -> String {
+    let mut p = std::env::temp_dir();
+    p.push("fastembed_cache");
+    p.to_string_lossy().into_owned()
 }
 
 #[tauri::command]
@@ -262,7 +251,7 @@ pub fn run() {
         .manage(watch::WatchState::new())
         .invoke_handler(tauri::generate_handler![
             spawn_sidecar, kill_sidecar, is_sidecar_alive, check_sidecar_health, check_needs_setup,
-            read_sidecar_log, export_log, write_text_file,
+            write_text_file, get_fastembed_cache_path,
             license::license_activate,
             license::license_status,
             license::license_deactivate,

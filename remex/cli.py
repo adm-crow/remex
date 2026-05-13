@@ -618,12 +618,24 @@ def _seed_bundled_model() -> None:
 @click.option("--reload", is_flag=True, help="Enable auto-reload (development only).")
 def serve_cmd(host: str, port: int, reload: bool) -> None:
     """Start the remex FastAPI sidecar."""
+    import logging
+    import os
+    # Inject the OS native certificate store before any network call so that
+    # corporate SSL-inspection proxies (which re-sign traffic with an internal
+    # CA) are trusted without manual certifi patching.
+    try:
+        import truststore
+        truststore.inject_into_ssl()
+    except ImportError:
+        pass
+    from remex.core.logger import setup_logging
+    setup_logging(level=logging.INFO, log_file=os.environ.get("REMEX_LOG_FILE"))
     _seed_bundled_model()
     try:
         import uvicorn
     except ImportError:
         raise click.ClickException("Run: pip install remex-cli[api]")
-    uvicorn.run("remex.api.main:app", host=host, port=port, reload=reload)
+    uvicorn.run("remex.api.main:app", host=host, port=port, reload=reload, log_level="warning")
 
 
 @cli.command(name="studio")

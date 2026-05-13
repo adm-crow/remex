@@ -62,10 +62,29 @@ interface QueryPaneProps {
   onFocusReady?: (fn: () => void) => void;
 }
 
+function isAiNetworkError(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("failed to fetch") ||
+    lower.includes("fetch failed") ||
+    lower.includes("networkerror") ||
+    lower.includes("failed to connect") ||
+    lower.includes("connection refused") ||
+    lower.includes("connection timed out") ||
+    lower.includes("name or service not known") ||
+    lower.includes("getaddrinfo") ||
+    lower.includes("502") ||
+    lower.includes("proxy") ||
+    lower.includes("ssl") ||
+    lower.includes("certificate")
+  );
+}
+
 export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
+          agentSystemPrompt,
           queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory,
-          openUpgradeModal } =
+          openUpgradeModal, setRequestedView } =
     useAppStore();
 
   const isPro = useIsPro();
@@ -148,6 +167,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       provider: aiProvider || undefined,
       model: aiModel || undefined,
       api_key: aiApiKey || undefined,
+      system_prompt: agentSystemPrompt || undefined,
     }
   );
   const singleChatResult = useChat(
@@ -159,6 +179,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       provider: aiProvider || undefined,
       model: aiModel || undefined,
       api_key: aiApiKey || undefined,
+      system_prompt: agentSystemPrompt || undefined,
     }
   );
   const chatResult = isMultiAi ? multiChatResult : singleChatResult;
@@ -325,7 +346,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     <div className="flex flex-col h-full">
 
       {/* ── Search area ─────────────────────────────────────────────────── */}
-      <div className="px-6 pt-5 pb-4 border-b shrink-0 space-y-3">
+      <div className="px-4 pt-4 pb-4 border-b shrink-0 space-y-3">
 
         {/* Search input — dominant, full width */}
         <form onSubmit={handleSubmit} className="flex gap-2">
@@ -375,13 +396,13 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                   value={historyFilter}
                   onChange={(e) => setHistoryFilter(e.target.value)}
                   placeholder="Search your query history…"
-                  className="h-7 text-xs"
+                  className="h-8 text-xs"
                   aria-label="Search query history"
                 />
               </div>
             )}
-            <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
-              <Clock className="w-3 h-3" />
+            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
+              <Clock className="w-3.5 h-3.5" />
               Recent
             </span>
             {visibleHistory.map((q) => (
@@ -402,7 +423,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                   aria-label={`Remove ${q}`}
                   className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
                 >
-                  <X className="w-3 h-3" />
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </span>
             ))}
@@ -426,8 +447,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         {/* Collection pills */}
         {collections.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
-            <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
-              <Layers className="w-3 h-3" />
+            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
+              <Layers className="w-3.5 h-3.5" />
               Collections
             </span>
             {collections.map((col) => (
@@ -453,7 +474,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               type="number" min={1} max={50}
               value={nResults}
               onChange={(e) => setNResults(Math.max(1, Number(e.target.value)))}
-              className="h-7 w-14 text-xs text-center px-1"
+              className="h-8 w-14 text-xs text-center px-1"
               aria-label="Max results"
             />
           </div>
@@ -466,7 +487,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               type="number" min={0} max={1} step={0.05}
               value={minScore}
               onChange={(e) => setMinScore(Number(e.target.value))}
-              className="h-7 w-16 text-xs text-center px-1"
+              className="h-8 w-16 text-xs text-center px-1"
             />
           </div>
 
@@ -497,10 +518,10 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           <Collapsible open={filterOpen} onOpenChange={setFilterOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground gap-1.5 text-xs">
-                <Filter className="w-3 h-3" />
+                <Filter className="w-3.5 h-3.5" />
                 Filter by source
                 {selectedSources.length > 0 && (
-                  <span className="rounded-full bg-primary text-primary-foreground text-[10px] px-1.5">
+                  <span className="rounded-full bg-primary text-primary-foreground text-xs px-1.5">
                     {selectedSources.length}
                   </span>
                 )}
@@ -513,7 +534,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                     value={sourceSearch}
                     onChange={(e) => setSourceSearch(e.target.value)}
                     placeholder="Filter sources…"
-                    className="h-7 text-xs"
+                    className="h-8 text-xs"
                     aria-label="Filter sources"
                   />
                 )}
@@ -561,8 +582,11 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
 
         {/* AI Agent notice — shown below the strip when toggle is on but not configured */}
         {useAi && !aiProvider && !aiModel && (
-          <div className="flex items-center gap-1.5 text-[11px] text-amber-500 dark:text-amber-400">
-            <Info className="w-3.5 h-3.5 shrink-0" />
+          <div
+            className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-600 dark:text-amber-400"
+            role="alert"
+          >
+            <Info className="w-4 h-4 shrink-0" />
             AI Answer requires a provider and model — configure them in{" "}
             <strong className="font-medium">Settings → AI Agent</strong>.
           </div>
@@ -572,29 +596,46 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       {/* ── Export error ─────────────────────────────────────────────────── */}
       {exportError && (
         <div
-          className="mx-6 mt-3 shrink-0 text-destructive text-sm p-3 border border-destructive/30 rounded-md bg-destructive/5 flex items-center justify-between gap-2"
+          className="mx-4 mt-3 shrink-0 flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
           role="alert"
         >
-          <span>Export failed: {exportError}</span>
-          <button type="button" onClick={() => setExportError(null)} className="shrink-0 opacity-70 hover:opacity-100">
-            <X className="w-3.5 h-3.5" />
+          <span className="flex-1">Export failed: {exportError}</span>
+          <button type="button" onClick={() => setExportError(null)} className="shrink-0 opacity-70 hover:opacity-100 mt-0.5">
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {/* ── Error ────────────────────────────────────────────────────────── */}
       {!!submitted && error && (
-        <div
-          className="mx-6 mt-4 shrink-0 text-destructive text-sm p-3 border border-destructive/30 rounded-md bg-destructive/5"
-          role="alert"
-        >
-          {error.message}
+        <div className="mx-4 mt-3 shrink-0 space-y-2">
+          {useAi && isAiNetworkError(error.message) && (
+            <div
+              className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400"
+              role="alert"
+            >
+              <Info className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                AI provider is unreachable — your network or corporate firewall may be blocking this endpoint.
+                Try switching to <strong>Ollama (local)</strong> in <strong>Settings → AI & Server</strong>, or check with your IT team.
+              </span>
+            </div>
+          )}
+          <div
+            className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
+            role="alert"
+          >
+          <span className="flex-1">{error.message}</span>
+          <button type="button" onClick={() => setSubmitted("")} className="shrink-0 opacity-70 hover:opacity-100 mt-0.5">
+            <X className="w-4 h-4" />
+          </button>
+          </div>
         </div>
       )}
 
       {/* ── Scrollable body ──────────────────────────────────────────────── */}
       <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-4 py-4 space-y-4">
 
           {/* Empty state: no project open */}
           {!currentDb && (
@@ -625,9 +666,12 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
             <div className="flex flex-col items-center justify-center py-16 text-center px-6">
               <Inbox className="w-8 h-8 text-muted-foreground/40 mb-3" />
               <p className="text-sm font-medium text-muted-foreground">No collections yet</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">
-                Go to the Ingest tab to add some documents first.
+              <p className="text-xs text-muted-foreground/60 mt-1 mb-4">
+                Add documents first, then search across them here.
               </p>
+              <Button size="sm" onClick={() => setRequestedView("ingest")}>
+                Go to Ingest
+              </Button>
             </div>
           )}
 
@@ -660,8 +704,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                   aria-label="Export AI answer"
                 >
                   {aiExportDone
-                    ? <><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Saved</>
-                    : <><Download className="w-3 h-3" /> Export</>}
+                    ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Saved</>
+                    : <><Download className="w-3.5 h-3.5" /> Export</>}
                 </Button>
               </div>
               <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed
@@ -743,8 +787,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                     aria-label="Export results"
                   >
                     {exportDone
-                      ? <><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Exported</>
-                      : <><Download className="w-3 h-3" /> Export</>
+                      ? <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Exported</>
+                      : <><Download className="w-3.5 h-3.5" /> Export</>
                     }
                   </Button>
                 </div>

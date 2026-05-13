@@ -10,13 +10,13 @@ export function IngestPane() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex border-b px-6 pt-4 shrink-0">
+      <div className="flex border-b px-4 shrink-0">
         {(["files", "sqlite"] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              "px-3 py-1.5 text-sm font-medium border-b-2 -mb-px transition-colors",
+              "px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors",
               activeTab === tab
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"

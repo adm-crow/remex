@@ -60,6 +60,7 @@ export interface AppState {
   aiProvider: string;
   aiModel: string;
   aiApiKey: string;
+  agentSystemPrompt: string;
   // Sidecar reconnect (not persisted)
   sidecarReconnectSeq: number;
   triggerSidecarReconnect: () => void;
@@ -115,6 +116,7 @@ export interface AppState {
   setAiProvider: (provider: string) => void;
   setAiModel: (model: string) => void;
   setAiApiKey: (key: string) => void;
+  setAgentSystemPrompt: (prompt: string) => void;
   resetIngestSession: () => void;
   appendIngestProgress: (item: ProgressItem) => void;
   setIngestFilesDone: (n: number) => void;
@@ -191,6 +193,7 @@ export const useAppStore = create<AppState>()(
       aiProvider: "",
       aiModel: "",
       aiApiKey: "",
+      agentSystemPrompt: "",
       ingestRunning: false,
       ingestProgress: [],
       ingestFilesDone: 0,
@@ -270,9 +273,10 @@ export const useAppStore = create<AppState>()(
       setRequestedView:  (view)     => set({ requestedView: view }),
       setTheme:          (theme)    => set({ theme }),
       setHomeBg:         (homeBg)   => set({ homeBg }),
-      setAiProvider:     (provider) => set({ aiProvider: provider }),
-      setAiModel:        (model)    => set({ aiModel: model }),
-      setAiApiKey:       (key)      => set({ aiApiKey: key }),
+      setAiProvider:          (provider) => set({ aiProvider: provider }),
+      setAiModel:             (model)    => set({ aiModel: model }),
+      setAiApiKey:            (key)      => set({ aiApiKey: key }),
+      setAgentSystemPrompt:   (prompt)   => set({ agentSystemPrompt: prompt }),
 
       resetIngestSession: () => set({
         ingestRunning:     false,
@@ -282,8 +286,11 @@ export const useAppStore = create<AppState>()(
         ingestStreamError: null,
       }),
 
-      appendIngestProgress: (item) =>
-        set({ ingestProgress: [...get().ingestProgress, item] }),
+      appendIngestProgress: (item) => {
+        const prev = get().ingestProgress;
+        const next = prev.length >= 500 ? [...prev.slice(-499), item] : [...prev, item];
+        set({ ingestProgress: next });
+      },
 
       setIngestFilesDone:   (n)   => set({ ingestFilesDone: n }),
       setIngestFilesTotal:  (n)   => set({ ingestFilesTotal: n }),
@@ -358,6 +365,7 @@ export const useAppStore = create<AppState>()(
           homeBg:       "dotgrid",
           theme:        "default",
           watchFolders: [],
+          queryHistory: get().queryHistory.slice(0, 20),
         });
         // Best-effort remote deactivation — fire-and-forget so UI isn't blocked.
         licenseApi.deactivate().catch(() => {});
@@ -399,8 +407,9 @@ export const useAppStore = create<AppState>()(
         darkModeAuto:     state.darkModeAuto,
         lastIngestParamsMap: state.lastIngestParamsMap,
         theme:            state.theme,
-        aiProvider:       state.aiProvider,
-        aiModel:          state.aiModel,
+        aiProvider:          state.aiProvider,
+        aiModel:             state.aiModel,
+        agentSystemPrompt:   state.agentSystemPrompt,
         // aiApiKey intentionally NOT persisted — re-entered each session to avoid
         // storing credentials in plaintext localStorage.
         homeBg:           state.homeBg,

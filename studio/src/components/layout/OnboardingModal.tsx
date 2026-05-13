@@ -16,7 +16,7 @@ export function OnboardingModal() {
           <div className="space-y-1">
             <DialogTitle className="text-lg font-semibold">Welcome to Remex Studio</DialogTitle>
             <p className="text-sm text-muted-foreground">
-              Your private knowledge base — fully offline, never leaves your machine.
+              Unleash the power of your files with local AI.
             </p>
           </div>
           <ol className="text-left space-y-3 w-full text-sm">

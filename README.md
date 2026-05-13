@@ -4,7 +4,7 @@
 
   # Remex
 
-  **Your private knowledge base — fully offline, never leaves your machine.**
+  **Unleash the power of your files with local AI.**
 
   <br/>
 

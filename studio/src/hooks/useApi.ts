@@ -51,6 +51,7 @@ export interface ChatOptions extends QueryOptions {
   provider?: string;
   model?: string;
   api_key?: string;
+  system_prompt?: string;
 }
 
 export function useMultiQueryResults(
@@ -112,6 +113,7 @@ export function useChat(
       options?.provider,
       options?.model,
       !!options?.api_key, // presence change (key added/removed) busts cache without exposing value
+      options?.system_prompt,
     ],
     queryFn: () =>
       api.chat(apiUrl, dbPath, collection, {
@@ -122,6 +124,7 @@ export function useChat(
         provider: options?.provider || undefined,
         model: options?.model || undefined,
         api_key: options?.api_key || undefined,
+        system_prompt: options?.system_prompt || undefined,
       }),
     enabled:
       !!apiUrl &&
@@ -153,6 +156,7 @@ export function useMultiChat(
       options?.where,
       options?.provider, options?.model,
       !!options?.api_key, // presence change busts cache without exposing value
+      options?.system_prompt,
     ],
     queryFn: () =>
       api.multiChat(apiUrl, dbPath, {
@@ -164,6 +168,7 @@ export function useMultiChat(
         provider: options?.provider || undefined,
         model: options?.model || undefined,
         api_key: options?.api_key || undefined,
+        system_prompt: options?.system_prompt || undefined,
       }),
     enabled:
       !!apiUrl && !!text && !!dbPath && collections.length > 0 && (options?.enabled ?? true),
