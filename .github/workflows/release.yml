@@ -74,6 +74,12 @@ jobs:
           $files = Get-ChildItem "studio/src-tauri/resources/onnx/all-MiniLM-L6-v2" -File
           Write-Host "ONNX model files: $($files.Count) files"
 
+      - name: Generate installer images
+        shell: pwsh
+        run: |
+          pip install pillow --quiet
+          python studio/src-tauri/generate-installer-images.py
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
