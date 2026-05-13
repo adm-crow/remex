@@ -165,7 +165,7 @@ function CompactPicker({
         ))}
 
         {!inSegment && (
-          extraPreset === undefined ? (
+          extraPreset == null ? (
             // Custom model string not in PRESETS — render as non-interactive display
             <div
               role="presentation"

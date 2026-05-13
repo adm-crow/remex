@@ -38,12 +38,9 @@ export function AppShell() {
   const shortcutsOpen = useAppStore((s) => s.shortcutsOpen);
   const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
-  const currentCollection = useAppStore((s) => s.currentCollection);
   const ingestDoneUnread = useAppStore((s) => s.ingestDoneUnread);
   const setIngestDoneUnread = useAppStore((s) => s.setIngestDoneUnread);
-  const setLastIngestResult = useAppStore((s) => s.setLastIngestResult);
   const lastIngestResult = useAppStore((s) => s.lastIngestResult);
-  const lastIngestParamsMap = useAppStore((s) => s.lastIngestParamsMap);
   const licensePromptSeq = useAppStore((s) => s.licensePromptSeq);
   const requestedView = useAppStore((s) => s.requestedView);
   const setRequestedView = useAppStore((s) => s.setRequestedView);
