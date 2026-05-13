@@ -49,7 +49,7 @@ Native desktop app for Windows. No terminal required.
 |---|---|
 | 🔍 **Semantic search** | Vector similarity search across one or more collections simultaneously |
 | 🤖 **AI Answer** | Ask a question, get a synthesised answer with cited sources (Anthropic · OpenAI · Ollama) |
-| 📄 **12 file formats** | `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.jsonl` `.html` `.pptx` `.xlsx` `.epub` `.odt` |
+| 📄 **12 file formats** | `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.jsonl` + `.html` `.pptx` `.xlsx` `.epub` `.odt` (optional package) |
 | 🗄 **SQLite ingest** | Embed rows from any table alongside your files |
 | ♻️ **Incremental ingest** | SHA-256 hash check — only changed files are re-processed |
 | 🎯 **Source filter** | Narrow results to one or more documents before searching or asking AI |
@@ -58,6 +58,7 @@ Native desktop app for Windows. No terminal required.
 | 📤 **Export** | JSON · CSV · Markdown · BibTeX · RIS · CSL-JSON · Obsidian vault |
 | 🌙 **Themes** | Light, dark, auto (follows OS) + ten accent colours |
 | ⌨️ **Keyboard-driven** | Press `?` anywhere in Studio for the full shortcuts reference |
+| 📦 **Optional packages** | Install extra file formats, AI integrations, or sentence chunking from `Settings → General` at any time |
 
 <br/>
 
@@ -93,8 +94,12 @@ Activate in `Settings → License` inside Studio. Licenses are issued and valida
 ## Python CLI & Library
 
 ```bash
-pip install remex-cli            # core — ingest + query
-pip install "remex-cli[api]"     # + FastAPI sidecar (used by Studio)
+pip install remex-cli                    # core — ingest + query (7 formats)
+pip install "remex-cli[formats]"         # + .pptx .xlsx .epub .html .odt
+pip install "remex-cli[ai]"              # + Anthropic & OpenAI embeddings / generation
+pip install "remex-cli[sentence]"        # + sentence-aware chunking (NLTK)
+pip install "remex-cli[api]"             # + FastAPI sidecar (used by Studio)
+pip install "remex-cli[all]"             # everything above
 ```
 
 ### Quick start
