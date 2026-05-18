@@ -167,10 +167,10 @@ db              = "./remex_db"
 collection      = "my-kb"
 embedding_model = "all-MiniLM-L6-v2"
 
-# chunk_size     = 1000   # tokens per chunk
-# overlap        = 200    # overlap between chunks
-# min_chunk_size = 50     # discard chunks shorter than this
-# chunking       = "word" # "word" or "sentence"
+# chunk_size     = 768          # characters per chunk (512-1024 works well)
+# overlap        = 150          # ~20% overlap preserves context at boundaries
+# min_chunk_size = 50           # discard chunks shorter than this
+# chunking       = "recursive"  # "recursive" (default) | "sentence" | "word"
 ```
 
 CLI flags always override `remex.toml` values.

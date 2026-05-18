@@ -60,10 +60,10 @@ class IngestRequest(BaseModel):
     def _check_db_path(cls, v: str) -> str:
         return _validate_db_path(v)
 
-    chunk_size: int = Field(default=1000, ge=1)
-    overlap: int = Field(default=200, ge=0)
+    chunk_size: int = Field(default=768, ge=1)
+    overlap: int = Field(default=150, ge=0)
     min_chunk_size: int = Field(default=50, ge=1)
-    chunking: Literal["word", "sentence"] = "word"
+    chunking: Literal["word", "sentence", "recursive"] = "recursive"
     incremental: bool = False
     streaming_threshold_mb: int = Field(default=50, ge=0)
 
@@ -85,10 +85,10 @@ class IngestSQLiteRequest(BaseModel):
     id_column: str = Field(default="id", max_length=256)
     row_template: Optional[str] = Field(default=None, max_length=4096)
     embedding_model: str = _EMBEDDING_MODEL_FIELD
-    chunk_size: int = Field(default=1000, ge=1)
-    overlap: int = Field(default=200, ge=0)
+    chunk_size: int = Field(default=768, ge=1)
+    overlap: int = Field(default=150, ge=0)
     min_chunk_size: int = Field(default=50, ge=1)
-    chunking: Literal["word", "sentence"] = "word"
+    chunking: Literal["word", "sentence", "recursive"] = "recursive"
     incremental: bool = False
 
     _check_overlap = model_validator(mode="after")(_validate_overlap)

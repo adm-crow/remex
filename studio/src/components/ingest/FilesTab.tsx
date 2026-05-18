@@ -50,8 +50,9 @@ export function FilesTab() {
   const [sourcePath,     setSourcePath]     = useState("");
   const [collectionName, setCollectionName] = useState(currentCollection ?? "");
   const [appendModel,    setAppendModel]    = useState(false);
-  const [chunkSize,      setChunkSize]      = useState(1000);
-  const [overlap,        setOverlap]        = useState(200);
+  const [chunkSize,      setChunkSize]      = useState(768);
+  const [overlap,        setOverlap]        = useState(150);
+  const [chunking,       setChunking]       = useState<"recursive" | "word" | "sentence">("recursive");
   const [embeddingModel, setEmbeddingModel] = useState(DEFAULT_EMBEDDING_MODEL);
   const [incremental,    setIncremental]    = useState(false);
   const [showDoneAlert,  setShowDoneAlert]  = useState(false);
@@ -69,6 +70,7 @@ export function FilesTab() {
     setSourcePath(prefill.sourcePath);
     setChunkSize(prefill.chunkSize);
     setOverlap(prefill.overlap);
+    setChunking(prefill.chunking ?? "recursive");
     setEmbeddingModel(prefill.embeddingModel);
     setIncremental(prefill.incremental);
     setIngestPrefill(null);
@@ -170,7 +172,7 @@ export function FilesTab() {
               overlap,
               embeddingModel,
               incremental,
-              chunking: "word",
+              chunking,
             });
           }
           queryClient.invalidateQueries({
@@ -281,7 +283,7 @@ export function FilesTab() {
           </CollapsibleTrigger>
           <div className="h-px bg-border flex-1" />
         </div>
-        <CollapsibleContent className="mt-2 bg-primary/5 rounded-lg p-3">
+        <CollapsibleContent className="mt-2 bg-primary/5 rounded-lg p-3 space-y-2.5">
           <div className="flex items-center gap-x-4">
             <div className="flex items-center gap-1.5">
               <Label htmlFor="chunk-size" className="text-xs whitespace-nowrap">Chunk size</Label>
@@ -302,6 +304,30 @@ export function FilesTab() {
                 onChange={(e) => setOverlap(Number(e.target.value))}
                 className="h-8 w-20 text-xs"
               />
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Label className="text-xs whitespace-nowrap">Mode</Label>
+            <div className="flex rounded-md border overflow-hidden text-xs">
+              {([
+                { value: "recursive", label: "Recursive" },
+                { value: "sentence",  label: "Sentence"  },
+                { value: "word",      label: "Word"      },
+              ] as const).map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setChunking(value)}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors",
+                    chunking === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </CollapsibleContent>

@@ -38,7 +38,7 @@ export interface FileIngestParams {
   overlap: number;
   embeddingModel: string;
   incremental: boolean;
-  chunking: "word" | "sentence";
+  chunking: "word" | "sentence" | "recursive";
 }
 
 export interface AppState {

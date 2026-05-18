@@ -127,3 +127,59 @@ def test_sentence_mode_long_sentence_fallback(require_nltk):
     long_sent = "word " * 300  # ~1500 chars, one "sentence"
     chunks = chunk_text(long_sent, chunk_size=500, overlap=50, min_chunk_size=1, mode="sentence")
     assert len(chunks) > 1
+
+
+# --- recursive mode ---
+
+def test_recursive_mode_short_text_single_chunk():
+    text = "Hello world. This is a test."
+    chunks = chunk_text(text, chunk_size=500, min_chunk_size=1, mode="recursive")
+    assert len(chunks) == 1
+    assert "Hello world" in chunks[0]
+
+
+def test_recursive_mode_splits_on_paragraphs():
+    para1 = "First paragraph. " * 5   # ~85 chars
+    para2 = "Second paragraph. " * 5  # ~90 chars
+    text = para1.strip() + "\n\n" + para2.strip()
+    # chunk_size=80 forces a split between paragraphs
+    chunks = chunk_text(text, chunk_size=80, overlap=0, min_chunk_size=1, mode="recursive")
+    assert len(chunks) >= 2
+    full = " ".join(chunks)
+    assert "First paragraph" in full
+    assert "Second paragraph" in full
+
+
+def test_recursive_mode_falls_back_to_line_then_word():
+    # No paragraph breaks — should split on lines, then words
+    text = ("alpha beta gamma delta " * 10 + "\n") * 3
+    chunks = chunk_text(text, chunk_size=100, overlap=20, min_chunk_size=1, mode="recursive")
+    assert len(chunks) > 1
+    assert all(len(c) <= 120 for c in chunks)  # reasonable headroom
+
+
+def test_recursive_mode_overlap_increases_chunk_count():
+    text = "word " * 300
+    no_overlap  = chunk_text(text, chunk_size=200, overlap=0,  min_chunk_size=1, mode="recursive")
+    with_overlap = chunk_text(text, chunk_size=200, overlap=50, min_chunk_size=1, mode="recursive")
+    assert len(with_overlap) >= len(no_overlap)
+
+
+def test_recursive_mode_empty_text():
+    assert chunk_text("", mode="recursive") == []
+
+
+def test_recursive_mode_is_default():
+    # Calling chunk_text with no mode argument should use recursive
+    text = "Paragraph one.\n\nParagraph two."
+    chunks_default   = chunk_text(text, chunk_size=500, min_chunk_size=1)
+    chunks_recursive = chunk_text(text, chunk_size=500, min_chunk_size=1, mode="recursive")
+    assert chunks_default == chunks_recursive
+
+
+def test_recursive_mode_long_piece_falls_back_to_word():
+    # A single run of text with no separators exceeding chunk_size falls back to words
+    text = "word " * 400  # ~2000 chars, no \n\n or \n or ". "
+    chunks = chunk_text(text, chunk_size=300, overlap=50, min_chunk_size=1, mode="recursive")
+    assert len(chunks) > 1
+    assert all("word" in c for c in chunks)

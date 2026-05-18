@@ -23,10 +23,10 @@ collection     = "remex"           # collection name
 embedding_model = "all-MiniLM-L6-v2"
 
 # Chunking defaults (used by ingest / ingest-sqlite)
-# chunk_size     = 1000
-# overlap        = 200
+# chunk_size     = 768
+# overlap        = 150
 # min_chunk_size = 50
-# chunking       = "word"          # "word" or "sentence"
+# chunking       = "recursive"     # "recursive" (default) | "sentence" | "word"
 """
 
 
@@ -58,14 +58,14 @@ def cli() -> None:
 )
 @click.option(
     "--chunk-size",
-    default=1000,
+    default=768,
     show_default=True,
     type=click.IntRange(min=1),
     help="Target characters per chunk.",
 )
 @click.option(
     "--overlap",
-    default=200,
+    default=150,
     show_default=True,
     type=click.IntRange(min=0),
     help="Character overlap between chunks.",
@@ -77,9 +77,9 @@ def cli() -> None:
 )
 @click.option(
     "--chunking",
-    default="word",
+    default="recursive",
     show_default=True,
-    type=click.Choice(["word", "sentence"]),
+    type=click.Choice(["recursive", "word", "sentence"]),
     help="Chunking strategy.",
 )
 @click.option(
