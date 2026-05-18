@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from remex.core import DEFAULT_MODELS, detect_provider, generate_answer, query
 from remex.core.exceptions import RemexError
+from remex.core.models import QueryResult
 from remex.api.schemas import ChatRequest, ChatResponse, QueryRequest, QueryResultItem, MultiChatRequest, MultiChatResponse
 
 _logger = logging.getLogger("remex.core")
@@ -15,7 +16,7 @@ router = APIRouter(prefix="/collections", tags=["query"])
 @router.post("/{collection}/query", response_model=list[QueryResultItem])
 async def query_collection(
     collection: str, req: QueryRequest
-) -> list[QueryResultItem]:
+) -> list:
     _logger.info("[QUERY] collection=%s n=%d q=%.120s", collection, req.n_results, req.text)
     try:
         results = await asyncio.to_thread(
@@ -86,7 +87,7 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
 
     return ChatResponse(
         answer=answer,
-        sources=list(results),
+        sources=[QueryResultItem(**r) for r in results],
         provider=provider,
         model=resolved_model,
     )
@@ -95,7 +96,7 @@ async def chat(collection: str, req: ChatRequest) -> ChatResponse:
 @router.post("/multi-chat", response_model=MultiChatResponse)
 async def multi_chat(req: MultiChatRequest) -> MultiChatResponse:
     """Query multiple collections, merge top results by score, generate AI answer."""
-    all_results: list[dict] = []
+    all_results: list[QueryResult] = []
 
     for collection_name in req.collections:
         try:
@@ -154,7 +155,7 @@ async def multi_chat(req: MultiChatRequest) -> MultiChatResponse:
 
     return MultiChatResponse(
         answer=answer,
-        sources=list(merged),
+        sources=[QueryResultItem(**r) for r in merged],
         provider=provider,
         model=resolved_model,
         collections=req.collections,
