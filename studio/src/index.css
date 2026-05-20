@@ -636,13 +636,15 @@
 }
 
 .animate-progress-shimmer {
+  /* Mirrors the logo gradient (indigo → teal) with a bright mint highlight
+     in the middle to give the shimmer some sparkle. Keep in sync with logo.svg. */
   background: linear-gradient(
     90deg,
-    #1CAC78 0%,
-    #7EBD01 40%,
-    #b8f04a 55%,
-    #7EBD01 70%,
-    #1CAC78 100%
+    #324A83 0%,
+    #00A586 40%,
+    #7BE5C8 55%,
+    #00A586 70%,
+    #324A83 100%
   );
   background-size: 200% auto;
   animation: progress-shimmer 1.6s linear infinite;

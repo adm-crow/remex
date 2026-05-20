@@ -18,6 +18,8 @@ _logger = logging.getLogger("remex.core")
 
 router = APIRouter(prefix="/collections", tags=["ingest"])
 
+_MODEL_DOWNLOAD_TIMEOUT_S = 600  # 10 minutes — large multilingual models can be ~1 GB
+
 
 async def _sse_ingest(
     request: Request,
@@ -71,14 +73,20 @@ async def _sse_ingest(
             pass  # Client disconnected — stream generator already exited.
         except (RemexError, FileNotFoundError, ValueError) as e:
             await queue.put({"type": "error", "detail": str(e)})
-        except Exception as e:  # noqa: BLE001
-            await queue.put({"type": "error", "detail": f"Unexpected error: {e}"})
+        except Exception:  # noqa: BLE001
+            _logger.exception("[INGEST/stream] unexpected error")
+            await queue.put({"type": "error", "detail": "An internal error occurred during ingest."})
 
     async def _poll_model_download() -> None:
-        """Emit model_download events every 500 ms while fastembed fetches the model."""
+        """Emit model_download events every 500 ms while fastembed fetches the model.
+
+        Bounded by ``_MODEL_DOWNLOAD_TIMEOUT_S`` so a stalled download surfaces as an
+        explicit error event instead of polling forever.
+        """
         if is_model_cached(model_name):
             return
         expected = get_model_expected_bytes(model_name)
+        deadline = loop.time() + _MODEL_DOWNLOAD_TIMEOUT_S
         while True:
             downloaded = get_model_downloaded_bytes(model_name)
             await queue.put({
@@ -91,6 +99,15 @@ async def _sse_ingest(
                     "type": "model_download",
                     "downloaded_bytes": expected,
                     "total_bytes": expected,
+                })
+                return
+            if loop.time() > deadline:
+                await queue.put({
+                    "type": "error",
+                    "detail": (
+                        f"Embedding model '{model_name}' did not finish downloading within "
+                        f"{_MODEL_DOWNLOAD_TIMEOUT_S // 60} minutes. Check your network connection."
+                    ),
                 })
                 return
             await asyncio.sleep(0.5)

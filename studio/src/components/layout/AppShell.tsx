@@ -6,10 +6,10 @@ import { QueryPane } from "@/components/query/QueryPane";
 import { IngestPane } from "@/components/ingest/IngestPane";
 import { SourcesPane } from "@/components/sources/SourcesPane";
 import { SettingsPane } from "@/components/settings/SettingsPane";
-import { fetch } from "@tauri-apps/plugin-http";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useAppStore, useIsPro } from "@/store/app";
+import { useAppStore } from "@/store/app";
+import { api } from "@/api/client";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { formatDuration } from "@/lib/formatDuration";
 import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
@@ -30,100 +30,130 @@ const DEFAULT_SIDEBAR = 208; // 52 * 4
 export function AppShell() {
   const [activeView, setActiveView] = useState<View>("query");
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
-  const isPro = useIsPro();
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const sidecarError = useAppStore((s) => s.sidecarError);
-  const currentDb = useAppStore((s) => s.currentDb);
-  const apiUrl = useAppStore((s) => s.apiUrl);
   const shortcutsOpen = useAppStore((s) => s.shortcutsOpen);
   const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
   const ingestDoneUnread = useAppStore((s) => s.ingestDoneUnread);
   const setIngestDoneUnread = useAppStore((s) => s.setIngestDoneUnread);
   const lastIngestResult = useAppStore((s) => s.lastIngestResult);
-  const licensePromptSeq = useAppStore((s) => s.licensePromptSeq);
   const requestedView = useAppStore((s) => s.requestedView);
   const setRequestedView = useAppStore((s) => s.setRequestedView);
-  const watchFolders = useAppStore((s) => s.watchFolders);
   const isDragging = useRef(false);
 
-  // Pre-warm the embedding model as soon as the sidecar is healthy and a
-  // project is selected. The warmup endpoint returns 202 immediately and
-  // loads the model in the background, so the first ingest doesn't block
-  // on a cold model download.
-  useEffect(() => {
-    if (sidecarStatus !== "connected" || !currentDb) return;
-    fetch(`${apiUrl}/collections/warmup?db_path=${encodeURIComponent(currentDb)}`, { method: "POST" })
-      .catch(() => {}); // non-critical — ingest works even without warmup
-  }, [sidecarStatus, currentDb, apiUrl]);
+  // Note: model warmup is fired from App.tsx — don't duplicate it here.
 
-  // Restore file watchers from the persisted list on startup. WatchState lives
-  // in Rust memory and is cleared on restart, so we re-register here once the
-  // Pro license is confirmed — before the user opens Settings.
+  // Restore file + database watchers from the persisted lists on startup. WatchState
+  // lives in Rust memory and is cleared on restart, so we re-register here once the
+  // shell mounts (a project is open).
   useEffect(() => {
-    if (!isPro || watchFolders.length === 0) return;
-    for (const folder of watchFolders) {
-      void invoke("watch_start", { folder }).catch(() => {});
+    const { watchFolders, watchDatabases } = useAppStore.getState();
+    for (const w of watchFolders) {
+      void invoke("watch_start", { folder: w.path }).catch(() => {});
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPro]); // intentionally omits watchFolders: only needs to run once when Pro is confirmed
+    for (const w of watchDatabases) {
+      void invoke("watch_db_start", { dbPath: w.dbPath }).catch(() => {});
+    }
+  }, []);
 
   // Global watch:changed listener — kept here (always mounted) so it survives
   // navigation away from the Settings tab where WatchFoldersCard lives.
   useEffect(() => {
-    if (!isPro) return;
     const unsub = listen<{ folder: string; paths: string[] }>("watch:changed", async (evt) => {
-      const db = useAppStore.getState().currentDb;
-      const col = useAppStore.getState().currentCollection;
-      if (!db || !col) return;
-      const lastParams = useAppStore.getState().lastIngestParamsMap[`${db}::${col}`];
+      const state = useAppStore.getState();
+      const db = state.currentDb;
+      if (!db) return;
+      const watch = state.watchFolders.find((w) => w.path === evt.payload.folder);
+      if (!watch || !watch.collection) {
+        console.warn("[watch] fired for folder without a target collection — skipping", evt.payload.folder);
+        return;
+      }
+      const col = watch.collection;
+      const url = state.apiUrl;
+      const lastParams = state.lastIngestParamsMap[`${db}::${col}`];
       const embeddingModel = lastParams?.embeddingModel ?? DEFAULT_EMBEDDING_MODEL;
       const startedAt = new Date().toISOString();
-      const url = useAppStore.getState().apiUrl;
-      const ingestResp = await fetch(
-        `${url}/collections/${encodeURIComponent(col)}/ingest`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            db_path: db,
-            source_dir: evt.payload.folder,
-            incremental: true,
-            embedding_model: embeddingModel,
-            ...(lastParams?.chunkSize  !== undefined && { chunk_size:     lastParams.chunkSize }),
-            ...(lastParams?.overlap    !== undefined && { overlap:         lastParams.overlap }),
-            ...(lastParams?.chunking   !== undefined && { chunking_method: lastParams.chunking }),
-          }),
-        }
-      ).catch((err) => { console.error("[watch] auto-ingest failed:", err); return null; });
-      if (!ingestResp || !ingestResp.ok) return;
-      const result = await ingestResp.json().catch(() => null);
-      if (result) {
+      try {
+        const result = await api.ingestFiles(url, db, col, {
+          source_dir: evt.payload.folder,
+          incremental: true,
+          embedding_model: embeddingModel,
+          ...(lastParams?.chunkSize !== undefined && { chunk_size: lastParams.chunkSize }),
+          ...(lastParams?.overlap   !== undefined && { overlap:    lastParams.overlap }),
+          ...(lastParams?.chunking  !== undefined && { chunking:   lastParams.chunking }),
+        });
         useAppStore.getState().setLastIngestResult({
           collection: col,
           sourcePath: evt.payload.folder,
           startedAt,
           completedAt: new Date().toISOString(),
-          sourcesFound:    result.sources_found    ?? 0,
-          sourcesIngested: result.sources_ingested ?? 0,
-          sourcesSkipped:  result.sources_skipped  ?? 0,
-          chunksStored:    result.chunks_stored     ?? 0,
-          skippedReasons:  result.skipped_reasons  ?? [],
+          sourcesFound:    result.sources_found,
+          sourcesIngested: result.sources_ingested,
+          sourcesSkipped:  result.sources_skipped,
+          chunksStored:    result.chunks_stored,
+          skippedReasons:  result.skipped_reasons,
         });
         useAppStore.getState().setIngestDoneUnread(true);
+      } catch (err) {
+        console.error("[watch] auto-ingest failed:", err);
+        return;
       }
-      await fetch(
-        `${url}/collections/${encodeURIComponent(col)}/purge?db_path=${encodeURIComponent(db)}`,
-        { method: "POST" }
-      ).catch((err) => console.error("[watch] purge failed:", err));
+      try {
+        await api.purgeCollection(url, db, col);
+      } catch (err) {
+        console.error("[watch] purge failed:", err);
+      }
     });
     return () => { void unsub.then((fn) => fn()); };
-  }, [isPro]);
+  }, []);
 
+  // watch:db:changed — fires when a watched SQLite file (or its WAL/SHM siblings)
+  // is written. Look up the watch's stored config and re-run ingest_sqlite with
+  // `incremental: true` so existing rows are deduped by hash.
   useEffect(() => {
-    if (licensePromptSeq === 0) return;
-    setActiveView("settings");
-  }, [licensePromptSeq]);
+    const unsub = listen<{ dbPath: string }>("watch:db:changed", async (evt) => {
+      const state = useAppStore.getState();
+      const proj = state.currentDb;
+      if (!proj) return;
+      const watch = state.watchDatabases.find((w) => w.dbPath === evt.payload.dbPath);
+      if (!watch) return;
+      const url = state.apiUrl;
+      const col = watch.collection;
+      const lastParams = state.lastIngestParamsMap[`${proj}::${col}`];
+      const embeddingModel = lastParams?.embeddingModel ?? DEFAULT_EMBEDDING_MODEL;
+      const startedAt = new Date().toISOString();
+      try {
+        const r = await api.ingestSqlite(url, proj, col, {
+          sqlite_path: watch.dbPath,
+          table:       watch.table,
+          incremental: true,
+          embedding_model: embeddingModel,
+          ...(watch.columns     !== undefined && { columns:      watch.columns }),
+          ...(watch.idColumn    !== undefined && { id_column:    watch.idColumn }),
+          ...(watch.rowTemplate !== undefined && { row_template: watch.rowTemplate }),
+          ...(lastParams?.chunkSize !== undefined && { chunk_size: lastParams.chunkSize }),
+          ...(lastParams?.overlap   !== undefined && { overlap:    lastParams.overlap }),
+          ...(lastParams?.chunking  !== undefined && { chunking:   lastParams.chunking }),
+        });
+        useAppStore.getState().setLastIngestResult({
+          collection: col,
+          sourcePath: watch.dbPath,
+          startedAt,
+          completedAt: new Date().toISOString(),
+          sourcesFound:    r.sources_found,
+          sourcesIngested: r.sources_ingested,
+          sourcesSkipped:  r.sources_skipped,
+          chunksStored:    r.chunks_stored,
+          skippedReasons:  r.skipped_reasons,
+        });
+        useAppStore.getState().setIngestDoneUnread(true);
+      } catch (err) {
+        console.error("[watch:db] auto-ingest failed:", err);
+      }
+    });
+    return () => { void unsub.then((fn) => fn()); };
+  }, []);
 
   useEffect(() => {
     if (!requestedView) return;
@@ -144,6 +174,19 @@ export function AppShell() {
   const openShortcuts = useCallback(() => setShortcutsOpen(true), [setShortcutsOpen]);
   useKeyboardShortcuts({ onViewChange: setActiveView, focusSearch, onShowShortcuts: openShortcuts });
 
+  const dragListenersRef = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null);
+
+  // Cleanup any drag listeners on unmount so an unmount mid-drag never leaks them.
+  useEffect(() => {
+    return () => {
+      if (dragListenersRef.current) {
+        document.removeEventListener("mousemove", dragListenersRef.current.move);
+        document.removeEventListener("mouseup",   dragListenersRef.current.up);
+        dragListenersRef.current = null;
+      }
+    };
+  }, []);
+
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
@@ -157,8 +200,10 @@ export function AppShell() {
       isDragging.current = false;
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
+      dragListenersRef.current = null;
     };
 
+    dragListenersRef.current = { move: onMouseMove, up: onMouseUp };
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
   }, []);

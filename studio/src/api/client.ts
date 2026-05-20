@@ -1,4 +1,5 @@
 import { fetch } from "@tauri-apps/plugin-http";
+import { errMsg } from "@/lib/utils";
 
 // ---- Types (mirror FastAPI schemas in remex/api/schemas.py) ----
 
@@ -72,7 +73,7 @@ export interface IngestRequest {
   chunk_size?: number;
   overlap?: number;
   min_chunk_size?: number;
-  chunking?: "word" | "sentence";
+  chunking?: "word" | "sentence" | "recursive";
   incremental?: boolean;
   streaming_threshold_mb?: number;
 }
@@ -101,7 +102,7 @@ export interface IngestSQLiteRequest {
   chunk_size?: number;
   overlap?: number;
   min_chunk_size?: number;
-  chunking?: "word" | "sentence";
+  chunking?: "word" | "sentence" | "recursive";
   columns?: string[];
   id_column?: string;
   row_template?: string;
@@ -205,6 +206,45 @@ function normalizeBase(base: string): string {
   return base.replace(/^(https?:\/\/)localhost(:\d+|\/|$)/, "$1127.0.0.1$2");
 }
 
+/**
+ * Turn a FastAPI/Pydantic error body into a readable single-line string.
+ *
+ * Two shapes are common:
+ *   • Application errors raised via `HTTPException(detail="…")` —
+ *     body is `{"detail": "…"}` with `detail` being a string.
+ *   • Pydantic validation errors —
+ *     body is `{"detail": [{"loc": [...], "msg": "…", "type": "…"}, …]}`
+ *     with `detail` being an **array**. Naively coercing the array to a string
+ *     produces "[object Object]" — useless. We extract `msg` from each entry
+ *     and join them.
+ */
+function formatErrorBody(body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (typeof parsed === "object" && parsed !== null && "detail" in parsed) {
+      const detail = (parsed as { detail: unknown }).detail;
+      if (typeof detail === "string") return detail;
+      if (Array.isArray(detail)) {
+        const parts = detail.map((d) => {
+          if (typeof d === "string") return d;
+          if (typeof d === "object" && d !== null) {
+            const obj = d as { msg?: unknown; loc?: unknown };
+            const msg = typeof obj.msg === "string" ? obj.msg : JSON.stringify(d);
+            const loc = Array.isArray(obj.loc) ? obj.loc.filter((x) => x !== "body").join(".") : "";
+            return loc ? `${loc}: ${msg}` : msg;
+          }
+          return JSON.stringify(d);
+        });
+        return parts.join("; ");
+      }
+      return JSON.stringify(detail);
+    }
+  } catch {
+    // body wasn't JSON
+  }
+  return body;
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const resolvedUrl = normalizeBase(url);
   let res: Response;
@@ -213,18 +253,12 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   } catch (e) {
     throw new Error(
       `Cannot reach the server at ${resolvedUrl.replace(/\/[^/]+$/, "")}. ` +
-      `Make sure 'remex serve' is running. (${e instanceof Error ? e.message : String(e)})`
+      `Make sure 'remex serve' is running. (${errMsg(e)})`
     );
   }
   if (!res.ok) {
-    const detail = await res.text();
-    let message: string;
-    try {
-      message = (JSON.parse(detail) as { detail?: string }).detail ?? detail;
-    } catch {
-      message = detail;
-    }
-    throw new Error(`${res.status}: ${message}`);
+    const body = await res.text();
+    throw new Error(`${res.status}: ${formatErrorBody(body)}`);
   }
   return res.json() as Promise<T>;
 }
@@ -379,18 +413,12 @@ export const api = {
     } catch (e) {
       throw new Error(
         `Cannot reach the server at ${resolvedBase}. Make sure 'remex serve' is running. ` +
-        `(${e instanceof Error ? e.message : String(e)})`
+        `(${errMsg(e)})`
       );
     }
     if (!res.ok || !res.body) {
       const body = await res.text().catch(() => "");
-      let message: string;
-      try {
-        message = (JSON.parse(body) as { detail?: string }).detail ?? body;
-      } catch {
-        message = body || "sqlite ingest stream failed";
-      }
-      throw new Error(`${res.status}: ${message}`);
+      throw new Error(`${res.status}: ${formatErrorBody(body) || "sqlite ingest stream failed"}`);
     }
     yield* readSseStream(res.body, signal);
   },
@@ -459,18 +487,12 @@ export const api = {
     } catch (e) {
       throw new Error(
         `Cannot reach the server at ${resolvedBase}. Make sure 'remex serve' is running. ` +
-        `(${e instanceof Error ? e.message : String(e)})`
+        `(${errMsg(e)})`
       );
     }
     if (!res.ok || !res.body) {
       const body = await res.text().catch(() => "");
-      let message: string;
-      try {
-        message = (JSON.parse(body) as { detail?: string }).detail ?? body;
-      } catch {
-        message = body || "ingest stream failed";
-      }
-      throw new Error(`${res.status}: ${message}`);
+      throw new Error(`${res.status}: ${formatErrorBody(body) || "ingest stream failed"}`);
     }
     yield* readSseStream(res.body, signal);
   },

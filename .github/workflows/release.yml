@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     strategy:
@@ -18,6 +22,7 @@ jobs:
             args: ""
 
     runs-on: ${{ matrix.platform }}
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v4
@@ -74,11 +79,8 @@ jobs:
           $files = Get-ChildItem "studio/src-tauri/resources/onnx/all-MiniLM-L6-v2" -File
           Write-Host "ONNX model files: $($files.Count) files"
 
-      - name: Generate installer images
-        shell: pwsh
-        run: |
-          pip install pillow --quiet
-          python studio/src-tauri/generate-installer-images.py
+      # Installer BMPs are committed to the repo (studio/src-tauri/installer-*.bmp).
+      # Re-running the Pillow generator on CI was a leftover from the bring-up phase.
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

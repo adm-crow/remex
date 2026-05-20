@@ -38,8 +38,8 @@ function Logo() {
     >
       <defs>
         <linearGradient id="sg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#1CAC78" />
-          <stop offset="100%" stopColor="#7EBD01" />
+          <stop offset="0%" stopColor="#324A83" />
+          <stop offset="100%" stopColor="#00A586" />
         </linearGradient>
       </defs>
       <path

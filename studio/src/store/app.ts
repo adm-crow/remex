@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { invoke } from "@tauri-apps/api/core";
-import { licenseApi, type LicenseStatus, type Tier } from "@/lib/licenseApi";
 
 export interface RecentProject {
   path: string;
@@ -41,6 +40,56 @@ export interface FileIngestParams {
   chunking: "word" | "sentence" | "recursive";
 }
 
+/** Per-project ingest defaults. When a new collection is being created, the
+ *  Ingest tabs seed their fields from these values instead of hard-coded ones.
+ *  Stored per `dbPath` so multiple projects can have different conventions. */
+export interface ProjectDefaults {
+  chunkSize?: number;
+  overlap?: number;
+  chunking?: "word" | "sentence" | "recursive";
+  embeddingModel?: string;
+}
+
+/** A user-defined embedding model entry. Surfaces in the EmbeddingModelField
+ *  picker alongside the built-in `Light` / `Balanced` / `Multilingual` presets. */
+export interface CustomEmbeddingPreset {
+  tag:   string;
+  model: string;
+  desc?: string;
+}
+
+/** A named AI agent configuration. Switched via the QueryPane persona dropdown.
+ *  Only the `systemPrompt` varies per persona for now — the provider/model/key
+ *  stay project-global because they're tied to user credentials. */
+export interface AgentPersona {
+  id:           string;
+  name:         string;
+  systemPrompt: string;
+}
+
+/** Persisted watch entry for a directory. Each watch must target a specific
+ *  collection — the v2 "use current collection" fallback was removed in v3 to
+ *  eliminate ambiguity at fire time (the current collection could be anything). */
+export interface WatchFolder {
+  path: string;
+  collection: string;
+}
+
+/** Persisted watch entry for a SQLite database file. The watch fires on any
+ *  write to the file (including its `-wal` / `-shm` siblings); the frontend
+ *  then re-runs `ingest_sqlite` with the stored config + `incremental: true`. */
+export interface WatchDatabase {
+  dbPath: string;
+  table: string;
+  collection: string;
+  /** Optional column subset; omitted = ingest all columns. */
+  columns?: string[];
+  /** Identity column for incremental dedup; defaults to `"id"`. */
+  idColumn?: string;
+  /** Optional row-to-text template; omitted = default serialisation. */
+  rowTemplate?: string;
+}
+
 export interface AppState {
   currentDb: string | null;
   currentCollection: string | null;
@@ -60,7 +109,6 @@ export interface AppState {
   aiProvider: string;
   aiModel: string;
   aiApiKey: string;
-  agentSystemPrompt: string;
   // Sidecar reconnect (not persisted)
   sidecarReconnectSeq: number;
   triggerSidecarReconnect: () => void;
@@ -116,7 +164,6 @@ export interface AppState {
   setAiProvider: (provider: string) => void;
   setAiModel: (model: string) => void;
   setAiApiKey: (key: string) => void;
-  setAgentSystemPrompt: (prompt: string) => void;
   resetIngestSession: () => void;
   appendIngestProgress: (item: ProgressItem) => void;
   setIngestFilesDone: (n: number) => void;
@@ -140,31 +187,30 @@ export interface AppState {
   // Keyboard shortcuts modal (not persisted)
   shortcutsOpen: boolean;
   setShortcutsOpen: (v: boolean) => void;
-  // Upgrade modal (not persisted)
-  upgradeModalOpen: boolean;
-  upgradeModalContext: string | null;
-  openUpgradeModal:  (context?: string) => void;
-  closeUpgradeModal: () => void;
-  // License-entry prompt signal (not persisted) — incremented when the user
-  // clicks "I already have a key" in the upgrade modal. AppShell switches to
-  // Settings; LicenseCard reveals its paste input and focuses it.
-  licensePromptSeq: number;
-  requestLicensePrompt: () => void;
-  // License (persisted subset)
-  license: {
-    tier: Tier;
-    email: string | null;
-    activatedAt: number | null;
-    lastValidatedAt: number | null;
-  };
-  activateLicense:      (key: string) => Promise<{ ok: boolean; error?: string }>;
-  deactivateLicense:    ()            => Promise<void>;
-  revalidateLicense:    ()            => Promise<void>;
-  refreshLicenseStatus: ()            => Promise<void>;
-  // Watch folders (Pro, persisted)
-  watchFolders: string[];
-  addWatchFolder:    (path: string) => Promise<void>;
+  // Per-project ingest defaults (persisted, keyed by dbPath)
+  projectDefaults: Record<string, ProjectDefaults>;
+  setProjectDefaults: (dbPath: string, defaults: ProjectDefaults) => void;
+  // User-defined embedding-model presets (persisted, global to the user)
+  customEmbeddingPresets: CustomEmbeddingPreset[];
+  addCustomEmbeddingPreset:    (preset: CustomEmbeddingPreset) => void;
+  removeCustomEmbeddingPreset: (model: string) => void;
+  // AI agent personas (persisted, global to the user)
+  agentPersonas:    AgentPersona[];
+  activePersonaId:  string | null;
+  addAgentPersona:    (persona: AgentPersona) => void;
+  updateAgentPersona: (id: string, patch: Partial<Omit<AgentPersona, "id">>) => void;
+  removeAgentPersona: (id: string) => void;
+  setActivePersonaId: (id: string | null) => void;
+  // Watch folders (persisted) — auto-ingest documents when a folder changes
+  watchFolders: WatchFolder[];
+  addWatchFolder:    (path: string, collection: string) => Promise<void>;
   removeWatchFolder: (path: string) => Promise<void>;
+  setWatchFolderCollection: (path: string, collection: string) => void;
+  // Watch databases (persisted) — auto-ingest SQLite rows when the .sqlite file changes
+  watchDatabases: WatchDatabase[];
+  addWatchDatabase:    (entry: WatchDatabase) => Promise<void>;
+  removeWatchDatabase: (dbPath: string) => Promise<void>;
+  setWatchDatabaseCollection: (dbPath: string, collection: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -193,7 +239,6 @@ export const useAppStore = create<AppState>()(
       aiProvider: "",
       aiModel: "",
       aiApiKey: "",
-      agentSystemPrompt: "",
       ingestRunning: false,
       ingestProgress: [],
       ingestFilesDone: 0,
@@ -209,11 +254,12 @@ export const useAppStore = create<AppState>()(
       incompleteCollections: {},
       onboardingDone: false,
       shortcutsOpen: false,
-      upgradeModalOpen: false,
-      upgradeModalContext: null,
-      licensePromptSeq: 0,
-      license: { tier: "free" as Tier, email: null, activatedAt: null, lastValidatedAt: null },
       watchFolders: [],
+      watchDatabases: [],
+      projectDefaults: {},
+      customEmbeddingPresets: [],
+      agentPersonas: [],
+      activePersonaId: null,
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -235,10 +281,8 @@ export const useAppStore = create<AppState>()(
       },
 
       addQueryHistory: (text) => {
-        const { license, queryHistory } = get();
-        const filtered = queryHistory.filter((q) => q !== text);
-        const cap = license.tier === "pro" ? 1000 : 20;
-        set({ queryHistory: [text, ...filtered].slice(0, cap) });
+        const filtered = get().queryHistory.filter((q) => q !== text);
+        set({ queryHistory: [text, ...filtered].slice(0, 1000) });
       },
 
       removeQueryHistory: (text) => {
@@ -276,7 +320,6 @@ export const useAppStore = create<AppState>()(
       setAiProvider:          (provider) => set({ aiProvider: provider }),
       setAiModel:             (model)    => set({ aiModel: model }),
       setAiApiKey:            (key)      => set({ aiApiKey: key }),
-      setAgentSystemPrompt:   (prompt)   => set({ agentSystemPrompt: prompt }),
 
       resetIngestSession: () => set({
         ingestRunning:     false,
@@ -337,92 +380,155 @@ export const useAppStore = create<AppState>()(
         }),
       setOnboardingDone: (v) => set({ onboardingDone: v }),
       setShortcutsOpen:  (v) => set({ shortcutsOpen: v }),
-      openUpgradeModal:  (context = "generic") => set({ upgradeModalOpen: true,  upgradeModalContext: context }),
-      closeUpgradeModal: ()                    => set({ upgradeModalOpen: false, upgradeModalContext: null }),
-      requestLicensePrompt: ()                 => set((s) => ({ licensePromptSeq: s.licensePromptSeq + 1 })),
 
-      activateLicense: async (key) => {
-        try {
-          const s: LicenseStatus = await licenseApi.activate(key);
-          set({ license: {
-            tier: s.tier, email: s.email,
-            activatedAt: s.activated_at, lastValidatedAt: s.last_validated_at,
-          }});
-          return { ok: true };
-        } catch (e) {
-          return { ok: false, error: e instanceof Error ? e.message : String(e) };
-        }
-      },
-      deactivateLicense: async () => {
-        // Reset local state immediately so the UI responds without waiting for the network call.
-        const { watchFolders } = get();
-        for (const path of watchFolders) {
-          await invoke("watch_stop", { folder: path }).catch(() => {});
-        }
-        set({
-          license:      { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
-          // Reset Pro-only settings so they don't persist after downgrade.
-          homeBg:       "dotgrid",
-          theme:        "default",
-          watchFolders: [],
-          queryHistory: get().queryHistory.slice(0, 20),
+      setProjectDefaults: (dbPath, defaults) =>
+        set((s) => ({
+          projectDefaults: { ...s.projectDefaults, [dbPath]: defaults },
+        })),
+
+      addCustomEmbeddingPreset: (preset) =>
+        set((s) => {
+          if (s.customEmbeddingPresets.some((p) => p.model === preset.model)) return s;
+          return { customEmbeddingPresets: [...s.customEmbeddingPresets, preset] };
+        }),
+      removeCustomEmbeddingPreset: (model) =>
+        set((s) => ({
+          customEmbeddingPresets: s.customEmbeddingPresets.filter((p) => p.model !== model),
+        })),
+
+      addAgentPersona: (persona) =>
+        set((s) => {
+          if (s.agentPersonas.some((p) => p.id === persona.id)) return s;
+          // First persona added becomes active automatically.
+          const activate = s.activePersonaId === null;
+          return {
+            agentPersonas:   [...s.agentPersonas, persona],
+            activePersonaId: activate ? persona.id : s.activePersonaId,
+          };
+        }),
+      updateAgentPersona: (id, patch) =>
+        set((s) => ({
+          agentPersonas: s.agentPersonas.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+        })),
+      removeAgentPersona: (id) =>
+        set((s) => {
+          const next = s.agentPersonas.filter((p) => p.id !== id);
+          // If the removed persona was active, promote the first remaining (or clear).
+          const activePersonaId =
+            s.activePersonaId === id ? (next[0]?.id ?? null) : s.activePersonaId;
+          return { agentPersonas: next, activePersonaId };
+        }),
+      setActivePersonaId: (id) => set({ activePersonaId: id }),
+
+      addWatchFolder: async (path, collection) => {
+        await invoke("watch_start", { folder: path }); // throws if the folder is gone
+        set((s) => {
+          if (s.watchFolders.some((w) => w.path === path)) return s;
+          return { watchFolders: [...s.watchFolders, { path, collection }] };
         });
-        // Best-effort remote deactivation — fire-and-forget so UI isn't blocked.
-        licenseApi.deactivate().catch(() => {});
-      },
-      revalidateLicense: async () => {
-        try {
-          const s = await licenseApi.revalidate();
-          set({ license: {
-            tier: s.tier, email: s.email,
-            activatedAt: s.activated_at, lastValidatedAt: s.last_validated_at,
-          }});
-        } catch { /* soft-fail: keep current slice */ }
-      },
-      refreshLicenseStatus: async () => {
-        try {
-          const s = await licenseApi.status();
-          set({ license: {
-            tier: s.tier, email: s.email,
-            activatedAt: s.activated_at, lastValidatedAt: s.last_validated_at,
-          }});
-        } catch { /* ignore */ }
-      },
-      addWatchFolder: async (path) => {
-        await invoke("watch_start", { folder: path }); // throws on Pro gate failure or missing folder
-        set((s) => ({ watchFolders: Array.from(new Set([...s.watchFolders, path])) }));
       },
       removeWatchFolder: async (path) => {
         await invoke("watch_stop", { folder: path });
-        set((s) => ({ watchFolders: s.watchFolders.filter((p) => p !== path) }));
+        set((s) => ({ watchFolders: s.watchFolders.filter((w) => w.path !== path) }));
       },
+      setWatchFolderCollection: (path, collection) =>
+        set((s) => ({
+          watchFolders: s.watchFolders.map((w) =>
+            w.path === path ? { ...w, collection } : w
+          ),
+        })),
+
+      addWatchDatabase: async (entry) => {
+        await invoke("watch_db_start", { dbPath: entry.dbPath });
+        set((s) => {
+          if (s.watchDatabases.some((w) => w.dbPath === entry.dbPath)) return s;
+          return { watchDatabases: [...s.watchDatabases, entry] };
+        });
+      },
+      removeWatchDatabase: async (dbPath) => {
+        await invoke("watch_db_stop", { dbPath });
+        set((s) => ({ watchDatabases: s.watchDatabases.filter((w) => w.dbPath !== dbPath) }));
+      },
+      setWatchDatabaseCollection: (dbPath, collection) =>
+        set((s) => ({
+          watchDatabases: s.watchDatabases.map((w) =>
+            w.dbPath === dbPath ? { ...w, collection } : w
+          ),
+        })),
     }),
     {
       name: "remex-studio",
-      partialize: (state) => ({
-        recentProjects:   state.recentProjects,
-        queryHistory:     state.queryHistory,
-        apiUrl:           state.apiUrl,
-        darkMode:         state.darkMode,
-        darkModeAuto:     state.darkModeAuto,
-        lastIngestParamsMap: state.lastIngestParamsMap,
-        theme:            state.theme,
-        aiProvider:          state.aiProvider,
-        aiModel:             state.aiModel,
-        agentSystemPrompt:   state.agentSystemPrompt,
-        // aiApiKey intentionally NOT persisted — re-entered each session to avoid
-        // storing credentials in plaintext localStorage.
-        homeBg:           state.homeBg,
-        lastIngestResult: state.lastIngestResult,
-        collectionTypes:       state.collectionTypes,
-        incompleteCollections: state.incompleteCollections,
-        onboardingDone:        state.onboardingDone,
-        watchFolders:          state.watchFolders,
-        setupExtras:           state.setupExtras,
-        // license intentionally NOT persisted — rehydrated from disk via Tauri at startup.
-      }),
+      version: 4,
+      // Forward-only migration. Each step transforms in place.
+      migrate: (persistedState, version) => {
+        const s = (persistedState ?? {}) as Record<string, unknown>;
+        // v1 → v2: watchFolders changed from `string[]` to `Array<{path, collection: null}>`
+        // so each entry can target a specific collection instead of the currently-selected one.
+        if (version < 2 && Array.isArray(s.watchFolders)) {
+          s.watchFolders = (s.watchFolders as unknown[]).map((entry) =>
+            typeof entry === "string"
+              ? { path: entry, collection: null }
+              : entry
+          );
+        }
+        // v2 → v3: WatchFolder.collection is now a required string. Drop entries
+        // whose collection is null/missing — the "use current collection" fallback
+        // was removed because it relied on UI-only state at fire time.
+        if (version < 3 && Array.isArray(s.watchFolders)) {
+          s.watchFolders = (s.watchFolders as unknown[]).filter((entry) => {
+            if (typeof entry !== "object" || entry === null) return false;
+            const c = (entry as { collection?: unknown }).collection;
+            return typeof c === "string" && c.length > 0;
+          });
+        }
+        // v3 → v4: agentSystemPrompt (single string) becomes agentPersonas (list).
+        // Existing prompt becomes a single "Default" persona, automatically active.
+        if (version < 4) {
+          const oldPrompt = typeof s.agentSystemPrompt === "string" ? s.agentSystemPrompt : "";
+          if (!Array.isArray(s.agentPersonas) || s.agentPersonas.length === 0) {
+            if (oldPrompt.length > 0) {
+              const id = "default";
+              s.agentPersonas    = [{ id, name: "Default", systemPrompt: oldPrompt }];
+              s.activePersonaId  = id;
+            } else {
+              s.agentPersonas    = [];
+              s.activePersonaId  = null;
+            }
+          }
+          delete s.agentSystemPrompt;
+        }
+        return s as ReturnType<typeof partialize>;
+      },
+      partialize,
     }
   )
 );
 
-export const useIsPro = () => useAppStore((s) => s.license.tier === "pro");
+// Extracted so `migrate` can refer to its return type without duplicating the shape.
+function partialize(state: AppState) {
+  return {
+    recentProjects:        state.recentProjects,
+    queryHistory:          state.queryHistory,
+    apiUrl:                state.apiUrl,
+    darkMode:              state.darkMode,
+    darkModeAuto:          state.darkModeAuto,
+    lastIngestParamsMap:   state.lastIngestParamsMap,
+    theme:                 state.theme,
+    aiProvider:            state.aiProvider,
+    aiModel:               state.aiModel,
+    agentPersonas:         state.agentPersonas,
+    activePersonaId:       state.activePersonaId,
+    projectDefaults:       state.projectDefaults,
+    customEmbeddingPresets: state.customEmbeddingPresets,
+    // aiApiKey intentionally NOT persisted — re-entered each session to avoid
+    // storing credentials in plaintext localStorage.
+    homeBg:                state.homeBg,
+    lastIngestResult:      state.lastIngestResult,
+    collectionTypes:       state.collectionTypes,
+    incompleteCollections: state.incompleteCollections,
+    onboardingDone:        state.onboardingDone,
+    watchFolders:          state.watchFolders,
+    watchDatabases:        state.watchDatabases,
+    setupExtras:           state.setupExtras,
+  };
+}

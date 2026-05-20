@@ -4,8 +4,9 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Sun, Moon, Palette, Bot, Eye, EyeOff,
-  Server, FolderOpen, ChevronRight, ExternalLink, BookOpen, Keyboard, MessageSquarePlus,
+  Server, FolderOpen, ExternalLink, BookOpen, Keyboard, MessageSquarePlus,
   HardDrive, Copy, Check, Package,
+  Sliders, Cpu, Trash2, Plus,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/button";
@@ -19,14 +20,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppStore, useIsPro } from "@/store/app";
+import { useAppStore } from "@/store/app";
 import type { HomeBg, Theme } from "@/store/app";
 import { cn } from "@/lib/utils";
-import { LicenseCard } from "@/components/license/LicenseCard";
-import { ProBadge } from "@/components/license/ProBadge";
 import { WatchFoldersCard } from "./WatchFoldersCard";
+import { WatchDatabasesCard } from "./WatchDatabasesCard";
 
-type ThemeOpt = { value: Theme; label: string; color: string; pro?: boolean };
+type ThemeOpt = { value: Theme; label: string; color: string };
 
 const THEME_OPTIONS: ThemeOpt[] = [
   { value: "default",  label: "Indigo",    color: "#324A83" },
@@ -37,14 +37,14 @@ const THEME_OPTIONS: ThemeOpt[] = [
   { value: "yellow",   label: "Yellow",    color: "#ED9400" },
   { value: "lime",     label: "Lime",      color: "#82B900" },
   { value: "slate",    label: "Slate",     color: "#406169" },
-  { value: "midnight", label: "Midnight",  color: "#0057C0", pro: true },
-  { value: "forest",   label: "Forest",    color: "#007700", pro: true },
-  { value: "ocean",    label: "Ocean",     color: "#0076BA", pro: true },
-  { value: "sunset",   label: "Sunset",    color: "#C96C00", pro: true },
-  { value: "rosegold", label: "Rosegold",  color: "#C86556", pro: true },
-  { value: "teal",     label: "Teal",      color: "#00A586", pro: true },
-  { value: "amethyst", label: "Amethyst",  color: "#6900EB", pro: true },
-  { value: "graphite", label: "Graphite",  color: "#6B5550", pro: true },
+  { value: "midnight", label: "Midnight",  color: "#0057C0" },
+  { value: "forest",   label: "Forest",    color: "#007700" },
+  { value: "ocean",    label: "Ocean",     color: "#0076BA" },
+  { value: "sunset",   label: "Sunset",    color: "#C96C00" },
+  { value: "rosegold", label: "Rosegold",  color: "#C86556" },
+  { value: "teal",     label: "Teal",      color: "#00A586" },
+  { value: "amethyst", label: "Amethyst",  color: "#6900EB" },
+  { value: "graphite", label: "Graphite",  color: "#6B5550" },
 ];
 
 const AUTO_PROVIDER = "__auto__";
@@ -89,12 +89,12 @@ const OFFLINE_MODELS = [
   },
 ] as const;
 
-type Tab = "appearance" | "ai" | "license";
+type Tab = "appearance" | "ai" | "watchers";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "appearance", label: "General"     },
   { id: "ai",         label: "AI & Server" },
-  { id: "license",    label: "License"     },
+  { id: "watchers",   label: "Auto-ingest" },
 ];
 
 function Card({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -133,7 +133,7 @@ function Field({ label, htmlFor, children, className }: {
 export function SettingsPane() {
   const {
     apiUrl, setApiUrl,
-    setCurrentDb, setCurrentCollection,
+    currentDb,
     darkMode, setDarkMode,
     darkModeAuto, setDarkModeAuto,
     theme, setTheme,
@@ -141,36 +141,27 @@ export function SettingsPane() {
     aiProvider, setAiProvider,
     aiModel, setAiModel,
     aiApiKey, setAiApiKey,
-    agentSystemPrompt, setAgentSystemPrompt,
+    agentPersonas, activePersonaId, setActivePersonaId,
+    addAgentPersona, updateAgentPersona, removeAgentPersona,
+    projectDefaults, setProjectDefaults,
+    customEmbeddingPresets, addCustomEmbeddingPreset, removeCustomEmbeddingPreset,
     setupExtras, setSetupExtras,
     triggerSidecarReconnect,
-    setOnboardingDone,
-    setShortcutsOpen,
+    setOnboardingDone, setShortcutsOpen,
   } = useAppStore();
+  const activePersona = agentPersonas.find((p) => p.id === activePersonaId) ?? null;
 
   const [localExtras, setLocalExtras] = useState<string[]>(setupExtras);
   const extrasChanged = [...localExtras].sort().join() !== [...setupExtras].sort().join();
 
-  const isPro = useIsPro();
-  const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
-
-  const licensePromptSeq = useAppStore((s) => s.licensePromptSeq);
-
   const [tab, setTab] = useState<Tab>("appearance");
   const [localApiUrl, setLocalApiUrl] = useState(apiUrl);
-
-  useEffect(() => {
-    if (licensePromptSeq === 0) return;
-    setTab("license");
-  }, [licensePromptSeq]);
   const [localModel,        setLocalModel]        = useState(aiModel);
   const [localApiKey,       setLocalApiKey]       = useState(aiApiKey);
-  const [localSystemPrompt, setLocalSystemPrompt] = useState(agentSystemPrompt);
 
   // Sync form fields if store values change externally (e.g. license deactivation reset)
   useEffect(() => { setLocalModel(aiModel); },               [aiModel]);
   useEffect(() => { setLocalApiKey(aiApiKey); },             [aiApiKey]);
-  useEffect(() => { setLocalSystemPrompt(agentSystemPrompt); }, [agentSystemPrompt]);
   const [showKey,      setShowKey]      = useState(false);
   const [appVersion,   setAppVersion]   = useState<string>("");
   const [cachePath,    setCachePath]    = useState<string>("");
@@ -207,9 +198,12 @@ export function SettingsPane() {
     setAiApiKey(localApiKey.trim());
   }
 
-  function handleSaveSystemPrompt(e: FormEvent) {
-    e.preventDefault();
-    setAgentSystemPrompt(localSystemPrompt.trim());
+  function handleAddPersona() {
+    const id = crypto.randomUUID();
+    addAgentPersona({ id, name: "New persona", systemPrompt: "" });
+  }
+  function handleDeleteActivePersona() {
+    if (activePersona) removeAgentPersona(activePersona.id);
   }
 
   return (
@@ -278,35 +272,27 @@ export function SettingsPane() {
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Accent colour</p>
                 <div className="grid grid-cols-4 gap-1.5">
-                  {THEME_OPTIONS.map((opt) => {
-                    const locked = opt.pro && !isPro;
-                    return (
-                      <button
-                        key={opt.value}
-                        onClick={() => {
-                          if (locked) { openUpgradeModal("theme"); return; }
-                          setTheme(opt.value);
-                        }}
-                        className={cn(
-                          "relative flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
-                          theme === opt.value ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
-                          locked && "bg-primary/5 border-primary/25 hover:bg-primary/10"
-                        )}
-                        title={opt.label}
-                        aria-label={opt.label}
-                        aria-pressed={theme === opt.value}
-                      >
-                        <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
-                        <span className={cn(
-                          "text-xs font-medium leading-none",
-                          theme === opt.value ? "text-primary" : "text-muted-foreground"
-                        )}>
-                          {opt.label}
-                        </span>
-                        {locked && <ProBadge className="absolute -top-1 -right-1" />}
-                      </button>
-                    );
-                  })}
+                  {THEME_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setTheme(opt.value)}
+                      className={cn(
+                        "relative flex flex-col items-center gap-1 py-1.5 px-1 rounded-lg border transition-all duration-150",
+                        theme === opt.value ? "border-primary bg-accent" : "border-border hover:bg-muted/50"
+                      )}
+                      title={opt.label}
+                      aria-label={opt.label}
+                      aria-pressed={theme === opt.value}
+                    >
+                      <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                      <span className={cn(
+                        "text-xs font-medium leading-none",
+                        theme === opt.value ? "text-primary" : "text-muted-foreground"
+                      )}>
+                        {opt.label}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -321,7 +307,6 @@ export function SettingsPane() {
                       {
                         id: "dotgrid" as HomeBg,
                         label: "Dot grid",
-                        pro: false,
                         preview: (
                           <div className="absolute inset-0 rounded-md overflow-hidden">
                             <div
@@ -341,7 +326,6 @@ export function SettingsPane() {
                       {
                         id: "aurora" as HomeBg,
                         label: "Aurora",
-                        pro: true,
                         preview: (
                           <div className="absolute inset-0 rounded-md overflow-hidden">
                             <div className="absolute inset-0" style={{ background: "radial-gradient(circle at 20% 30%, oklch(from var(--primary) 0.65 0.22 h / 0.55) 0%, transparent 55%)" }} />
@@ -353,7 +337,6 @@ export function SettingsPane() {
                       {
                         id: "network" as HomeBg,
                         label: "Network",
-                        pro: true,
                         preview: (
                           <div className="absolute inset-0 rounded-md overflow-hidden flex items-center justify-center">
                             <svg width="100%" height="100%" viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg" className="absolute inset-0">
@@ -371,98 +354,37 @@ export function SettingsPane() {
                           </div>
                         ),
                       },
-                    ] satisfies { id: HomeBg; label: string; pro: boolean; preview: React.ReactNode }[]
-                  ).map(({ id, label, pro, preview }) => {
-                    const locked = pro && !isPro;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        onClick={() => {
-                          if (locked) { openUpgradeModal("theme"); return; }
-                          setHomeBg(id);
-                        }}
-                        aria-label={label}
-                        aria-pressed={homeBg === id}
-                        className={cn(
-                          "relative flex-1 flex flex-col items-center gap-1.5 pt-1.5 pb-1 rounded-lg border transition-all duration-150",
-                          homeBg === id ? "border-primary bg-accent" : "border-border hover:bg-muted/50",
-                          locked && "bg-primary/5 border-primary/25 hover:bg-primary/10"
-                        )}
-                      >
-                        <div className="relative w-full h-10 rounded-md overflow-hidden bg-background/60">
-                          {preview}
-                        </div>
-                        <span className={cn(
-                          "text-xs font-medium leading-none pb-0.5",
-                          homeBg === id ? "text-primary" : "text-muted-foreground"
-                        )}>
-                          {label}
-                        </span>
-                        {locked && <ProBadge className="absolute -top-1 -right-1" />}
-                      </button>
-                    );
-                  })}
+                    ] satisfies { id: HomeBg; label: string; preview: React.ReactNode }[]
+                  ).map(({ id, label, preview }) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setHomeBg(id)}
+                      aria-label={label}
+                      aria-pressed={homeBg === id}
+                      className={cn(
+                        "relative flex-1 flex flex-col items-center gap-1.5 pt-1.5 pb-1 rounded-lg border transition-all duration-150",
+                        homeBg === id ? "border-primary bg-accent" : "border-border hover:bg-muted/50"
+                      )}
+                    >
+                      <div className="relative w-full h-10 rounded-md overflow-hidden bg-background/60">
+                        {preview}
+                      </div>
+                      <span className={cn(
+                        "text-xs font-medium leading-none pb-0.5",
+                        homeBg === id ? "text-primary" : "text-muted-foreground"
+                      )}>
+                        {label}
+                      </span>
+                    </button>
+                  ))}
                 </div>
               </div>
             </Card>
 
-            {/* Right — Project, Help & Packages */}
+            {/* Right — Optional packages (Change project / Welcome guide / Shortcuts /
+                Report-a-bug moved to the Sidebar 2×2 icon grid) */}
             <div className="space-y-3">
-              <Card className="p-0 space-y-0 overflow-hidden">
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                  onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
-                  aria-label="Change project"
-                >
-                  <FolderOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Change project</p>
-                    <p className="text-xs text-muted-foreground">Open a different database folder</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                </button>
-                <div className="h-px bg-border mx-4" />
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                  onClick={() => setOnboardingDone(false)}
-                  aria-label="Show welcome guide"
-                >
-                  <BookOpen className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Show welcome guide</p>
-                    <p className="text-xs text-muted-foreground">Replay the getting-started walkthrough</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                </button>
-                <div className="h-px bg-border mx-4" />
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                  onClick={() => setShortcutsOpen(true)}
-                  aria-label="Show keyboard shortcuts"
-                >
-                  <Keyboard className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Keyboard shortcuts</p>
-                    <p className="text-xs text-muted-foreground">View all keyboard shortcuts</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                </button>
-                <div className="h-px bg-border mx-4" />
-                <button
-                  className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors text-left"
-                  onClick={() => void open("https://github.com/adm-crow/remex/issues/new/choose")}
-                  aria-label="Report a bug or request a feature"
-                >
-                  <MessageSquarePlus className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">Report a bug / Request a feature</p>
-                    <p className="text-xs text-muted-foreground">Open an issue on GitHub</p>
-                  </div>
-                  <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
-                </button>
-              </Card>
-
               {/* Optional packages */}
               <Card>
                 <CardHeader icon={Package} title="Optional packages" subtitle="Requires reinstall — needs internet" />
@@ -503,6 +425,22 @@ export function SettingsPane() {
                   </Button>
                 )}
               </Card>
+
+              {/* Project defaults — seeded into the Ingest tabs when this project is open */}
+              {currentDb && (
+                <ProjectDefaultsCard
+                  currentDb={currentDb}
+                  defaults={projectDefaults[currentDb] ?? {}}
+                  onChange={(d) => setProjectDefaults(currentDb, d)}
+                />
+              )}
+
+              {/* User-defined embedding-model presets — surfaced in EmbeddingModelField */}
+              <CustomPresetsCard
+                presets={customEmbeddingPresets}
+                onAdd={addCustomEmbeddingPreset}
+                onRemove={removeCustomEmbeddingPreset}
+              />
             </div>
           </div>
         )}
@@ -577,22 +515,79 @@ export function SettingsPane() {
               </Card>
 
               <Card>
-                <CardHeader icon={MessageSquarePlus} title="System Prompt" subtitle="Prepended before every AI answer" />
-                <form onSubmit={handleSaveSystemPrompt} className="space-y-2.5">
-                  <textarea
-                    id="agent-system-prompt"
-                    value={localSystemPrompt}
-                    onChange={(e) => setLocalSystemPrompt(e.target.value)}
-                    placeholder={"You are a helpful assistant specialized in…\nAlways answer in French.\nCite your sources."}
-                    rows={4}
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono resize-none placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    aria-label="Agent system prompt"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Use it to set the language, tone, or domain focus of the AI agent.
-                  </p>
-                  <Button type="submit" size="sm" className="w-full">Save system prompt</Button>
-                </form>
+                <CardHeader
+                  icon={MessageSquarePlus}
+                  title="AI personas"
+                  subtitle="Save multiple agent prompts and switch from the Query pane"
+                />
+                <div className="space-y-2.5">
+                  {/* Persona picker row + add/delete */}
+                  <div className="flex gap-2">
+                    <Select
+                      value={activePersonaId ?? ""}
+                      onValueChange={(v) => setActivePersonaId(v || null)}
+                      disabled={agentPersonas.length === 0}
+                    >
+                      <SelectTrigger className="h-8 text-sm flex-1" aria-label="Active persona">
+                        <SelectValue placeholder={agentPersonas.length === 0 ? "No personas yet — click +" : "Select…"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {agentPersonas.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name || "(unnamed)"}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" size="sm" variant="outline" onClick={handleAddPersona} aria-label="Add persona">
+                      +
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleDeleteActivePersona}
+                      disabled={!activePersona}
+                      aria-label="Delete persona"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+
+                  {/* Edit fields for the currently-selected persona */}
+                  {activePersona ? (
+                    <>
+                      <Field label="Name" htmlFor="persona-name">
+                        <Input
+                          id="persona-name"
+                          value={activePersona.name}
+                          onChange={(e) => updateAgentPersona(activePersona.id, { name: e.target.value })}
+                          placeholder="e.g. Researcher"
+                          className="h-8 text-sm"
+                        />
+                      </Field>
+                      <Field label="System prompt" htmlFor="persona-prompt">
+                        <textarea
+                          id="persona-prompt"
+                          value={activePersona.systemPrompt}
+                          onChange={(e) =>
+                            updateAgentPersona(activePersona.id, { systemPrompt: e.target.value })
+                          }
+                          placeholder={"You are a helpful assistant specialized in…\nAlways answer in French.\nCite your sources."}
+                          rows={5}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono resize-none placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          aria-label="Agent system prompt"
+                        />
+                      </Field>
+                      <p className="text-xs text-muted-foreground">
+                        The active persona is sent on every AI answer in Query. Changes save automatically.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Personas let you save different agent voices (Researcher, Code Q&amp;A, Summariser…)
+                      and switch between them from the Query pane. Click <b>+</b> to add your first.
+                    </p>
+                  )}
+                </div>
               </Card>
 
               <Card>
@@ -742,35 +737,224 @@ export function SettingsPane() {
           </div>
         )}
 
-        {/* ── License ────────────────────────────────────────────────────── */}
-        {tab === "license" && (
+        {/* ── Auto-ingest (watch folders + watch databases) ──────────────── */}
+        {tab === "watchers" && (
           <div className="grid grid-cols-2 gap-3 items-start">
-            {/* Left — License */}
-            <LicenseCard />
-            {/* Right — Watch folders */}
             <WatchFoldersCard />
+            <WatchDatabasesCard />
           </div>
         )}
 
       </div>
 
       {/* ── Sticky version footer ────────────────────────────────────────── */}
-      <div className="shrink-0 border-t px-4 py-2.5 flex items-center justify-between bg-background">
-        <p className="text-xs text-muted-foreground">
+      <div className="shrink-0 border-t px-4 py-2.5 flex items-center justify-between gap-2 bg-background">
+        <p className="text-xs text-muted-foreground shrink-0">
           {appVersion ? `Remex Studio v${appVersion}` : "Remex Studio"}
         </p>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-6 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground"
-          onClick={() => void open("https://github.com/adm-crow/remex/releases")}
-          aria-label="Check for updates"
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-          Check for updates
-        </Button>
+        <div className="flex items-center gap-0.5 flex-wrap justify-end">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setOnboardingDone(false)}
+            aria-label="Show welcome guide"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            Welcome guide
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setShortcutsOpen(true)}
+            aria-label="Keyboard shortcuts"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+            Shortcuts
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => void open("https://github.com/adm-crow/remex/issues/new/choose")}
+            aria-label="Report a bug"
+          >
+            <MessageSquarePlus className="w-3.5 h-3.5" />
+            Report a bug
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs px-2 gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => void open("https://github.com/adm-crow/remex/releases")}
+            aria-label="Check for updates"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Check for updates
+          </Button>
+        </div>
       </div>
     </div>
+  );
+}
+
+// ─── Project Defaults card ─────────────────────────────────────────────────
+import type { ProjectDefaults, CustomEmbeddingPreset } from "@/store/app";
+import { EmbeddingModelField } from "@/components/ingest/EmbeddingModelField";
+
+function ProjectDefaultsCard({
+  defaults,
+  onChange,
+}: {
+  currentDb: string;
+  defaults: ProjectDefaults;
+  onChange: (next: ProjectDefaults) => void;
+}) {
+  const patch = (delta: Partial<ProjectDefaults>) => onChange({ ...defaults, ...delta });
+  const chunking = defaults.chunking ?? "recursive";
+
+  return (
+    <Card>
+      <CardHeader
+        icon={Sliders}
+        title="Project defaults"
+        subtitle="Pre-fill Ingest fields when a new collection is created in this project"
+      />
+      <div className="space-y-2.5">
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+          <Field label="Chunk size" htmlFor="pd-chunk-size">
+            <Input
+              id="pd-chunk-size"
+              type="number"
+              value={defaults.chunkSize ?? 768}
+              onChange={(e) => patch({ chunkSize: Number(e.target.value) || undefined })}
+              className="h-8 w-20 text-xs"
+            />
+          </Field>
+          <Field label="Overlap" htmlFor="pd-overlap">
+            <Input
+              id="pd-overlap"
+              type="number"
+              value={defaults.overlap ?? 150}
+              onChange={(e) => patch({ overlap: Number(e.target.value) || undefined })}
+              className="h-8 w-20 text-xs"
+            />
+          </Field>
+          <Field label="Mode">
+            <div className="flex rounded-md border overflow-hidden text-xs">
+              {([
+                { value: "recursive", label: "Recursive" },
+                { value: "sentence",  label: "Sentence"  },
+                { value: "word",      label: "Word"      },
+              ] as const).map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => patch({ chunking: value })}
+                  className={cn(
+                    "px-2.5 py-1 transition-colors",
+                    chunking === value
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+        <EmbeddingModelField
+          inputId="pd-embedding-model"
+          value={defaults.embeddingModel ?? "all-MiniLM-L6-v2"}
+          onChange={(v) => patch({ embeddingModel: v })}
+          compact
+        />
+      </div>
+    </Card>
+  );
+}
+
+// ─── Custom embedding presets card ─────────────────────────────────────────
+
+function CustomPresetsCard({
+  presets,
+  onAdd,
+  onRemove,
+}: {
+  presets: CustomEmbeddingPreset[];
+  onAdd:    (p: CustomEmbeddingPreset) => void;
+  onRemove: (model: string) => void;
+}) {
+  const [tag,   setTag]   = useState("");
+  const [model, setModel] = useState("");
+
+  const canAdd = tag.trim().length > 0 && model.trim().length > 0;
+
+  function handleAdd() {
+    if (!canAdd) return;
+    onAdd({ tag: tag.trim(), model: model.trim() });
+    setTag("");
+    setModel("");
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        icon={Cpu}
+        title="Custom embedding models"
+        subtitle="Shows alongside Light / Balanced / Multilingual in the picker"
+      />
+      <div className="space-y-2">
+        {presets.length > 0 && (
+          <ul className="space-y-1">
+            {presets.map((p) => (
+              <li key={p.model} className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0">
+                  {p.tag}
+                </span>
+                <span className="text-xs font-mono text-muted-foreground flex-1 truncate" title={p.model}>
+                  {p.model}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(p.model)}
+                  className="text-muted-foreground hover:text-destructive transition-colors"
+                  aria-label={`Remove ${p.tag}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="grid grid-cols-[80px_1fr_auto] gap-1.5 items-center">
+          <Input
+            value={tag}
+            onChange={(e) => setTag(e.target.value)}
+            placeholder="Tag"
+            className="h-7 text-xs"
+            aria-label="Preset tag"
+          />
+          <Input
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            placeholder="org/model-name"
+            className="h-7 text-xs font-mono"
+            aria-label="Preset model"
+            onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
+          />
+          <Button size="sm" variant="outline" onClick={handleAdd} disabled={!canAdd} aria-label="Add preset">
+            <Plus className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </div>
+    </Card>
   );
 }

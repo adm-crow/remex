@@ -49,14 +49,7 @@ describe("SettingsPane", () => {
     await waitFor(() => {}); // drain async queue (getVersion useEffect)
   });
 
-  it("change project button clears currentDb and currentCollection", async () => {
-    renderWithProviders(<SettingsPane />);
-    // Change project is on the General tab (default tab — no tab click needed)
-    fireEvent.click(screen.getByRole("button", { name: /change project/i }));
-    expect(useAppStore.getState().currentDb).toBeNull();
-    expect(useAppStore.getState().currentCollection).toBeNull();
-    await waitFor(() => {}); // drain async queue (getVersion useEffect)
-  });
+  // "Change project" is on the Sidebar — see `layout.test.tsx`.
 
   it("displays app version loaded from Tauri", async () => {
     renderWithProviders(<SettingsPane />);
@@ -64,31 +57,29 @@ describe("SettingsPane", () => {
       expect(screen.getByText(/1\.2\.3/)).toBeInTheDocument();
     });
   });
+
+  it("footer Welcome guide button resets onboarding", async () => {
+    useAppStore.setState({ onboardingDone: true } as any);
+    renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByRole("button", { name: /show welcome guide/i }));
+    expect(useAppStore.getState().onboardingDone).toBe(false);
+    await waitFor(() => {});
+  });
+
+  it("footer Shortcuts button opens the shortcuts modal", async () => {
+    renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByRole("button", { name: /keyboard shortcuts/i }));
+    expect(useAppStore.getState().shortcutsOpen).toBe(true);
+    await waitFor(() => {});
+  });
 });
 
-describe("SettingsPane — Pro theme gating", () => {
+describe("SettingsPane — theme selection", () => {
   beforeEach(() => {
-    useAppStore.setState({
-      license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
-      theme: "default",
-      upgradeModalOpen: false,
-      upgradeModalContext: null,
-    } as any);
+    useAppStore.setState({ theme: "default" } as any);
   });
 
-  it("clicking a Pro theme as free opens the upgrade modal with theme context", async () => {
-    renderWithProviders(<SettingsPane />);
-    fireEvent.click(screen.getByLabelText("Midnight"));
-    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
-    expect(useAppStore.getState().upgradeModalContext).toBe("theme");
-    expect(useAppStore.getState().theme).toBe("default");
-    await waitFor(() => {}); // drain async queue (getVersion useEffect)
-  });
-
-  it("clicking a Pro theme as Pro sets the theme", async () => {
-    useAppStore.setState({
-      license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
-    } as any);
+  it("clicking any theme sets it on the store", async () => {
     renderWithProviders(<SettingsPane />);
     fireEvent.click(screen.getByLabelText("Midnight"));
     expect(useAppStore.getState().theme).toBe("midnight");

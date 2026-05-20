@@ -6,7 +6,6 @@ import { Home } from "@/pages/Home";
 import { AppShell } from "@/components/layout/AppShell";
 import { SetupScreen } from "@/components/setup/SetupScreen";
 import { useSidecar } from "@/hooks/useSidecar";
-import { UpgradeModal } from "@/components/license/UpgradeModal";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,26 +53,6 @@ export function App() {
     api.warmupModels(apiUrl, currentDb).catch(() => {});
   }, [sidecarStatus, currentDb, apiUrl]);
 
-  useEffect(() => {
-    const store = useAppStore.getState();
-    void (async () => {
-      await store.refreshLicenseStatus();
-      try {
-        const { licenseApi } = await import("@/lib/licenseApi");
-        if (await licenseApi.shouldRevalidate()) {
-          await store.revalidateLicense();
-        }
-      } catch { /* ignore */ }
-      const s = useAppStore.getState();
-      if (s.license.tier === "pro") {
-        const { invoke } = await import("@tauri-apps/api/core");
-        for (const p of s.watchFolders) {
-          try { await invoke("watch_start", { folder: p }); } catch { /* ignore */ }
-        }
-      }
-    })();
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       {sidecarStatus === "starting" || sidecarStatus === "setup_config" || sidecarStatus === "setup" || sidecarStatus === "setup_error" ? (
@@ -83,7 +62,6 @@ export function App() {
       ) : (
         <Home />
       )}
-      <UpgradeModal />
     </QueryClientProvider>
   );
 }

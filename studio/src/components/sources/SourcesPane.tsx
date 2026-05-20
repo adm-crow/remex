@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle, FileText, Database, Pencil, RotateCcw, MessageSquare } from "lucide-react";
 
-const errMsg = (e: unknown) => e instanceof Error ? e.message : String(e);
+import { errMsg } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";

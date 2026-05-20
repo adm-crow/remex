@@ -1,6 +1,6 @@
 """API-level tests for query and chat endpoints."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient

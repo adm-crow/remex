@@ -6,9 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       matrix:
         python-version: ["3.13"]
@@ -32,6 +37,7 @@ jobs:
 
   frontend:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: studio
@@ -50,7 +56,15 @@ jobs:
         run: npm test
 
   rust:
-    runs-on: ubuntu-latest
+    # Studio ships only on Windows. Run on both ubuntu (cheap, catches portable
+    # code regressions) and windows (catches Windows-specific `#[cfg]` branches
+    # — Job Object code, CREATE_NO_WINDOW path, etc.).
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -63,13 +77,16 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: studio/src-tauri
+          key: ${{ matrix.os }}
 
       - name: Install system dependencies (Tauri)
+        if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Create placeholder uv.exe for Tauri resource validation
+        shell: bash
         run: mkdir -p studio/src-tauri/resources && touch studio/src-tauri/resources/uv.exe
 
       - name: Check (no warnings treated as errors)

@@ -76,8 +76,12 @@ describe("SQLiteTab", () => {
     expect(screen.getByRole("switch", { name: /incremental/i })).toBeInTheDocument();
   });
 
-  it("embedding model segmented control is visible without opening Advanced", () => {
+  it("embedding model picker lives inside Advanced for new collections", () => {
     renderWithProviders(<SQLiteTab />);
+    // Closed by default: no "Light" preset button rendered.
+    expect(screen.queryByRole("button", { name: /light/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+    // Opens: picker is now visible.
     expect(screen.getByRole("button", { name: /light/i })).toBeInTheDocument();
   });
 });

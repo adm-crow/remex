@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAppStore, useIsPro } from "@/store/app";
-import { ProBadge } from "@/components/license/ProBadge";
 import { cn } from "@/lib/utils";
+import { useAppStore } from "@/store/app";
 
 type Preset = {
   tag: string;
@@ -12,10 +11,9 @@ type Preset = {
   model: string;
   desc: string;
   speed: string;
-  pro?: boolean;
 };
 
-const PRESETS: Preset[] = [
+const BUILT_IN_PRESETS: Preset[] = [
   { tag: "Light",        tagColor: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
     model: "all-MiniLM-L6-v2",
     desc: "90 MB · fast, works offline, no HuggingFace required",
@@ -31,14 +29,14 @@ const PRESETS: Preset[] = [
   { tag: "Large",        tagColor: "bg-primary/15 text-primary",
     model: "BAAI/bge-large-en-v1.5",
     desc: "1.2 GB · best English accuracy",
-    speed: "~15× slower", pro: true },
+    speed: "~15× slower" },
   { tag: "Long ctx",     tagColor: "bg-primary/15 text-primary",
     model: "nomic-ai/nomic-embed-text-v1.5-Q",
     desc: "130 MB · long context window (8 192 tokens)",
-    speed: "~6× slower", pro: true },
+    speed: "~6× slower" },
 ];
 
-const SEGMENT_PRESETS = PRESETS.slice(0, 3);
+const SEGMENT_PRESETS = BUILT_IN_PRESETS.slice(0, 3);
 
 const LINKS = [
   { label: "FastEmbed models", href: "https://qdrant.github.io/fastembed/examples/Supported_Models/" },
@@ -56,6 +54,24 @@ function shortName(model: string): string {
   return model.includes("/") ? model.split("/").pop()! : model;
 }
 
+/** Merge built-in presets with user-defined ones (Settings → Custom embedding models). */
+function useAllPresets(): Preset[] {
+  const custom = useAppStore((s) => s.customEmbeddingPresets);
+  return useMemo(
+    () => [
+      ...BUILT_IN_PRESETS,
+      ...custom.map((c) => ({
+        tag:      c.tag,
+        tagColor: "bg-violet-500/15 text-violet-600 dark:text-violet-400",
+        model:    c.model,
+        desc:     c.desc ?? "Custom preset",
+        speed:    "—",
+      })),
+    ],
+    [custom],
+  );
+}
+
 function PresetList({
   value,
   onChange,
@@ -63,13 +79,11 @@ function PresetList({
   value: string;
   onChange: (v: string) => void;
 }) {
-  const isPro = useIsPro();
-  const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
+  const presets = useAllPresets();
   return (
     <>
       <div className="flex flex-col gap-1">
-        {PRESETS.map(({ tag, tagColor, model, desc, speed, pro }) => {
-          const locked = pro && !isPro;
+        {presets.map(({ tag, tagColor, model, desc, speed }) => {
           const isSelected = value === model;
           return (
             <button
@@ -80,19 +94,13 @@ function PresetList({
                 "flex items-center gap-2 rounded-md border px-2 py-1.5 text-left transition-colors",
                 isSelected
                   ? "border-primary bg-primary/10"
-                  : locked
-                    ? "border-dashed bg-muted/20 hover:bg-muted/40 cursor-pointer"
-                    : "bg-muted/20 hover:bg-muted/50 border-transparent hover:border-border"
+                  : "bg-muted/20 hover:bg-muted/50 border-transparent hover:border-border"
               )}
-              onClick={() => {
-                if (locked) { openUpgradeModal("embedding-model"); return; }
-                onChange(model);
-              }}
+              onClick={() => onChange(model)}
             >
               <span className={`text-xs font-semibold px-1.5 py-0.5 rounded shrink-0 ${tagColor}`}>{tag}</span>
               <span className="text-xs font-mono text-muted-foreground flex-1 truncate min-w-0">{model}</span>
               <span className="text-xs text-muted-foreground/60 shrink-0">{speed}</span>
-              {locked && <ProBadge />}
             </button>
           );
         })}
@@ -126,11 +134,10 @@ function CompactPicker({
   inputId: string;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const isPro = useIsPro();
-  const openUpgradeModal = useAppStore((s) => s.openUpgradeModal);
+  const presets = useAllPresets();
 
   const inSegment = SEGMENT_PRESETS.some((p) => p.model === value);
-  const extraPreset = inSegment ? null : PRESETS.find((p) => p.model === value);
+  const extraPreset = inSegment ? null : presets.find((p) => p.model === value);
 
   const segBase =
     "flex-1 flex flex-col items-center justify-center border-r border-border px-1 py-1.5 gap-0.5 transition-colors min-w-0";
@@ -178,15 +185,12 @@ function CompactPicker({
               </span>
             </div>
           ) : (
-            // Known preset (possibly Pro-locked) — render as interactive button
+            // Known non-segment preset — render as interactive button
             <button
               type="button"
               data-testid="model-segment-extra"
-              className={cn(segBase, "bg-primary text-primary-foreground relative")}
-              onClick={() => {
-                if (extraPreset?.pro && !isPro) { openUpgradeModal("embedding-model"); return; }
-                onChange(extraPreset.model);
-              }}
+              className={cn(segBase, "bg-primary text-primary-foreground")}
+              onClick={() => onChange(extraPreset.model)}
             >
               <span className="text-[10px] font-bold leading-none whitespace-nowrap truncate w-full text-center px-0.5">
                 {extraPreset.tag}
@@ -194,11 +198,6 @@ function CompactPicker({
               <span className="text-[8.5px] font-mono leading-none w-full text-center truncate px-0.5 opacity-85">
                 {shortName(extraPreset.model)}
               </span>
-              {extraPreset.pro && !isPro && (
-                <span className="absolute top-0.5 right-0.5">
-                  <ProBadge />
-                </span>
-              )}
             </button>
           )
         )}

@@ -556,6 +556,9 @@ def query(
         query_kwargs["where"] = where
 
     results = collection.query(**query_kwargs)
+    # A heavily-filtered `where=` can return zero rows even when count > 0.
+    if not results["documents"] or not results["documents"][0]:  # type: ignore[index]
+        return []
     documents = results["documents"][0]  # type: ignore[index]
     metadatas = results["metadatas"][0]  # type: ignore[index]
     distances = results["distances"][0]  # type: ignore[index]
@@ -726,6 +729,7 @@ def warmup_collections(db_path: str = "./remex_db") -> list[str]:
 
     seen: set[str] = set()
     for col in collections:
+        model = ""
         try:
             meta = col.metadata if isinstance(col.metadata, dict) else {}
             model = meta.get("embedding_model", "")
@@ -751,7 +755,8 @@ def list_collections(db_path: str = "./remex_db") -> list[str]:
         return sorted(c.name for c in client.list_collections())
     except (PermissionError, OSError):
         raise
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to list collections at %s: %s", db_path, e)
         return []
 
 

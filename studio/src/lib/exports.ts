@@ -1,4 +1,5 @@
 import type { QueryResultItem } from "@/api/client";
+import { basename } from "@/lib/utils";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const today = () => {
@@ -7,8 +8,7 @@ const today = () => {
 };
 
 function citeKey(source: string, idx: number): string {
-  const base = source.split(/[/\\]/).pop() ?? "source";
-  const stem = base.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]+/g, "_");
+  const stem = basename(source).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9]+/g, "_");
   return `${stem}_${idx}`;
 }
 
@@ -16,7 +16,7 @@ export function toBibTeX(results: QueryResultItem[], query: string): string {
   const year = new Date().getFullYear();
   return results.map((r, i) => {
     const key = citeKey(r.source, i);
-    const title = r.source.split(/[/\\]/).pop() ?? r.source;
+    const title = basename(r.source);
     const note = r.text.replace(/[{}]/g, "").replace(/\s+/g, " ").slice(0, 500);
     return [
       `@misc{${key},`,
@@ -32,7 +32,7 @@ export function toBibTeX(results: QueryResultItem[], query: string): string {
 export function toRIS(results: QueryResultItem[], query: string): string {
   const year = new Date().getFullYear();
   return results.map((r) => {
-    const title = r.source.split(/[/\\]/).pop() ?? r.source;
+    const title = basename(r.source);
     const lines = [
       `TY  - GEN`,
       `TI  - ${title}`,
@@ -56,7 +56,7 @@ export function toCSLJson(results: QueryResultItem[], query: string): string {
   const items = results.map((r, i) => ({
     id:                citeKey(r.source, i),
     type:              "document",
-    title:             r.source.split(/[/\\]/).pop() ?? r.source,
+    title:             basename(r.source),
     "abstract":        r.text.slice(0, 2000),
     note:              `score=${r.score.toFixed(3)}; query=${query}`,
     issued:            { "date-parts": [[year]] },

@@ -325,7 +325,6 @@ def test_ingest_sqlite_incremental_skips_unchanged_row(tmp_path):
     # Simulate row already in collection with matching hash
     import hashlib
     from remex.core.sqlite_ingester import _make_sqlite_id
-    text = "body: " + "word " * 30  # default serialization includes "body: " prefix
     # Just use the actual serialization that ingest_sqlite produces
     body_text = "word " * 30
     row_hash = hashlib.sha256(f"body: {body_text}".encode(), usedforsecurity=False).hexdigest()[:16]

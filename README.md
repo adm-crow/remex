@@ -56,36 +56,16 @@ Native desktop app for Windows. No terminal required.
 | 🔎 **Chunk viewer** | Expand any result to read the full chunk, navigate with keyboard arrows |
 | 📦 **Collections manager** | Rename, describe, purge, bulk-delete sources, one-click re-ingest |
 | 📤 **Export** | JSON · CSV · Markdown · BibTeX · RIS · CSL-JSON · Obsidian vault |
-| 🌙 **Themes** | Light, dark, auto (follows OS) + eight accent colours |
+| 👁️ **Watch folders** | Re-ingest automatically when files change inside chosen directories |
+| 🔬 **All embedding models** | `MiniLM`, `bge-base`, `bge-large`, multilingual, `nomic-embed` long-context, custom HuggingFace/FastEmbed names |
+| 🌙 **Themes** | Light, dark, auto (follows OS) + sixteen accent colours |
+| 🔎 **Searchable query history** | Filter past queries by substring |
 | ⌨️ **Keyboard-driven** | Press `?` anywhere in Studio for the full shortcuts reference |
 | ⚙️ **Optional packages** | Install extra file formats, AI integrations, or sentence chunking from `Settings → General` at any time |
 
 <br/>
 
----
-
-## Remex Pro — 29€, one-time
-
-Free Remex covers the full local-first workflow. **Remex Pro** unlocks power-user features for a single one-time payment (two machines):
-
-| Feature | Free | Pro |
-|:--------|:----:|:---:|
-| Semantic search | ✓ | ✓ |
-| AI Answer | ✓ | ✓ |
-| All 12 file formats + SQLite | ✓ | ✓ |
-| Incremental ingest | ✓ | ✓ |
-| Source filter + chunk viewer | ✓ | ✓ |
-| Collections manager | ✓ | ✓ |
-| JSON · CSV · Markdown export | ✓ | ✓ |
-| Query history (last 20) | ✓ | ✓ |
-| **Pro embedding models** (`bge-large`, `e5-large`, `nomic-embed`) | — | ✓ |
-| **Advanced exports** (BibTeX · RIS · CSL-JSON · Obsidian vault) | — | ✓ |
-| **Watch-folder auto-ingest** | — | ✓ |
-| **Unlimited searchable query history** | — | ✓ |
-| **Extra accent themes** (8 additional) | — | ✓ |
-| **Priority email support** (48-hour business-day SLA) | — | ✓ |
-
-Activate in `Settings → License` inside Studio. Licenses are issued and validated via [Lemon Squeezy](https://lemonsqueezy.com/).
+**Remex is free and open-source.** Every feature ships in the box — no tiers, no license keys, no payment required.
 
 <br/>
 

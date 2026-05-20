@@ -1,49 +1,24 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { EmbeddingModelField } from "./EmbeddingModelField";
-import { useAppStore } from "@/store/app";
 
-describe("EmbeddingModelField — Pro lock", () => {
-  beforeEach(() => {
-    useAppStore.setState({
-      license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
-      upgradeModalOpen: false,
-    });
-  });
-
-  it("clicking a Pro preset as free opens the upgrade modal with embedding-model context", () => {
-    render(<EmbeddingModelField value="" onChange={() => {}} />);
-    fireEvent.click(screen.getByTitle(/best English accuracy/));
-    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
-    expect(useAppStore.getState().upgradeModalContext).toBe("embedding-model");
-  });
-
-  it("clicking a Pro preset as Pro selects the model", () => {
-    useAppStore.setState({
-      license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
-    });
-    let selected = "";
-    render(<EmbeddingModelField value="" onChange={(v) => { selected = v; }} />);
-    fireEvent.click(screen.getByTitle(/best English accuracy/));
-    expect(selected).toBe("BAAI/bge-large-en-v1.5");
-  });
-
-  it("clicking a free preset works regardless of tier", () => {
+describe("EmbeddingModelField — preset selection", () => {
+  it("clicking the Light preset calls onChange with all-MiniLM-L6-v2", () => {
     let selected = "";
     render(<EmbeddingModelField value="" onChange={(v) => { selected = v; }} />);
     fireEvent.click(screen.getByTitle(/works offline/));
     expect(selected).toBe("all-MiniLM-L6-v2");
   });
+
+  it("clicking the Large preset calls onChange with BAAI/bge-large-en-v1.5", () => {
+    let selected = "";
+    render(<EmbeddingModelField value="" onChange={(v) => { selected = v; }} />);
+    fireEvent.click(screen.getByTitle(/best English accuracy/));
+    expect(selected).toBe("BAAI/bge-large-en-v1.5");
+  });
 });
 
 describe("EmbeddingModelField — compact mode", () => {
-  beforeEach(() => {
-    useAppStore.setState({
-      license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
-      upgradeModalOpen: false,
-    });
-  });
-
   it("renders 4 segment buttons", () => {
     render(<EmbeddingModelField value="all-MiniLM-L6-v2" onChange={() => {}} compact />);
     expect(screen.getByRole("button", { name: /light/i })).toBeInTheDocument();
@@ -84,7 +59,7 @@ describe("EmbeddingModelField — compact mode", () => {
     expect(screen.queryByTitle(/best English accuracy/)).not.toBeInTheDocument();
   });
 
-  it("shows a 5th segment when a Pro model is selected", () => {
+  it("shows a 5th segment when a non-segment preset model is selected", () => {
     render(
       <EmbeddingModelField value="BAAI/bge-large-en-v1.5" onChange={() => {}} compact />
     );
@@ -98,11 +73,8 @@ describe("EmbeddingModelField — compact mode", () => {
     expect(screen.getByTestId("model-segment-extra")).toBeInTheDocument();
   });
 
-  it("clicking the 5th segment for a Pro model calls onChange with that model", () => {
+  it("clicking the 5th segment calls onChange with that model", () => {
     let selected = "";
-    useAppStore.setState({
-      license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
-    });
     render(
       <EmbeddingModelField
         value="BAAI/bge-large-en-v1.5"
@@ -112,23 +84,5 @@ describe("EmbeddingModelField — compact mode", () => {
     );
     fireEvent.click(screen.getByTestId("model-segment-extra"));
     expect(selected).toBe("BAAI/bge-large-en-v1.5");
-  });
-
-  it("5th segment for a locked Pro model triggers upgrade modal on free tier", () => {
-    // useAppStore already set to free tier in beforeEach
-    render(
-      <EmbeddingModelField value="BAAI/bge-large-en-v1.5" onChange={() => {}} compact />
-    );
-    fireEvent.click(screen.getByTestId("model-segment-extra"));
-    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
-    expect(useAppStore.getState().upgradeModalContext).toBe("embedding-model");
-  });
-
-  it("Pro preset in expansion panel triggers upgrade modal for free tier", () => {
-    render(<EmbeddingModelField value="all-MiniLM-L6-v2" onChange={() => {}} compact />);
-    fireEvent.click(screen.getByRole("button", { name: /more/i }));
-    fireEvent.click(screen.getByTitle(/best English accuracy/));
-    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
-    expect(useAppStore.getState().upgradeModalContext).toBe("embedding-model");
   });
 });

@@ -4,15 +4,16 @@ import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, Chevron
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
-import { cn } from "@/lib/utils";
+import { cn, errMsg, basename } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
-import { useAppStore, useIsPro } from "@/store/app";
+import { useAppStore } from "@/store/app";
 import { toBibTeX, toRIS, toCSLJson, toObsidianVault } from "@/lib/exports";
 import { join } from "@tauri-apps/api/path";
 import { ResultCard } from "./ResultCard";
@@ -82,19 +83,19 @@ function isAiNetworkError(msg: string): boolean {
 
 export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
-          agentSystemPrompt,
+          agentPersonas, activePersonaId, setActivePersonaId,
           queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory,
-          openUpgradeModal, setRequestedView } =
+          setRequestedView } =
     useAppStore();
+  const activePersona = agentPersonas.find((p) => p.id === activePersonaId) ?? null;
+  const agentSystemPrompt = activePersona?.systemPrompt ?? "";
 
-  const isPro = useIsPro();
   const [historyFilter, setHistoryFilter] = useState("");
   const visibleHistory = useMemo(() => {
-    if (!isPro) return queryHistory.slice(0, 20);
     const q = historyFilter.trim().toLowerCase();
     if (!q) return queryHistory;
     return queryHistory.filter((h) => h.toLowerCase().includes(q));
-  }, [isPro, queryHistory, historyFilter]);
+  }, [queryHistory, historyFilter]);
 
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState("");
@@ -207,22 +208,13 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     const path = await save({
       defaultPath: "remex-results.json",
       filters: [
-        { name: "JSON",      extensions: ["json"] },
-        { name: "CSV",       extensions: ["csv"]  },
-        { name: "Markdown",  extensions: ["md"]   },
-        ...(isPro ? [
-          { name: "BibTeX",   extensions: ["bib"] },
-          { name: "RIS",      extensions: ["ris"] },
-          { name: "CSL-JSON", extensions: ["csl"] },
-          { name: "Obsidian Vault (folder)", extensions: [""] },
-        ] : [
-          // Pro formats shown to free users. .csl is unambiguous (no collision
-          // with the free .json export), so the gate below can rely on extension alone.
-          { name: "BibTeX (Pro)",   extensions: ["bib"] },
-          { name: "RIS (Pro)",      extensions: ["ris"] },
-          { name: "CSL-JSON (Pro)", extensions: ["csl"] },
-          { name: "Obsidian Vault — folder (Pro)", extensions: [""] },
-        ]),
+        { name: "JSON",                    extensions: ["json"] },
+        { name: "CSV",                     extensions: ["csv"]  },
+        { name: "Markdown",                extensions: ["md"]   },
+        { name: "BibTeX",                  extensions: ["bib"]  },
+        { name: "RIS",                     extensions: ["ris"]  },
+        { name: "CSL-JSON",                extensions: ["csl"]  },
+        { name: "Obsidian Vault (folder)", extensions: [""]     },
       ],
     });
     if (!path) return;
@@ -235,17 +227,13 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     let content: string | null = null;
 
     if (ext === "bib") {
-      if (!isPro) { openUpgradeModal("export"); return; }
       content = toBibTeX(results, submitted);
     } else if (ext === "ris") {
-      if (!isPro) { openUpgradeModal("export"); return; }
       content = toRIS(results, submitted);
     } else if (ext === "csl") {
-      if (!isPro) { openUpgradeModal("export"); return; }
       content = toCSLJson(results, submitted);
     } else if (ext === "") {
       // Obsidian vault: path is the folder the user chose.
-      if (!isPro) { openUpgradeModal("export"); return; }
       const files = toObsidianVault(results, submitted);
       try {
         for (const [rel, fileContent] of Object.entries(files)) {
@@ -256,7 +244,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         setExportError(null);
         setTimeout(() => setExportDone(false), 3000);
       } catch (e) {
-        setExportError(e instanceof Error ? e.message : String(e));
+        setExportError(errMsg(e));
       }
       return;
     } else if (ext === "csv") {
@@ -271,7 +259,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       content += results
         .map(
           (r, i) =>
-            `## ${i + 1}. ${r.source.split(/[/\\]/).pop() ?? r.source} (score: ${r.score.toFixed(3)})\n\n${r.text}\n`
+            `## ${i + 1}. ${basename(r.source)} (score: ${r.score.toFixed(3)})\n\n${r.text}\n`
         )
         .join("\n---\n\n");
     } else {
@@ -284,7 +272,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       setExportError(null);
       setTimeout(() => setExportDone(false), 3000);
     } catch (e) {
-      setExportError(e instanceof Error ? e.message : String(e));
+      setExportError(errMsg(e));
     }
   }
 
@@ -298,7 +286,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     const { answer, provider, model, sources } = chatResult.data;
     const sourceList = sources
       .map((s, i) =>
-        `### ${i + 1}. ${s.source.split(/[/\\]/).pop() ?? s.source} (score: ${s.score.toFixed(3)})\n\n${s.text}`
+        `### ${i + 1}. ${basename(s.source)} (score: ${s.score.toFixed(3)})\n\n${s.text}`
       )
       .join("\n\n---\n\n");
     const content = [
@@ -321,7 +309,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       setExportError(null);
       setTimeout(() => setAiExportDone(false), 3000);
     } catch (e) {
-      setExportError(e instanceof Error ? e.message : String(e));
+      setExportError(errMsg(e));
     }
   }
 
@@ -390,7 +378,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
         {/* Query history chips */}
         {queryHistory.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
-            {isPro && queryHistory.length > 20 && (
+            {queryHistory.length > 20 && (
               <div className="w-full">
                 <Input
                   value={historyFilter}
@@ -493,6 +481,24 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
 
           <div className="flex-1" />
 
+          {/* Persona switcher — only meaningful when AI Answer is on AND personas exist.
+              Lets the user swap the agent's voice without leaving the Query pane. */}
+          {useAi && agentPersonas.length > 0 && (
+            <Select
+              value={activePersonaId ?? ""}
+              onValueChange={(v) => setActivePersonaId(v || null)}
+            >
+              <SelectTrigger className="h-7 text-xs w-36" aria-label="Active persona">
+                <SelectValue placeholder="Persona…" />
+              </SelectTrigger>
+              <SelectContent>
+                {agentPersonas.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name || "(unnamed)"}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
           {/* AI toggle */}
           <div className="flex items-center gap-2">
             <Switch
@@ -540,7 +546,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                 )}
                 <div className="flex flex-wrap gap-1.5">
                   {filteredSources.map((s) => {
-                    const label = s.source.split(/[/\\]/).pop() ?? s.source;
+                    const label = basename(s.source);
                     const isSelected = selectedSources.includes(s.source);
                     return (
                       <button

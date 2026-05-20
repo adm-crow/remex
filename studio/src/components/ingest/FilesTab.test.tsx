@@ -262,15 +262,23 @@ describe("FilesTab", () => {
     expect(screen.getByRole("switch", { name: /incremental/i })).toBeInTheDocument();
   });
 
-  it("embedding model segmented control is visible without opening Advanced", () => {
+  it("embedding model picker lives inside Advanced for new collections", () => {
     renderWithProviders(<FilesTab />);
+    // Closed by default: no "Light" preset button rendered.
+    expect(screen.queryByRole("button", { name: /light/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+    // Opens: picker is now visible.
     expect(screen.getByRole("button", { name: /light/i })).toBeInTheDocument();
   });
 
   it("toggling append-model shows the effective collection name preview", () => {
     renderWithProviders(<FilesTab />);
-    expect(screen.queryByText(/will ingest into/i)).not.toBeInTheDocument();
+    // The +model suffix toggle now lives inside the Advanced section — open it first.
+    fireEvent.click(screen.getByRole("button", { name: /advanced/i }));
+    // Default collection is "myCol" (from beforeEach); default embedding model is all-MiniLM-L6-v2.
+    expect(screen.queryByText("myCol-all-MiniLM-L6-v2")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("switch", { name: /append embedding model/i }));
-    expect(screen.getByText(/will ingest into/i)).toBeInTheDocument();
+    // Once toggled, the effective name ("<name>-<model>") is rendered as a preview.
+    expect(screen.getByText("myCol-all-MiniLM-L6-v2")).toBeInTheDocument();
   });
 });

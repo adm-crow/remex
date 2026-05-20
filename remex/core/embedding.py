@@ -61,7 +61,7 @@ class _FastEmbedEmbeddingFunction:
             _maybe_raise_missing_model(model_name, exc)
 
     def __call__(self, input: "Documents") -> "Embeddings":
-        return [list(v) for v in self._model.embed(input)]
+        return [list(v) for v in self._model.embed(input)]  # type: ignore[return-value]
 
 
 def get_embedding_function(model_name: str) -> "EmbeddingFunction":
@@ -72,7 +72,7 @@ def get_embedding_function(model_name: str) -> "EmbeddingFunction":
             if model_name == _DEFAULT_MODEL:
                 _EF_CACHE[model_name] = ONNXMiniLM_L6_V2()
             else:
-                _EF_CACHE[model_name] = _FastEmbedEmbeddingFunction(model_name)
+                _EF_CACHE[model_name] = _FastEmbedEmbeddingFunction(model_name)  # type: ignore[assignment]
     return _EF_CACHE[model_name]
 
 

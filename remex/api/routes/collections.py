@@ -28,7 +28,7 @@ def _require_absolute_db_path(db_path: str) -> str:
 
 
 @router.get("", response_model=list[str])
-def get_collections(db_path: str = Query(default="./remex_db")) -> list[str]:
+def get_collections(db_path: str = Query(..., description="Absolute path to the ChromaDB directory")) -> list[str]:
     _require_absolute_db_path(db_path)
     return list_collections(db_path=db_path)
 
@@ -59,7 +59,7 @@ def list_sqlite_tables(
 @router.post("/warmup", status_code=202)
 def warmup_models(
     background_tasks: BackgroundTasks,
-    db_path: str = Query(default="./remex_db"),
+    db_path: str = Query(..., description="Absolute path to the ChromaDB directory"),
 ) -> dict:
     """Kick off background model loading so the first query is not slow.
 
@@ -73,7 +73,7 @@ def warmup_models(
 
 @router.get("/{collection}/stats", response_model=CollectionStatsResponse)
 def get_stats(
-    collection: str, db_path: str = Query(default="./remex_db")
+    collection: str, db_path: str = Query(..., description="Absolute path to the ChromaDB directory")
 ) -> CollectionStatsResponse:
     _require_absolute_db_path(db_path)
     try:
@@ -93,7 +93,7 @@ def get_stats(
 def set_description(
     collection: str,
     req: UpdateDescriptionRequest,
-    db_path: str = Query(default="./remex_db"),
+    db_path: str = Query(..., description="Absolute path to the ChromaDB directory"),
 ) -> CollectionStatsResponse:
     _require_absolute_db_path(db_path)
     try:
@@ -119,7 +119,7 @@ def set_description(
 
 @router.get("/{collection}/sources", response_model=list[SourceItem])
 def get_sources(
-    collection: str, db_path: str = Query(default="./remex_db")
+    collection: str, db_path: str = Query(..., description="Absolute path to the ChromaDB directory")
 ) -> list[SourceItem]:
     _require_absolute_db_path(db_path)
     try:
@@ -134,7 +134,7 @@ def get_sources(
 
 @router.delete("/{collection}/sources/{source:path}", response_model=DeletedChunksResponse)
 def remove_source(
-    collection: str, source: str, db_path: str = Query(default="./remex_db")
+    collection: str, source: str, db_path: str = Query(..., description="Absolute path to the ChromaDB directory")
 ) -> DeletedChunksResponse:
     _require_absolute_db_path(db_path)
     try:
@@ -146,7 +146,7 @@ def remove_source(
 
 @router.delete("/{collection}", response_model=DeletedResponse)
 def reset_collection(
-    collection: str, db_path: str = Query(default="./remex_db")
+    collection: str, db_path: str = Query(..., description="Absolute path to the ChromaDB directory")
 ) -> DeletedResponse:
     _require_absolute_db_path(db_path)
     try:
@@ -158,7 +158,7 @@ def reset_collection(
 
 @router.post("/{collection}/purge", response_model=PurgeResultResponse)
 def purge_collection(
-    collection: str, db_path: str = Query(default="./remex_db")
+    collection: str, db_path: str = Query(..., description="Absolute path to the ChromaDB directory")
 ) -> PurgeResultResponse:
     _require_absolute_db_path(db_path)
     try:
@@ -175,7 +175,7 @@ def purge_collection(
 def rename_collection(
     collection: str,
     req: RenameRequest,
-    db_path: str = Query(default="./remex_db"),
+    db_path: str = Query(..., description="Absolute path to the ChromaDB directory"),
 ) -> RenamedResponse:
     """Rename a ChromaDB collection via a sentinel-copy pattern.
 

@@ -87,11 +87,11 @@ describe("useAppStore", () => {
     expect(queryHistory[0]).toBe("first query");
   });
 
-  it("addQueryHistory caps at 20 entries", () => {
-    for (let i = 0; i < 25; i++) {
+  it("addQueryHistory caps at 1000 entries", () => {
+    for (let i = 0; i < 1005; i++) {
       useAppStore.getState().addQueryHistory(`query ${i}`);
     }
-    expect(useAppStore.getState().queryHistory).toHaveLength(20);
+    expect(useAppStore.getState().queryHistory).toHaveLength(1000);
   });
 
   it("removeQueryHistory removes the matching entry", () => {

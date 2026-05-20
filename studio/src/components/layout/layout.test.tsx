@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/utils";
-import { CollectionSwitcher } from "./CollectionSwitcher";
 import { Sidebar } from "./Sidebar";
 import { useAppStore } from "@/store/app";
 
@@ -29,33 +28,6 @@ beforeEach(() => {
     mutate: vi.fn(),
     isPending: false,
   } as any);
-});
-
-describe("CollectionSwitcher", () => {
-  it("renders available collections in the dropdown", async () => {
-    vi.mocked(useCollections).mockReturnValue({
-      data: ["col1", "col2"],
-      isLoading: false,
-    } as any);
-    renderWithProviders(<CollectionSwitcher />);
-    fireEvent.click(screen.getByRole("combobox", { name: /collection/i }));
-    await waitFor(() => {
-      expect(screen.getByText("col1")).toBeInTheDocument();
-      expect(screen.getByText("col2")).toBeInTheDocument();
-    });
-  });
-
-  it("selecting a collection updates the store", async () => {
-    vi.mocked(useCollections).mockReturnValue({
-      data: ["col1", "col2"],
-      isLoading: false,
-    } as any);
-    renderWithProviders(<CollectionSwitcher />);
-    fireEvent.click(screen.getByRole("combobox", { name: /collection/i }));
-    await waitFor(() => screen.getByText("col1"));
-    fireEvent.click(screen.getByText("col1"));
-    expect(useAppStore.getState().currentCollection).toBe("col1");
-  });
 });
 
 describe("Sidebar", () => {
@@ -96,5 +68,25 @@ describe("Sidebar", () => {
       <Sidebar activeView="query" onViewChange={vi.fn()} />
     );
     expect(screen.getByLabelText("Server error")).toBeInTheDocument();
+  });
+
+  it("Home button clears currentDb and currentCollection", () => {
+    vi.mocked(useCollections).mockReturnValue({ data: [] } as any);
+    renderWithProviders(
+      <Sidebar activeView="query" onViewChange={vi.fn()} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /change project/i }));
+    expect(useAppStore.getState().currentDb).toBeNull();
+    expect(useAppStore.getState().currentCollection).toBeNull();
+  });
+
+  it("Settings button at the bottom navigates to the settings view", () => {
+    vi.mocked(useCollections).mockReturnValue({ data: [] } as any);
+    const onViewChange = vi.fn();
+    renderWithProviders(
+      <Sidebar activeView="query" onViewChange={onViewChange} />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^settings$/i }));
+    expect(onViewChange).toHaveBeenCalledWith("settings");
   });
 });

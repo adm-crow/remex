@@ -1,9 +1,7 @@
 import { Search, Upload, Database, Settings, RotateCcw, House } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CollectionSwitcher } from "./CollectionSwitcher";
-import { useAppStore, useIsPro } from "@/store/app";
-import { ProBadge } from "@/components/license/ProBadge";
+import { useAppStore } from "@/store/app";
 
 export type View = "query" | "ingest" | "collections" | "settings";
 
@@ -13,16 +11,22 @@ interface SidebarProps {
   style?: React.CSSProperties;
 }
 
+// Primary navigation only — Settings has been promoted to the bottom row
+// next to Home so the four primary content views (Query / Ingest / Collections /
+// Sources is implicit via Collections) read cleanly without a utility bullet
+// breaking the rhythm.
 const NAV_ITEMS: { view: View; label: string; icon: LucideIcon }[] = [
   { view: "query",       label: "Query",       icon: Search   },
   { view: "ingest",      label: "Ingest",      icon: Upload   },
   { view: "collections", label: "Collections", icon: Database },
-  { view: "settings",    label: "Settings",    icon: Settings },
 ];
 
 export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
-  const { currentDb, sidecarStatus, setIngestDoneUnread, triggerSidecarReconnect, setCurrentDb } = useAppStore();
-  const isPro = useIsPro();
+  const {
+    currentDb, sidecarStatus,
+    setIngestDoneUnread, triggerSidecarReconnect,
+    setCurrentDb, setCurrentCollection,
+  } = useAppStore();
 
   return (
     <aside
@@ -31,9 +35,8 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
     >
       {/* ── Brand ───────────────────────────────────────────────────────── */}
       <div className="px-4 pt-5 pb-4 shrink-0">
-        <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground flex items-center">
+        <p className="font-semibold text-[13px] leading-tight tracking-tight text-sidebar-foreground">
           Remex Studio
-          {isPro && <ProBadge size="md" className="ml-2" />}
         </p>
         {currentDb && (
           <p
@@ -44,11 +47,6 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
             {currentDb}
           </p>
         )}
-      </div>
-
-      {/* ── Collection switcher ─────────────────────────────────────────── */}
-      <div className="px-3 pb-3 shrink-0">
-        <CollectionSwitcher />
       </div>
 
       {/* ── Separator ───────────────────────────────────────────────────── */}
@@ -91,16 +89,31 @@ export function Sidebar({ activeView, onViewChange, style }: SidebarProps) {
         ))}
       </nav>
 
-      {/* ── Home button ─────────────────────────────────────────────────── */}
-      <div className="px-2 pb-2 shrink-0">
+      {/* ── Home + Settings row ─────────────────────────────────────────── */}
+      <div className="px-2 pb-2 shrink-0 grid grid-cols-2 gap-1.5">
         <button
-          onClick={() => setCurrentDb(null)}
-          className="w-full flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40 transition-all duration-150"
-          title="Back to home"
-          aria-label="Back to home"
+          onClick={() => { setCurrentDb(null); setCurrentCollection(null); }}
+          className="flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40 transition-all duration-150"
+          title="Change project"
+          aria-label="Change project"
         >
           <House className="w-4 h-4 shrink-0" />
           <span>Home</span>
+        </button>
+        <button
+          onClick={() => onViewChange("settings")}
+          className={cn(
+            "flex items-center justify-center gap-2 text-sm py-1.5 rounded-md border transition-all duration-150",
+            activeView === "settings"
+              ? "border-primary bg-accent text-primary font-medium"
+              : "border-border text-muted-foreground hover:text-sidebar-foreground hover:border-sidebar-foreground/40"
+          )}
+          aria-current={activeView === "settings" ? "page" : undefined}
+          title="Settings"
+          aria-label="Settings"
+        >
+          <Settings className="w-4 h-4 shrink-0" />
+          <span>Settings</span>
         </button>
       </div>
 

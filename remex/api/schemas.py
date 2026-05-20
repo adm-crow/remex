@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Literal, Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Annotated, Any, Literal, Optional
+from pydantic import AfterValidator, BaseModel, Field, field_validator, model_validator
 
 
 def _validate_overlap(values):
@@ -38,6 +38,17 @@ def _check_where_depth(obj: Any, depth: int = 0) -> None:
             _check_where_depth(item, depth + 1)
 
 
+def _validate_where(v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+    if v is not None:
+        _check_where_depth(v)
+    return v
+
+
+# Reusable annotated types — collapse 5x db_path and 3x where duplication.
+DbPath = Annotated[str, AfterValidator(_validate_db_path)]
+WhereFilter = Annotated[Optional[dict[str, Any]], AfterValidator(_validate_where)]
+
+
 # ---------------------------------------------------------------------------
 # Requests
 # ---------------------------------------------------------------------------
@@ -48,17 +59,13 @@ _EMBEDDING_MODEL_FIELD = Field(
     pattern=r"^[a-zA-Z0-9][\w./\-]*$",
 )
 _TEXT_FIELD = Field(min_length=1, max_length=8192)
+_API_KEY_FIELD = Field(default=None, max_length=512)
 
 
 class IngestRequest(BaseModel):
     source_dir: str
-    db_path: str = "./remex_db"
+    db_path: DbPath = "./remex_db"
     embedding_model: str = _EMBEDDING_MODEL_FIELD
-
-    @field_validator("db_path")
-    @classmethod
-    def _check_db_path(cls, v: str) -> str:
-        return _validate_db_path(v)
 
     chunk_size: int = Field(default=768, ge=1)
     overlap: int = Field(default=150, ge=0)
@@ -80,7 +87,7 @@ class IngestRequest(BaseModel):
 class IngestSQLiteRequest(BaseModel):
     sqlite_path: str
     table: str = Field(max_length=256)
-    db_path: str = "./remex_db"
+    db_path: DbPath = "./remex_db"
     columns: Optional[list[str]] = None
     id_column: str = Field(default="id", max_length=256)
     row_template: Optional[str] = Field(default=None, max_length=4096)
@@ -93,11 +100,6 @@ class IngestSQLiteRequest(BaseModel):
 
     _check_overlap = model_validator(mode="after")(_validate_overlap)
 
-    @field_validator("db_path")
-    @classmethod
-    def _check_db_path(cls, v: str) -> str:
-        return _validate_db_path(v)
-
     @field_validator("sqlite_path")
     @classmethod
     def sqlite_must_be_absolute(cls, v: str) -> str:
@@ -108,48 +110,24 @@ class IngestSQLiteRequest(BaseModel):
 
 class QueryRequest(BaseModel):
     text: str = _TEXT_FIELD
-    db_path: str = "./remex_db"
+    db_path: DbPath = "./remex_db"
     n_results: int = Field(default=5, ge=1, le=500)
     embedding_model: str = _EMBEDDING_MODEL_FIELD
-    where: Optional[dict[str, Any]] = None
+    where: WhereFilter = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-
-    @field_validator("db_path")
-    @classmethod
-    def _check_db_path(cls, v: str) -> str:
-        return _validate_db_path(v)
-
-    @field_validator("where")
-    @classmethod
-    def validate_where(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
-        if v is not None:
-            _check_where_depth(v)
-        return v
 
 
 class ChatRequest(BaseModel):
     text: str = _TEXT_FIELD
-    db_path: str = "./remex_db"
+    db_path: DbPath = "./remex_db"
     n_results: int = Field(default=5, ge=1, le=500)
     embedding_model: str = _EMBEDDING_MODEL_FIELD
-    where: Optional[dict[str, Any]] = None
+    where: WhereFilter = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     provider: Optional[str] = None
     model: Optional[str] = None
-    api_key: Optional[str] = None
+    api_key: Optional[str] = _API_KEY_FIELD
     system_prompt: Optional[str] = Field(default=None, max_length=32768)
-
-    @field_validator("db_path")
-    @classmethod
-    def _check_db_path(cls, v: str) -> str:
-        return _validate_db_path(v)
-
-    @field_validator("where")
-    @classmethod
-    def validate_where(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
-        if v is not None:
-            _check_where_depth(v)
-        return v
 
 
 # ---------------------------------------------------------------------------
@@ -206,27 +184,15 @@ class ChatResponse(BaseModel):
 class MultiChatRequest(BaseModel):
     text: str = _TEXT_FIELD
     collections: list[str]
-    db_path: str = "./remex_db"
+    db_path: DbPath = "./remex_db"
     n_results: int = Field(default=5, ge=1, le=500)
     embedding_model: str = _EMBEDDING_MODEL_FIELD
-    where: Optional[dict[str, Any]] = None
+    where: WhereFilter = None
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     provider: Optional[str] = None
     model: Optional[str] = None
-    api_key: Optional[str] = None
+    api_key: Optional[str] = _API_KEY_FIELD
     system_prompt: Optional[str] = Field(default=None, max_length=32768)
-
-    @field_validator("db_path")
-    @classmethod
-    def _check_db_path(cls, v: str) -> str:
-        return _validate_db_path(v)
-
-    @field_validator("where")
-    @classmethod
-    def validate_where(cls, v: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
-        if v is not None:
-            _check_where_depth(v)
-        return v
 
 
 class MultiChatResponse(BaseModel):

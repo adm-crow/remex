@@ -1,38 +1,31 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { screen } from "@testing-library/react";
+import { renderWithProviders } from "@/test/utils";
 import { WatchFoldersCard } from "./WatchFoldersCard";
 import { useAppStore } from "@/store/app";
 
 describe("WatchFoldersCard", () => {
   beforeEach(() => {
-    useAppStore.setState({
-      license: { tier: "free", email: null, activatedAt: null, lastValidatedAt: null },
-      watchFolders: [],
-      upgradeModalOpen: false,
-      upgradeModalContext: null,
-    });
+    useAppStore.setState({ watchFolders: [], currentDb: null });
   });
 
-  it("renders locked teaser when user is free", () => {
-    render(<WatchFoldersCard />);
-    expect(screen.getByText(/Watch folders/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Unlock watch folders with Pro/ })).toBeInTheDocument();
-  });
-
-  it("opens upgrade modal when free user clicks the card", () => {
-    render(<WatchFoldersCard />);
-    fireEvent.click(screen.getByRole("button", { name: /Unlock watch folders with Pro/ }));
-    expect(useAppStore.getState().upgradeModalOpen).toBe(true);
-    expect(useAppStore.getState().upgradeModalContext).toBe("watch-folder");
-  });
-
-  it("renders card with folder controls when user is Pro", () => {
-    useAppStore.setState({
-      license: { tier: "pro", email: "x", activatedAt: 1, lastValidatedAt: 1 },
-    });
-    render(<WatchFoldersCard />);
+  it("renders the card with the Add folder control", () => {
+    renderWithProviders(<WatchFoldersCard />);
     expect(screen.getByText(/Watch folders/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Add folder/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Unlock/ })).not.toBeInTheDocument();
+  });
+
+  it("renders persisted folders in the list with a collection dropdown per row", () => {
+    useAppStore.setState({ watchFolders: [
+      { path: "C:/tmp/foo",   collection: "docs" },
+      { path: "/var/log/bar", collection: "logs" },
+    ]});
+    renderWithProviders(<WatchFoldersCard />);
+    // Full path appears (as a tooltip-style subtitle), and the basename as the label.
+    expect(screen.getByText("C:/tmp/foo")).toBeInTheDocument();
+    expect(screen.getByText("/var/log/bar")).toBeInTheDocument();
+    // Each row shows a dropdown labelled with the path.
+    expect(screen.getByLabelText(/Target collection for C:\/tmp\/foo/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Target collection for \/var\/log\/bar/)).toBeInTheDocument();
   });
 });

@@ -1,28 +1,46 @@
-"""Generate NSIS installer BMP images for Remex Studio.
+"""Generate Remex Studio's brand artwork from one source of truth.
 
-Outputs:
-  installer-sidebar.bmp  164x314  — Welcome / Finish pages
-  installer-header.bmp   150x57   — all other installer pages
+Outputs (relative to this script's directory):
 
-Run from the repo root:
+  Desktop icons (consumed by Tauri/NSIS):
+    icons/icon.png            1024x1024
+    icons/32x32.png
+    icons/64x64.png
+    icons/128x128.png
+    icons/128x128@2x.png      256x256
+    icons/icon.ico            multi-size container (16/24/32/48/64/128/256)
+
+  NSIS installer artwork (registered in tauri.conf.json bundle.windows.nsis):
+    installer-sidebar.bmp     164x314  — Welcome / Finish pages
+    installer-header.bmp      150x57   — all other installer pages
+
+The logo geometry is rendered directly from the same quadratic Bézier path the
+SVG uses (../logo.svg), so the colour gradient and shape stay in sync with
+``logo.svg`` / ``studio/public/remex.svg``.
+
+Run from anywhere — paths are resolved relative to this file:
   python studio/src-tauri/generate-installer-images.py
 """
 
 import os
-import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-OUT_DIR = Path(__file__).parent
+OUT_DIR   = Path(__file__).parent
+ICONS_DIR = OUT_DIR / "icons"
 
-# Brand colours
-BRAND_GREEN = (28, 172, 120)    # #1CAC78
-BRAND_LIME  = (126, 189, 1)     # #7EBD01
-BG_DARK     = (13, 22, 15)
+# Brand colours — keep in sync with logo.svg / studio/public/remex.svg.
+# These are the Settings → Appearance "Indigo" and "Teal" theme tokens
+# (see THEME_OPTIONS in SettingsPane.tsx), so the logo gradient matches
+# the user's default accent.
+BRAND_START = (50, 74, 131)    # #324A83 (indigo, gradient start)
+BRAND_END   = (0, 165, 134)    # #00A586 (teal,   gradient end)
+
+BG_DARK     = (14, 18, 28)     # very dark indigo — installer sidebar background
 WHITE       = (255, 255, 255)
-GRAY_LIGHT  = (160, 170, 162)
-TEXT_DARK   = (13, 22, 15)
-TEXT_GRAY   = (100, 110, 105)
+GRAY_LIGHT  = (170, 175, 180)  # tagline grey on dark
+TEXT_DARK   = (14, 18, 28)
+TEXT_GRAY   = (100, 105, 110)
 
 
 # ---------------------------------------------------------------------------
@@ -67,58 +85,113 @@ def _try_font(size, bold=False):
 
 
 # ---------------------------------------------------------------------------
-# Actual Remex logo renderer
+# Logo renderer
 #
 # SVG path (viewBox 0 0 8 16):
-#   M0 0 Q0 8 8 8  Q8 0 0 0          ← shape 1, top half
-#   M0 8 Q8 8 8 16 Q0 16 0 8         ← shape 2, bottom half (relative → absolute)
+#   M0 0 Q0 8 8 8  Q8 0 0 0          ← top half
+#   M0 8 Q8 8 8 16 Q0 16 0 8         ← bottom half (relative → absolute)
 #
-# Both shapes are filled with the brand gradient (#1CAC78 → #7EBD01).
+# Both shapes are filled with the brand gradient (BRAND_START → BRAND_END).
 # ---------------------------------------------------------------------------
 
 def _make_logo(pixel_height: int) -> Image.Image:
     """Return an RGBA image containing the Remex logo at the given height."""
-    scale     = pixel_height / 16          # 16 SVG units → pixel_height px
-    logo_w    = round(8  * scale)
-    logo_h    = round(16 * scale)
+    scale  = pixel_height / 16        # 16 SVG units → pixel_height px
+    logo_w = round(8  * scale)
+    logo_h = round(16 * scale)
 
     def s(lx, ly):
         return (lx * scale, ly * scale)
 
-    # --- build a 1-bit mask for each shape via polygon ---
-    mask = Image.new("L", (logo_w, logo_h), 0)
+    # 8-bit alpha mask, antialias the shape boundaries via supersampling.
+    # (Polygon fills are already aliased — for big sizes we render at 2x and
+    # downsample with LANCZOS to get crisp edges.)
+    ss = 2 if pixel_height < 256 else 1
+    mask = Image.new("L", (logo_w * ss, logo_h * ss), 0)
     md   = ImageDraw.Draw(mask)
 
-    # Shape 1: M(0,0) Q(0,8)(8,8) Q(8,0)(0,0)
-    poly1 = (
-        _qbez(s(0,0), s(0,8), s(8,8)) +
-        _qbez(s(8,8), s(8,0), s(0,0))
-    )
+    def ss_pt(p):
+        return (p[0] * ss, p[1] * ss)
+
+    poly1 = [ss_pt(p) for p in (
+        _qbez(s(0, 0), s(0, 8), s(8, 8)) +
+        _qbez(s(8, 8), s(8, 0), s(0, 0))
+    )]
     md.polygon(poly1, fill=255)
 
-    # Shape 2 (absolute coords): M(0,8) Q(8,8)(8,16) Q(0,16)(0,8)
-    poly2 = (
-        _qbez(s(0,8), s(8,8),  s(8,16)) +
-        _qbez(s(8,16), s(0,16), s(0,8))
-    )
+    poly2 = [ss_pt(p) for p in (
+        _qbez(s(0, 8), s(8, 8),  s(8, 16)) +
+        _qbez(s(8, 16), s(0, 16), s(0, 8))
+    )]
     md.polygon(poly2, fill=255)
 
-    # --- diagonal gradient (matches the SVG linearGradient 0%→100%) ---
+    if ss > 1:
+        mask = mask.resize((logo_w, logo_h), Image.LANCZOS)
+
+    # Diagonal gradient (matches the SVG linearGradient 0,0 → 100%,100%)
     gradient = Image.new("RGBA", (logo_w, logo_h))
-    gd       = ImageDraw.Draw(gradient)
+    denom = max(1, logo_w + logo_h - 2)
     for row in range(logo_h):
         for col in range(logo_w):
-            t     = (col + row) / (logo_w + logo_h - 2) if (logo_w + logo_h) > 2 else 0
-            color = _lerp(BRAND_GREEN, BRAND_LIME, t) + (255,)
+            t     = (col + row) / denom
+            color = _lerp(BRAND_START, BRAND_END, t) + (255,)
             gradient.putpixel((col, row), color)
 
-    # Apply the shape mask as the alpha channel
     gradient.putalpha(mask)
     return gradient
 
 
+def _make_square_icon(size: int, padding_pct: float = 0.10) -> Image.Image:
+    """Square RGBA icon with the logo centred and ~10% padding.
+
+    The logo is 8:16 (portrait), so on a square canvas it's height-constrained.
+    """
+    canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    pad    = round(size * padding_pct)
+    logo_h = size - 2 * pad
+    logo   = _make_logo(logo_h)
+    x = (size - logo.width) // 2
+    y = (size - logo.height) // 2
+    canvas.alpha_composite(logo, (x, y))
+    return canvas
+
+
 # ---------------------------------------------------------------------------
-# Image builders
+# Image builders — desktop icons
+# ---------------------------------------------------------------------------
+
+def make_app_icons():
+    """Regenerate the icon set Tauri/NSIS ships on Windows."""
+    ICONS_DIR.mkdir(exist_ok=True)
+
+    # Render each size directly from SVG geometry — crisper than downsampling
+    # one big rasterised source.
+    sizes = {
+        "icon.png":         1024,
+        "128x128@2x.png":    256,
+        "128x128.png":       128,
+        "64x64.png":          64,
+        "32x32.png":          32,
+    }
+    for fname, size in sizes.items():
+        out = ICONS_DIR / fname
+        _make_square_icon(size).save(out, format="PNG")
+        print(f"  {out}")
+
+    # Multi-size ICO — produced from the 256x256 master so all entries share
+    # the same crisp source. Pillow downsamples per requested size.
+    master   = _make_square_icon(256)
+    ico_path = ICONS_DIR / "icon.ico"
+    master.save(
+        ico_path,
+        format="ICO",
+        sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)],
+    )
+    print(f"  {ico_path}")
+
+
+# ---------------------------------------------------------------------------
+# Image builders — NSIS installer artwork
 # ---------------------------------------------------------------------------
 
 def make_sidebar():
@@ -128,7 +201,7 @@ def make_sidebar():
     draw = ImageDraw.Draw(img)
 
     # Brand gradient strip — left edge
-    _gradient_strip(draw, 0, 0, 4, H, BRAND_GREEN, BRAND_LIME)
+    _gradient_strip(draw, 0, 0, 4, H, BRAND_START, BRAND_END)
 
     # Remex logo — centred horizontally, upper third of the image
     logo_h  = 72                        # px tall — 16 SVG units
@@ -174,7 +247,7 @@ def make_header():
     draw = ImageDraw.Draw(img)
 
     # Brand gradient strip — left edge
-    _gradient_strip(draw, 0, 0, 4, H, BRAND_GREEN, BRAND_LIME)
+    _gradient_strip(draw, 0, 0, 4, H, BRAND_START, BRAND_END)
 
     # Remex logo — left side, vertically centred
     logo_h = 36
@@ -206,7 +279,8 @@ def make_header():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("Generating installer images...")
+    print("Generating Remex brand artwork...")
+    make_app_icons()
     make_sidebar()
     make_header()
     print("Done.")

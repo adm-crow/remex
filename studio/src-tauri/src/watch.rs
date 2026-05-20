@@ -5,9 +5,7 @@ use std::time::{Duration, Instant};
 
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
-
-use crate::license::{read_from, LicenseStatus, Tier};
+use tauri::{AppHandle, Emitter, State};
 
 pub struct WatchState(pub Mutex<HashMap<PathBuf, WatcherEntry>>);
 
@@ -41,16 +39,6 @@ const FLUSH_POLL: Duration = Duration::from_millis(500);
 
 #[tauri::command]
 pub fn watch_start(app: AppHandle, state: State<WatchState>, folder: String) -> Result<(), String> {
-    // Server-side Pro gate — read license from disk to prevent DevTools bypass
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let tier = read_from(&data_dir)
-        .map_err(|e| e.to_string())?
-        .map(|f| LicenseStatus::from_file(&f).tier)
-        .unwrap_or(Tier::Free);
-    if tier != Tier::Pro {
-        return Err("Pro license required for watch folders".into());
-    }
-
     let folder_pb = PathBuf::from(&folder);
     if !folder_pb.exists() { return Err("Folder does not exist".into()); }
 

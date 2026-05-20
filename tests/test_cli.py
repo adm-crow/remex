@@ -15,7 +15,7 @@ def test_cli_ingest_default_args(mock_ingest):
     call_kwargs = mock_ingest.call_args.kwargs
     assert call_kwargs["source_dir"] == "./docs"
     assert call_kwargs["incremental"] is False
-    assert call_kwargs["chunking"] == "word"
+    assert call_kwargs["chunking"] == "recursive"
 
 
 @patch("remex.cli.ingest")

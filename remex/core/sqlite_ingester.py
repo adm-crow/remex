@@ -136,7 +136,11 @@ def ingest_sqlite(
     if row_template:
         _row_to_text({c: "" for c in selected}, row_template)
 
-    collection = _get_collection(chroma_path, collection_name, embedding_model)
+    try:
+        collection = _get_collection(chroma_path, collection_name, embedding_model)
+    except Exception:
+        conn.close()
+        raise
 
     if verbose:
         logger.info("Ingesting: %s (%d records)", table, row_count)

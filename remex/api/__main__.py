@@ -13,6 +13,7 @@ from pathlib import Path
 
 import uvicorn
 
+from remex.api.bootstrap import bootstrap_sidecar
 from remex.core.logger import setup_logging
 
 _DEFAULT_PORT = 37421
@@ -35,6 +36,8 @@ def main() -> None:
     log_path = Path(args.log_file)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     setup_logging(level=logging.INFO, log_file=str(log_path))
+
+    bootstrap_sidecar()
 
     uvicorn.run(
         "remex.api.main:app",

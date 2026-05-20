@@ -8,6 +8,73 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.5.1] — 2026-05-20
+
+### Added
+- **Recursive chunking mode** — new separator-aware chunking (`\n\n` → `\n` → `". "` → `" "`).
+  Now the default for all new ingests; the existing `"word"` and `"sentence"`
+  modes still work. *Selecting "Recursive" in 1.5.0 would 422 because the
+  PyPI schema didn't include it — this release ships the schema fix.*
+- **Watch databases** — new card in Settings → Auto-ingest that re-ingests
+  SQLite rows whenever the watched `.sqlite` file (or its `-wal`/`-shm`/`-journal`
+  siblings) changes. Mirrors the existing watch-folder workflow.
+- **AI personas** — save multiple named system prompts (Researcher, Code Q&A,
+  Summariser, …) and switch from a dropdown in the Query pane. Replaces the
+  single global system prompt.
+- **Per-project defaults** — chunk size, overlap, mode and default embedding
+  model can be saved per project; new collections pre-fill from them.
+- **Custom embedding-model presets** — add your own model entries that show
+  up alongside Light / Balanced / Multilingual in the picker.
+
+### Changed
+- **Remex is now fully free.** The Pro tier has been discontinued and every
+  previously paid feature (large embedding models, advanced exports,
+  watch-folder auto-ingest, searchable query history, extra themes) ships
+  enabled in the box for everyone. Existing Pro licenses are no longer
+  required or checked.
+- **Ingest pane redesign** — two-column layout (Configure left · Run & Monitor
+  right) with a sticky action bar. Embedding model picker hides for existing
+  collections (the model is locked by ChromaDB) and slides into Advanced for
+  new ones. Mode / chunk size / overlap are now on one line.
+- **Settings → Auto-ingest** is a dedicated tab housing both Watch folder and
+  Watch database cards, each entry targets a specific collection (the old
+  "use current collection" fallback is gone).
+- **Sidebar** — Settings promoted to a bottom row next to Home; the
+  Welcome guide / Shortcuts / Report-a-bug / Check-for-updates actions live
+  in the Settings sticky footer.
+- **Brand colours** updated to the Settings Indigo → Teal gradient
+  (`#324A83 → #00A586`); all icons (ICO, ICNS, Windows tile, iOS, Android,
+  desktop PNGs) regenerated.
+- **Defaults**: `chunk_size 768`, `overlap 150`, `chunking "recursive"`.
+
+### Fixed
+- Pydantic 422 error bodies were rendered as `[object Object]` in the
+  frontend; now a shared formatter unwraps the `detail` array and shows
+  `field: message` strings.
+- Sidecar process is now bound to a Windows Job Object so a force-kill of
+  Remex Studio (Task Manager, crash, OS shutdown) terminates the Python
+  child instead of orphaning it on port 8000.
+- Sidecar startup waits on `/health` instead of a blind 1500 ms sleep —
+  faster on the happy path, surfaces real errors instead of a generic
+  "Sidecar started but is not responding".
+- `reqwest` switched from Schannel (`native-tls`) to `rustls-tls-native-roots`
+  so corporate CA bundles (`SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`) work for
+  Rust HTTP calls too — was already working for the Python sidecar.
+- Several dead/duplicated code paths and stale tests cleaned up; details in
+  the diff.
+
+### Removed
+- License activation, validation, and deactivation flows (both UI and the
+  Lemon Squeezy backend integration).
+- Settings → License tab. Watch folders + databases live in the new
+  Auto-ingest tab.
+- `UpgradeModal`, `LicenseCard`, `ProBadge` components.
+- The `license` slice from the persisted Zustand store.
+- Rust `license` module (`license/api.rs`, `license/constants.rs`,
+  `license.rs`) and the `wiremock` / `thiserror` dependencies that backed it.
+
+---
+
 ## [1.5.0] — 2026-05-08
 
 ### ⚠ Breaking change — re-ingest required

@@ -21,7 +21,7 @@ def extract_pdf(path: Path) -> str:
 
 def extract_docx(path: Path) -> str:
     try:
-        from docx import Document
+        from docx import Document  # type: ignore[attr-defined]
     except ImportError:
         raise ImportError("Install python-docx: pip install python-docx")
     doc = Document(str(path))
@@ -277,7 +277,7 @@ def extract_metadata(path: Path) -> dict[str, str]:
 
     elif suffix == ".docx":
         try:
-            from docx import Document
+            from docx import Document  # type: ignore[attr-defined]
             props = Document(str(path)).core_properties
             meta["doc_title"] = props.title or ""
             meta["doc_author"] = props.author or ""

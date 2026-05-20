@@ -1,7 +1,6 @@
 import threading
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 def test_default_model_returns_onnx_function():

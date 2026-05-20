@@ -4,7 +4,10 @@ use std::sync::{Mutex, OnceLock, atomic::{AtomicBool, Ordering}};
 use std::time::Duration;
 
 #[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+use std::os::windows::{io::AsRawHandle, process::CommandExt};
+
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State};
 
@@ -19,12 +22,11 @@ fn health_client() -> &'static reqwest::Client {
     })
 }
 
-#[cfg(target_os = "windows")]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-pub mod license;
 pub mod setup;
 pub mod watch;
+pub mod watch_db;
+#[cfg(target_os = "windows")]
+mod job_object;
 
 pub struct SidecarState {
     pub child:     Mutex<Option<Child>>,
@@ -160,15 +162,49 @@ async fn do_spawn(
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {e}"))?;
 
-    tokio::time::sleep(Duration::from_millis(1500)).await;
-    if let Ok(Some(status)) = child.try_wait() {
-        let log = log_path
-            .as_ref()
-            .and_then(|p| fs::read_to_string(p).ok())
-            .unwrap_or_default();
-        let tail: String = log.lines().rev().take(20).collect::<Vec<_>>()
-            .into_iter().rev().collect::<Vec<_>>().join("\n");
-        return Err(format!("Sidecar exited immediately ({status}): {tail}"));
+    // Bind to a Job Object so the sidecar is auto-killed if Studio is force-quit
+    // (Task Manager, OS shutdown, crash). Without this, the orphaned Python
+    // process holds the port hostage on the next launch.
+    #[cfg(target_os = "windows")]
+    {
+        let raw = child.as_raw_handle() as windows_sys::Win32::Foundation::HANDLE;
+        job_object::assign_to_job(raw);
+    }
+
+    // Poll for readiness instead of sleeping a fixed 1500 ms.
+    // Loop until either:
+    //   * the process exits early (return the tailed log as an error), OR
+    //   * /health responds 200 (return Ok — sidecar is fully serving).
+    // Cap at 15 s to surface a "stuck startup" rather than block the user forever.
+    let health_url = format!("http://{}:{}/health", host, port);
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    let mut healthy = false;
+    while std::time::Instant::now() < deadline {
+        if let Ok(Some(status)) = child.try_wait() {
+            let log = log_path
+                .as_ref()
+                .and_then(|p| fs::read_to_string(p).ok())
+                .unwrap_or_default();
+            let tail: String = log.lines().rev().take(20).collect::<Vec<_>>()
+                .into_iter().rev().collect::<Vec<_>>().join("\n");
+            return Err(format!("Sidecar exited immediately ({status}): {tail}"));
+        }
+        if health_client()
+            .get(&health_url)
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
+        {
+            healthy = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    if !healthy {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("Sidecar started but did not become healthy within 15s.".into());
     }
 
     let mut guard = state.child.lock().map_err(|e| e.to_string())?;
@@ -249,17 +285,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(SidecarState::new())
         .manage(watch::WatchState::new())
+        .manage(watch_db::WatchDbState::new())
         .invoke_handler(tauri::generate_handler![
             spawn_sidecar, kill_sidecar, is_sidecar_alive, check_sidecar_health, check_needs_setup,
             write_text_file, get_fastembed_cache_path,
-            license::license_activate,
-            license::license_status,
-            license::license_deactivate,
-            license::license_revalidate,
-            license::license_should_revalidate,
             watch::watch_start,
             watch::watch_stop,
             watch::watch_list,
+            watch_db::watch_db_start,
+            watch_db::watch_db_stop,
+            watch_db::watch_db_list,
         ])
         .setup(|app| {
             if let Some(window) = app.get_webview_window("main") {

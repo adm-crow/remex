@@ -1,6 +1,5 @@
 import json
 import os
-import shutil
 from pathlib import Path
 
 import click
@@ -596,22 +595,6 @@ def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> 
         raise SystemExit(1)
 
 
-def _seed_bundled_model() -> None:
-    try:
-        bundled = os.environ.get("REMEX_BUNDLED_ONNX_PATH")
-        if not bundled:
-            return
-        dest = Path.home() / ".cache" / "chroma" / "onnx_models" / "all-MiniLM-L6-v2" / "onnx"
-        if dest.exists():
-            return
-        dest.mkdir(parents=True, exist_ok=True)
-        for f in Path(bundled).iterdir():
-            if f.is_file():
-                shutil.copy2(f, dest / f.name)
-    except Exception as exc:
-        logger.debug("Bundled ONNX seed skipped: %s", exc)
-
-
 @cli.command(name="serve")
 @click.option("--host", default="127.0.0.1", show_default=True, help="Bind host.")
 @click.option("--port", default=8000, show_default=True, type=int, help="Bind port.")
@@ -620,17 +603,10 @@ def serve_cmd(host: str, port: int, reload: bool) -> None:
     """Start the remex FastAPI sidecar."""
     import logging
     import os
-    # Inject the OS native certificate store before any network call so that
-    # corporate SSL-inspection proxies (which re-sign traffic with an internal
-    # CA) are trusted without manual certifi patching.
-    try:
-        import truststore
-        truststore.inject_into_ssl()
-    except ImportError:
-        pass
+    from remex.api.bootstrap import bootstrap_sidecar
     from remex.core.logger import setup_logging
     setup_logging(level=logging.INFO, log_file=os.environ.get("REMEX_LOG_FILE"))
-    _seed_bundled_model()
+    bootstrap_sidecar()
     try:
         import uvicorn
     except ImportError:
