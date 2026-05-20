@@ -52,6 +52,10 @@ export interface ChatOptions extends QueryOptions {
   model?: string;
   api_key?: string;
   system_prompt?: string;
+  // Custom-provider config — only forwarded when `provider === "custom"`.
+  base_url?:      string;
+  header_name?:   string;
+  header_prefix?: string;
 }
 
 export function useMultiQueryResults(
@@ -125,6 +129,9 @@ export function useChat(
         model: options?.model || undefined,
         api_key: options?.api_key || undefined,
         system_prompt: options?.system_prompt || undefined,
+        base_url:      options?.base_url      || undefined,
+        header_name:   options?.header_name   || undefined,
+        header_prefix: options?.header_prefix,
       }),
     enabled:
       !!apiUrl &&
@@ -169,6 +176,9 @@ export function useMultiChat(
         model: options?.model || undefined,
         api_key: options?.api_key || undefined,
         system_prompt: options?.system_prompt || undefined,
+        base_url:      options?.base_url      || undefined,
+        header_name:   options?.header_name   || undefined,
+        header_prefix: options?.header_prefix,
       }),
     enabled:
       !!apiUrl && !!text && !!dbPath && collections.length > 0 && (options?.enabled ?? true),

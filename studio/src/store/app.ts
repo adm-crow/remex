@@ -67,6 +67,21 @@ export interface AgentPersona {
   systemPrompt: string;
 }
 
+/** A user-defined OpenAI-compatible LLM endpoint (corporate gateway, Azure
+ *  OpenAI, LiteLLM proxy, vLLM, etc.). The API key is never persisted — it's
+ *  re-entered each session, same policy as the built-in `aiApiKey`. */
+export interface CustomProvider {
+  id:            string;
+  name:          string;
+  baseUrl:       string;
+  /** HTTP header carrying the auth credential. Default `"Authorization"`. */
+  headerName:    string;
+  /** Value prepended to the API key when written to the header. Default `"Bearer "`. */
+  headerPrefix:  string;
+  /** Optional default model name (set by the Test-connection button or by hand). */
+  defaultModel?: string;
+}
+
 /** Persisted watch entry for a directory. Each watch must target a specific
  *  collection — the v2 "use current collection" fallback was removed in v3 to
  *  eliminate ambiguity at fire time (the current collection could be anything). */
@@ -201,6 +216,16 @@ export interface AppState {
   updateAgentPersona: (id: string, patch: Partial<Omit<AgentPersona, "id">>) => void;
   removeAgentPersona: (id: string) => void;
   setActivePersonaId: (id: string | null) => void;
+  // Custom OpenAI-compatible providers (persisted — except for the API keys,
+  // which live in the in-memory `customApiKeys` map below).
+  customProviders:        CustomProvider[];
+  activeCustomProviderId: string | null;
+  customApiKeys:          Record<string, string>; // NOT persisted (credentials)
+  addCustomProvider:    (provider: CustomProvider) => void;
+  updateCustomProvider: (id: string, patch: Partial<Omit<CustomProvider, "id">>) => void;
+  removeCustomProvider: (id: string) => void;
+  setActiveCustomProviderId: (id: string | null) => void;
+  setCustomApiKey:      (id: string, key: string) => void;
   // Watch folders (persisted) — auto-ingest documents when a folder changes
   watchFolders: WatchFolder[];
   addWatchFolder:    (path: string, collection: string) => Promise<void>;
@@ -260,6 +285,9 @@ export const useAppStore = create<AppState>()(
       customEmbeddingPresets: [],
       agentPersonas: [],
       activePersonaId: null,
+      customProviders: [],
+      activeCustomProviderId: null,
+      customApiKeys: {},
 
       setCurrentDb: (db) => set({ currentDb: db }),
       setCurrentCollection: (col) => set({ currentCollection: col }),
@@ -420,6 +448,32 @@ export const useAppStore = create<AppState>()(
         }),
       setActivePersonaId: (id) => set({ activePersonaId: id }),
 
+      addCustomProvider: (provider) =>
+        set((s) => {
+          if (s.customProviders.some((p) => p.id === provider.id)) return s;
+          return { customProviders: [...s.customProviders, provider] };
+        }),
+      updateCustomProvider: (id, patch) =>
+        set((s) => ({
+          customProviders: s.customProviders.map((p) =>
+            p.id === id ? { ...p, ...patch } : p
+          ),
+        })),
+      removeCustomProvider: (id) =>
+        set((s) => {
+          const { [id]: _dropped, ...remainingKeys } = s.customApiKeys;
+          void _dropped;
+          return {
+            customProviders:        s.customProviders.filter((p) => p.id !== id),
+            customApiKeys:          remainingKeys,
+            // Clear the active selection if we just removed it.
+            activeCustomProviderId: s.activeCustomProviderId === id ? null : s.activeCustomProviderId,
+          };
+        }),
+      setActiveCustomProviderId: (id) => set({ activeCustomProviderId: id }),
+      setCustomApiKey: (id, key) =>
+        set((s) => ({ customApiKeys: { ...s.customApiKeys, [id]: key } })),
+
       addWatchFolder: async (path, collection) => {
         await invoke("watch_start", { folder: path }); // throws if the folder is gone
         set((s) => {
@@ -458,7 +512,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "remex-studio",
-      version: 4,
+      version: 5,
       // Forward-only migration. Each step transforms in place.
       migrate: (persistedState, version) => {
         const s = (persistedState ?? {}) as Record<string, unknown>;
@@ -480,6 +534,12 @@ export const useAppStore = create<AppState>()(
             const c = (entry as { collection?: unknown }).collection;
             return typeof c === "string" && c.length > 0;
           });
+        }
+        // v4 → v5: introduced custom OpenAI-compatible providers. Nothing to
+        // backfill — existing installs simply start with an empty list.
+        if (version < 5) {
+          if (!Array.isArray(s.customProviders))        s.customProviders        = [];
+          if (typeof s.activeCustomProviderId === "undefined") s.activeCustomProviderId = null;
         }
         // v3 → v4: agentSystemPrompt (single string) becomes agentPersonas (list).
         // Existing prompt becomes a single "Default" persona, automatically active.
@@ -518,6 +578,10 @@ function partialize(state: AppState) {
     aiModel:               state.aiModel,
     agentPersonas:         state.agentPersonas,
     activePersonaId:       state.activePersonaId,
+    // customApiKeys intentionally NOT persisted — re-entered each session
+    // so credentials never hit plaintext localStorage.
+    customProviders:        state.customProviders,
+    activeCustomProviderId: state.activeCustomProviderId,
     projectDefaults:       state.projectDefaults,
     customEmbeddingPresets: state.customEmbeddingPresets,
     // aiApiKey intentionally NOT persisted — re-entered each session to avoid

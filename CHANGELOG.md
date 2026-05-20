@@ -8,6 +8,27 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.5.2] — 2026-05-20
+
+### Added
+- **Custom AI providers** — Settings → AI → Custom providers card. Configure
+  any OpenAI-Chat-Completions-compatible endpoint (corporate AI gateway,
+  Azure OpenAI, LiteLLM proxy, vLLM, …) with a name, base URL and API key,
+  plus optional auth-header customisation for non-`Authorization: Bearer`
+  schemes. A **Test connection** button probes `{base_url}/models` via the
+  Python sidecar (so corporate CA bundles and proxies apply), lists the
+  discovered models inline, and auto-fills the default model. The provider
+  is selectable from the main AI provider dropdown alongside Anthropic /
+  OpenAI / Ollama; the QueryPane chat call forwards the full config.
+- **`POST /system/test-custom-provider`** sidecar route + supporting
+  `list_custom_provider_models()` helper in `remex.core.ai`.
+
+### Security
+- Custom-provider API keys are kept **in memory only** — never written to
+  disk, re-entered each session. Matches the existing `aiApiKey` policy.
+
+---
+
 ## [1.5.1] — 2026-05-20
 
 ### Added

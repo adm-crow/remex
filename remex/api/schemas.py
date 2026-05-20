@@ -128,6 +128,10 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     api_key: Optional[str] = _API_KEY_FIELD
     system_prompt: Optional[str] = Field(default=None, max_length=32768)
+    # Custom-provider config — only consulted when provider == "custom"
+    base_url:      Optional[str] = Field(default=None, max_length=1024)
+    header_name:   Optional[str] = Field(default=None, max_length=128)
+    header_prefix: Optional[str] = Field(default=None, max_length=64)
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +197,22 @@ class MultiChatRequest(BaseModel):
     model: Optional[str] = None
     api_key: Optional[str] = _API_KEY_FIELD
     system_prompt: Optional[str] = Field(default=None, max_length=32768)
+    # Custom-provider config — only consulted when provider == "custom"
+    base_url:      Optional[str] = Field(default=None, max_length=1024)
+    header_name:   Optional[str] = Field(default=None, max_length=128)
+    header_prefix: Optional[str] = Field(default=None, max_length=64)
+
+
+class TestCustomProviderRequest(BaseModel):
+    """Body for ``POST /system/test-custom-provider``."""
+    base_url:      str             = Field(min_length=1, max_length=1024)
+    api_key:       Optional[str]   = _API_KEY_FIELD
+    header_name:   Optional[str]   = Field(default="Authorization", max_length=128)
+    header_prefix: Optional[str]   = Field(default="Bearer ",      max_length=64)
+
+
+class TestCustomProviderResponse(BaseModel):
+    models: list[str]
 
 
 class MultiChatResponse(BaseModel):

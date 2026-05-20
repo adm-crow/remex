@@ -65,6 +65,14 @@ export interface ChatRequest extends QueryRequest {
   model?: string;
   api_key?: string;
   system_prompt?: string;
+  // Custom-provider config — only sent when provider === "custom".
+  base_url?: string;
+  header_name?: string;
+  header_prefix?: string;
+}
+
+export interface TestCustomProviderResponse {
+  models: string[];
 }
 
 export interface IngestRequest {
@@ -463,6 +471,26 @@ export const api = {
     apiFetch<{ status: string }>(
       `${base}/collections/warmup?db_path=${encodeURIComponent(dbPath)}`,
       { method: "POST" }
+    ),
+
+  /** Probe an OpenAI-compatible custom provider and return its available models.
+   *  Used by the "Test connection" button in Settings → AI → Custom providers. */
+  testCustomProvider: (
+    base: string,
+    req: {
+      base_url: string;
+      api_key?: string;
+      header_name?: string;
+      header_prefix?: string;
+    },
+  ) =>
+    apiFetch<TestCustomProviderResponse>(
+      `${base}/system/test-custom-provider`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(req),
+      }
     ),
 
   async *ingestFilesStream(

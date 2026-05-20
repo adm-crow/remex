@@ -84,11 +84,27 @@ function isAiNetworkError(msg: string): boolean {
 export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
           agentPersonas, activePersonaId, setActivePersonaId,
+          customProviders, activeCustomProviderId, customApiKeys,
           queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory,
           setRequestedView } =
     useAppStore();
   const activePersona = agentPersonas.find((p) => p.id === activePersonaId) ?? null;
   const agentSystemPrompt = activePersona?.systemPrompt ?? "";
+
+  // When the user has picked a custom OpenAI-compatible provider, resolve it
+  // and overlay its config + in-memory API key onto the chat request.
+  const activeCustomProvider = aiProvider === "custom" && activeCustomProviderId
+    ? customProviders.find((p) => p.id === activeCustomProviderId) ?? null
+    : null;
+  const customOverlay = activeCustomProvider
+    ? {
+        model:         aiModel || activeCustomProvider.defaultModel || undefined,
+        api_key:       customApiKeys[activeCustomProvider.id] || undefined,
+        base_url:      activeCustomProvider.baseUrl || undefined,
+        header_name:   activeCustomProvider.headerName || undefined,
+        header_prefix: activeCustomProvider.headerPrefix,
+      }
+    : null;
 
   const [historyFilter, setHistoryFilter] = useState("");
   const visibleHistory = useMemo(() => {
@@ -166,9 +182,12 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       min_score: minScore > 0 ? minScore : undefined,
       where: whereFilter,
       provider: aiProvider || undefined,
-      model: aiModel || undefined,
-      api_key: aiApiKey || undefined,
+      model: customOverlay?.model ?? (aiModel || undefined),
+      api_key: customOverlay?.api_key ?? (aiApiKey || undefined),
       system_prompt: agentSystemPrompt || undefined,
+      base_url:      customOverlay?.base_url,
+      header_name:   customOverlay?.header_name,
+      header_prefix: customOverlay?.header_prefix,
     }
   );
   const singleChatResult = useChat(
@@ -178,9 +197,12 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       min_score: minScore > 0 ? minScore : undefined,
       where: whereFilter,
       provider: aiProvider || undefined,
-      model: aiModel || undefined,
-      api_key: aiApiKey || undefined,
+      model: customOverlay?.model ?? (aiModel || undefined),
+      api_key: customOverlay?.api_key ?? (aiApiKey || undefined),
       system_prompt: agentSystemPrompt || undefined,
+      base_url:      customOverlay?.base_url,
+      header_name:   customOverlay?.header_name,
+      header_prefix: customOverlay?.header_prefix,
     }
   );
   const chatResult = isMultiAi ? multiChatResult : singleChatResult;

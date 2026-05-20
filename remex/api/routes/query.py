@@ -50,6 +50,9 @@ async def _generate_chat_response(
             model=resolved_model,
             api_key=req.api_key if req.api_key else None,
             system_prompt=req.system_prompt or None,
+            base_url=req.base_url or None,
+            header_name=req.header_name or None,
+            header_prefix=req.header_prefix if req.header_prefix is not None else None,
         )
     except (ValueError, ImportError) as e:
         # Missing API key, unknown provider, or SDK not installed — user config error.

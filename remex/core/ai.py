@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from typing import Optional
 
-PROVIDERS = ("anthropic", "openai", "ollama")
+PROVIDERS = ("anthropic", "openai", "ollama", "custom")
 
 DEFAULT_MODELS: dict[str, str] = {
     "anthropic": "claude-sonnet-4-5",
@@ -73,6 +73,13 @@ def generate_answer(
     model: Optional[str] = None,
     api_key: Optional[str] = None,
     system_prompt: Optional[str] = None,
+    # Custom-provider config — only used when provider == "custom". These come
+    # from the Studio "Custom providers" card and let the user point Remex at
+    # any OpenAI-Chat-Completions-compatible endpoint (corporate AI gateway,
+    # Azure OpenAI, LiteLLM proxy, vLLM, etc.).
+    base_url: Optional[str] = None,
+    header_name: Optional[str] = None,
+    header_prefix: Optional[str] = None,
 ) -> str:
     """Generate an answer using the specified provider and model."""
     model = model or DEFAULT_MODELS.get(provider, "")
@@ -85,6 +92,18 @@ def generate_answer(
         return _answer_openai(question, system, model, api_key=api_key)
     if provider == "ollama":
         return _answer_ollama(question, system, model)
+    if provider == "custom":
+        if not base_url:
+            raise ValueError("Custom provider requires a base_url (Settings → AI → Custom providers).")
+        if not model:
+            raise ValueError("Custom provider requires a model name.")
+        return _answer_custom_openai(
+            question, system, model,
+            base_url=base_url,
+            api_key=api_key,
+            header_name=header_name or "Authorization",
+            header_prefix=header_prefix if header_prefix is not None else "Bearer ",
+        )
 
     raise ValueError(
         f"Unknown provider '{provider}'. Choose from: {', '.join(PROVIDERS)}"
@@ -174,3 +193,103 @@ def _answer_ollama(question: str, system: str, model: str) -> str:
         return data["response"]
     except KeyError:
         raise RuntimeError(f"Unexpected Ollama response format: {data}")
+
+
+# ── Custom OpenAI-compatible providers ───────────────────────────────────────
+
+
+def _custom_request(
+    url: str,
+    *,
+    api_key: Optional[str],
+    header_name: str,
+    header_prefix: str,
+    body: Optional[bytes] = None,
+    timeout: float = 60.0,
+) -> urllib.request.Request:
+    """Build a Request object with the custom-provider auth header attached."""
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if body is not None:
+        headers["Content-Type"] = "application/json"
+    if api_key:
+        headers[header_name] = f"{header_prefix}{api_key}"
+    method = "POST" if body is not None else "GET"
+    return urllib.request.Request(url, data=body, headers=headers, method=method)
+
+
+def _answer_custom_openai(
+    question: str,
+    system: str,
+    model: str,
+    *,
+    base_url: str,
+    api_key: Optional[str],
+    header_name: str,
+    header_prefix: str,
+) -> str:
+    """POST to ``{base_url}/chat/completions`` using the OpenAI message schema."""
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    payload = json.dumps({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user",   "content": question},
+        ],
+    }).encode()
+    req = _custom_request(
+        url, api_key=api_key,
+        header_name=header_name, header_prefix=header_prefix,
+        body=payload,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode(errors="replace")[:500]
+        raise RuntimeError(f"Custom provider HTTP {e.code}: {detail}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Custom provider unreachable: {e.reason}") from e
+    try:
+        return data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        raise RuntimeError(f"Unexpected custom-provider response shape: {str(data)[:200]}")
+
+
+def list_custom_provider_models(
+    *,
+    base_url: str,
+    api_key: Optional[str] = None,
+    header_name: str = "Authorization",
+    header_prefix: str = "Bearer ",
+    timeout: float = 10.0,
+) -> list[str]:
+    """GET ``{base_url}/models`` and return the sorted unique model IDs.
+
+    Raises ``RuntimeError`` with a single-line diagnostic on any failure so the
+    "Test connection" button can surface a readable message.
+    """
+    url = f"{base_url.rstrip('/')}/models"
+    req = _custom_request(
+        url, api_key=api_key,
+        header_name=header_name, header_prefix=header_prefix,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code} {e.reason}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Unreachable: {e.reason}") from e
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Non-JSON response: {e}") from e
+
+    # OpenAI shape: {"data": [{"id": "model-name", ...}, ...]}
+    # Some gateways return a bare list — handle both.
+    items = data.get("data", data) if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        raise RuntimeError(f"Unexpected /models shape: {str(data)[:200]}")
+    ids = {
+        item["id"] for item in items
+        if isinstance(item, dict) and isinstance(item.get("id"), str)
+    }
+    return sorted(ids)

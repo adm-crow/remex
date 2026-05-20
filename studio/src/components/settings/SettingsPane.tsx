@@ -145,6 +145,10 @@ export function SettingsPane() {
     addAgentPersona, updateAgentPersona, removeAgentPersona,
     projectDefaults, setProjectDefaults,
     customEmbeddingPresets, addCustomEmbeddingPreset, removeCustomEmbeddingPreset,
+    customProviders, activeCustomProviderId,
+    addCustomProvider, updateCustomProvider, removeCustomProvider,
+    setActiveCustomProviderId, setCustomApiKey,
+    customApiKeys,
     setupExtras, setSetupExtras,
     triggerSidecarReconnect,
     setOnboardingDone, setShortcutsOpen,
@@ -457,8 +461,20 @@ export function SettingsPane() {
                   <div className="flex gap-2">
                     <Field label="Provider" htmlFor="ai-provider" className="w-[140px] shrink-0">
                       <Select
-                        value={aiProvider || AUTO_PROVIDER}
-                        onValueChange={(v) => setAiProvider(v === AUTO_PROVIDER ? "" : v)}
+                        value={
+                          aiProvider === "custom" && activeCustomProviderId
+                            ? `custom:${activeCustomProviderId}`
+                            : (aiProvider || AUTO_PROVIDER)
+                        }
+                        onValueChange={(v) => {
+                          if (v.startsWith("custom:")) {
+                            setAiProvider("custom");
+                            setActiveCustomProviderId(v.slice("custom:".length));
+                          } else {
+                            setAiProvider(v === AUTO_PROVIDER ? "" : v);
+                            setActiveCustomProviderId(null);
+                          }
+                        }}
                       >
                         <SelectTrigger id="ai-provider" aria-label="AI provider" className="w-full h-8 text-sm">
                           <SelectValue placeholder="Auto-detect" />
@@ -466,6 +482,9 @@ export function SettingsPane() {
                         <SelectContent>
                           {AI_PROVIDERS.map((p) => (
                             <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                          ))}
+                          {customProviders.map((p) => (
+                            <SelectItem key={p.id} value={`custom:${p.id}`}>{p.name || "(unnamed)"}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -589,6 +608,18 @@ export function SettingsPane() {
                   )}
                 </div>
               </Card>
+
+              <CustomProvidersCard
+                apiUrl={apiUrl}
+                providers={customProviders}
+                activeProviderId={activeCustomProviderId}
+                apiKeys={customApiKeys}
+                onAdd={addCustomProvider}
+                onUpdate={updateCustomProvider}
+                onRemove={removeCustomProvider}
+                onSetActive={setActiveCustomProviderId}
+                onSetApiKey={setCustomApiKey}
+              />
 
               <Card>
                 <CardHeader icon={BookOpen} title="Find models" subtitle="Browse available models for each provider" />
@@ -804,8 +835,11 @@ export function SettingsPane() {
 }
 
 // ─── Project Defaults card ─────────────────────────────────────────────────
-import type { ProjectDefaults, CustomEmbeddingPreset } from "@/store/app";
+import type { ProjectDefaults, CustomEmbeddingPreset, CustomProvider } from "@/store/app";
 import { EmbeddingModelField } from "@/components/ingest/EmbeddingModelField";
+import { api } from "@/api/client";
+import { errMsg } from "@/lib/utils";
+import { CheckCircle2, AlertCircle, Loader2, Plug } from "lucide-react";
 
 function ProjectDefaultsCard({
   defaults,
@@ -954,6 +988,278 @@ function CustomPresetsCard({
             <Plus className="w-3.5 h-3.5" />
           </Button>
         </div>
+      </div>
+    </Card>
+  );
+}
+
+// ─── Custom OpenAI-compatible Providers card ───────────────────────────────
+
+function CustomProvidersCard({
+  apiUrl,
+  providers,
+  activeProviderId,
+  apiKeys,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onSetActive,
+  onSetApiKey,
+}: {
+  apiUrl:           string;
+  providers:        CustomProvider[];
+  activeProviderId: string | null;
+  apiKeys:          Record<string, string>;
+  onAdd:            (p: CustomProvider) => void;
+  onUpdate:         (id: string, patch: Partial<Omit<CustomProvider, "id">>) => void;
+  onRemove:         (id: string) => void;
+  onSetActive:      (id: string | null) => void;
+  onSetApiKey:      (id: string, key: string) => void;
+}) {
+  // Which provider is being edited in the form — independent of which one is
+  // the project-wide "active" choice, so users can edit a non-active provider
+  // without flipping their active selection.
+  const [editId, setEditId] = useState<string | null>(
+    activeProviderId ?? providers[0]?.id ?? null
+  );
+  const editing = providers.find((p) => p.id === editId) ?? null;
+
+  const [showKey,    setShowKey]    = useState(false);
+  const [testStatus, setTestStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "loading" }
+    | { kind: "ok"; models: string[] }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  function handleAdd() {
+    const id = crypto.randomUUID();
+    onAdd({
+      id,
+      name:         "New provider",
+      baseUrl:      "",
+      headerName:   "Authorization",
+      headerPrefix: "Bearer ",
+    });
+    setEditId(id);
+    setTestStatus({ kind: "idle" });
+  }
+
+  function handleDelete() {
+    if (!editing) return;
+    onRemove(editing.id);
+    const remaining = providers.filter((p) => p.id !== editing.id);
+    setEditId(remaining[0]?.id ?? null);
+    setTestStatus({ kind: "idle" });
+  }
+
+  async function handleTest() {
+    if (!editing) return;
+    if (!editing.baseUrl.trim()) {
+      setTestStatus({ kind: "error", message: "Base URL is required." });
+      return;
+    }
+    setTestStatus({ kind: "loading" });
+    try {
+      const resp = await api.testCustomProvider(apiUrl, {
+        base_url:      editing.baseUrl.trim(),
+        api_key:       apiKeys[editing.id] || undefined,
+        header_name:   editing.headerName,
+        header_prefix: editing.headerPrefix,
+      });
+      setTestStatus({ kind: "ok", models: resp.models });
+      // If the user hasn't picked a default model yet and the endpoint
+      // returned at least one, populate it automatically.
+      if (!editing.defaultModel && resp.models.length > 0) {
+        onUpdate(editing.id, { defaultModel: resp.models[0] });
+      }
+    } catch (e) {
+      setTestStatus({ kind: "error", message: errMsg(e) });
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader
+        icon={Plug}
+        title="Custom providers"
+        subtitle="Point Remex at any OpenAI-Chat-Completions-compatible endpoint"
+      />
+      <div className="space-y-2.5">
+        {/* Picker row + add/delete */}
+        <div className="flex gap-2">
+          <Select
+            value={editId ?? ""}
+            onValueChange={(v) => { setEditId(v || null); setTestStatus({ kind: "idle" }); }}
+            disabled={providers.length === 0}
+          >
+            <SelectTrigger className="h-8 text-sm flex-1" aria-label="Edit custom provider">
+              <SelectValue placeholder={providers.length === 0 ? "No providers yet — click +" : "Select…"} />
+            </SelectTrigger>
+            <SelectContent>
+              {providers.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.name || "(unnamed)"}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" size="sm" variant="outline" onClick={handleAdd} aria-label="Add custom provider">+</Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleDelete}
+            disabled={!editing}
+            aria-label="Delete custom provider"
+          >
+            ✕
+          </Button>
+        </div>
+
+        {/* Edit form for the selected provider */}
+        {editing ? (
+          <>
+            <Field label="Name" htmlFor="cp-name">
+              <Input
+                id="cp-name"
+                value={editing.name}
+                onChange={(e) => onUpdate(editing.id, { name: e.target.value })}
+                placeholder="Acme Corp Gateway"
+                className="h-8 text-sm"
+              />
+            </Field>
+            <Field label="Base URL" htmlFor="cp-base-url">
+              <Input
+                id="cp-base-url"
+                value={editing.baseUrl}
+                onChange={(e) => onUpdate(editing.id, { baseUrl: e.target.value })}
+                placeholder="https://ai.acme.corp/v1"
+                className="h-8 text-sm font-mono"
+              />
+            </Field>
+            <Field label="API key" htmlFor="cp-api-key">
+              <div className="flex gap-1.5">
+                <Input
+                  id="cp-api-key"
+                  type={showKey ? "text" : "password"}
+                  value={apiKeys[editing.id] ?? ""}
+                  onChange={(e) => onSetApiKey(editing.id, e.target.value)}
+                  placeholder="Not stored on disk — re-enter each session"
+                  className="flex-1 font-mono text-xs h-8"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 w-8 p-0 shrink-0"
+                  onClick={() => setShowKey((v) => !v)}
+                  aria-label={showKey ? "Hide API key" : "Show API key"}
+                >
+                  {showKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+            </Field>
+
+            {/* Advanced: header name + prefix */}
+            <details className="text-xs">
+              <summary className="cursor-pointer text-muted-foreground select-none">Advanced header config</summary>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <Field label="Header name" htmlFor="cp-header-name">
+                  <Input
+                    id="cp-header-name"
+                    value={editing.headerName}
+                    onChange={(e) => onUpdate(editing.id, { headerName: e.target.value })}
+                    placeholder="Authorization"
+                    className="h-7 text-xs font-mono"
+                  />
+                </Field>
+                <Field label="Header prefix" htmlFor="cp-header-prefix">
+                  <Input
+                    id="cp-header-prefix"
+                    value={editing.headerPrefix}
+                    onChange={(e) => onUpdate(editing.id, { headerPrefix: e.target.value })}
+                    placeholder="Bearer "
+                    className="h-7 text-xs font-mono"
+                  />
+                </Field>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Default sends <code>Authorization: Bearer &lt;key&gt;</code>. Set to e.g. <code>api-key</code> + empty prefix for Azure OpenAI.
+              </p>
+            </details>
+
+            {/* Default model — populated by Test Connection or typed by hand */}
+            <Field label="Default model" htmlFor="cp-default-model">
+              {testStatus.kind === "ok" && testStatus.models.length > 0 ? (
+                <Select
+                  value={editing.defaultModel ?? ""}
+                  onValueChange={(v) => onUpdate(editing.id, { defaultModel: v })}
+                >
+                  <SelectTrigger id="cp-default-model" className="h-8 text-sm" aria-label="Default model">
+                    <SelectValue placeholder="Pick a discovered model…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {testStatus.models.map((m) => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="cp-default-model"
+                  value={editing.defaultModel ?? ""}
+                  onChange={(e) => onUpdate(editing.id, { defaultModel: e.target.value })}
+                  placeholder="gpt-4-acme"
+                  className="h-8 text-sm font-mono"
+                />
+              )}
+            </Field>
+
+            {/* Test connection */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void handleTest()}
+                disabled={testStatus.kind === "loading"}
+              >
+                {testStatus.kind === "loading"
+                  ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />Testing…</>
+                  : "Test connection"}
+              </Button>
+              {testStatus.kind === "ok" && (
+                <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {testStatus.models.length} model{testStatus.models.length !== 1 ? "s" : ""} discovered
+                </span>
+              )}
+              {testStatus.kind === "error" && (
+                <span className="flex items-center gap-1 text-xs text-destructive truncate" title={testStatus.message}>
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {testStatus.message}
+                </span>
+              )}
+            </div>
+
+            {/* "Use this provider" — sets it as the global active provider */}
+            <Button
+              type="button"
+              size="sm"
+              className="w-full"
+              variant={activeProviderId === editing.id ? "default" : "outline"}
+              onClick={() => onSetActive(editing.id)}
+              disabled={activeProviderId === editing.id}
+            >
+              {activeProviderId === editing.id ? "Active provider" : "Use this provider"}
+            </Button>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Add an OpenAI-Chat-Completions-compatible endpoint (corporate AI gateway,
+            Azure OpenAI, LiteLLM proxy, vLLM, etc.). API keys are kept in memory
+            only — never written to disk.
+          </p>
+        )}
       </div>
     </Card>
   );

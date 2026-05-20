@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 // Must match the remex-cli version published to PyPI.
-pub const EXPECTED_VERSION: &str = "1.5.1";
+pub const EXPECTED_VERSION: &str = "1.5.2";
 pub const PYTHON_VERSION: &str = "3.13";
 
 #[derive(Serialize, Deserialize)]
