@@ -67,10 +67,14 @@ describe("SetupScreen", () => {
     expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
   });
 
-  it("does not show log lines during normal setup progress", () => {
+  it("streams uv log lines live during normal setup progress", () => {
+    // The remex-cli install can take many minutes; without a live tail the UI
+    // looks frozen. Each uv stderr line (Downloading, Installed, …) should
+    // render under the progress bar as it arrives.
     useAppStore.setState({ setupLogLines: ["Downloading remex-cli…", "Done."] } as any);
     renderWithProviders(<SetupScreen />);
-    expect(screen.queryByText("Downloading remex-cli…")).not.toBeInTheDocument();
+    expect(screen.getByText("Downloading remex-cli…")).toBeInTheDocument();
+    expect(screen.getByText("Done.")).toBeInTheDocument();
   });
 
   it("shows log lines on error screen to help diagnose failures", () => {

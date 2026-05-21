@@ -230,6 +230,23 @@ export function SetupScreen() {
           {elapsed > 0 && <span>Elapsed: {formatElapsed(elapsed)}</span>}
         </div>
 
+        {/* Live log tail — surfaces uv's "Downloading … / Installed …" lines
+            during the slow remex-cli install so it doesn't feel hung. */}
+        {setupLogLines.length > 0 && (
+          <div
+            ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}
+            className="w-full max-h-32 overflow-y-auto rounded-md bg-muted/50 px-3 py-2 text-left font-mono text-[11px] text-muted-foreground space-y-0.5 leading-snug"
+            aria-live="polite"
+            aria-atomic="false"
+          >
+            {setupLogLines.slice(-12).map((line, i) => (
+              <div key={`${setupLogLines.length}-${i}`} className="truncate" title={line}>
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
+
         <p className="text-xs text-muted-foreground">
           This only runs once. Requires an internet connection.
         </p>

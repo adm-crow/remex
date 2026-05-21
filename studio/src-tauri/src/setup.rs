@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 // Must match the remex-cli version published to PyPI.
-pub const EXPECTED_VERSION: &str = "1.5.2";
+pub const EXPECTED_VERSION: &str = "1.5.3";
 pub const PYTHON_VERSION: &str = "3.13";
 
 #[derive(Serialize, Deserialize)]
@@ -104,28 +104,61 @@ fn emit_log(app: &AppHandle, message: &str) {
 }
 
 async fn run_uv(app: &AppHandle, uv_path: &Path, args: &[&str]) -> Result<(), String> {
+    use std::process::Stdio;
+    use std::sync::{Arc, Mutex};
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
     let mut cmd = tokio::process::Command::new(uv_path);
-    cmd.args(args);
+    cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(target_os = "windows")]
     cmd.creation_flags(CREATE_NO_WINDOW);
-    let output = cmd
-        .output()
-        .await
-        .map_err(|e| format!("Failed to run uv: {e}"))?;
 
-    // Emit stdout + stderr lines for display in the setup log tail
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr_out = String::from_utf8_lossy(&output.stderr);
-    for line in stdout.lines().chain(stderr_out.lines()) {
-        let t = line.trim();
-        if !t.is_empty() {
-            emit_log(app, t);
+    let mut child = cmd.spawn().map_err(|e| format!("Failed to run uv: {e}"))?;
+
+    let stdout = child.stdout.take().ok_or_else(|| "uv stdout unavailable".to_string())?;
+    let stderr = child.stderr.take().ok_or_else(|| "uv stderr unavailable".to_string())?;
+
+    // stderr is captured to a buffer too so we can return it as the failure detail
+    // if the process exits non-zero. uv writes its progress (Downloading, Installed)
+    // to stderr; stdout is mostly empty.
+    let stderr_buf: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let app_out = app.clone();
+    let stdout_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let t = line.trim();
+            if !t.is_empty() {
+                let _ = app_out.emit("setup://log", LogEvent { message: t.to_string() });
+            }
         }
-    }
+    });
 
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(stderr.trim().to_string());
+    let app_err = app.clone();
+    let stderr_buf_clone = stderr_buf.clone();
+    let stderr_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let t = line.trim();
+            if !t.is_empty() {
+                let _ = app_err.emit("setup://log", LogEvent { message: t.to_string() });
+                // Don't await while holding the lock — push and drop.
+                if let Ok(mut buf) = stderr_buf_clone.lock() {
+                    buf.push(t.to_string());
+                }
+            }
+        }
+    });
+
+    let status = child.wait().await.map_err(|e| format!("Failed to wait for uv: {e}"))?;
+
+    // Drain both readers so all events have been emitted before we return.
+    let _ = stdout_task.await;
+    let _ = stderr_task.await;
+
+    if !status.success() {
+        let buf = stderr_buf.lock().map_err(|e| e.to_string())?;
+        return Err(buf.join("\n").trim().to_string());
     }
     Ok(())
 }

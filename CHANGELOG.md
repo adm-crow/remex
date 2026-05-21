@@ -8,6 +8,22 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [1.5.3] — 2026-05-21
+
+### Changed
+- **Setup screen now streams uv's output live.** The Rust `run_uv` was
+  blocking on the full process output before emitting any log events, so the
+  first-install setup screen sat at "Installing remex-cli…" with no visible
+  progress for the entire 5-15 minutes it took to download + extract the
+  ~400 MB of wheels (chromadb, onnxruntime, fastembed, …) — looking hung.
+  uv's stdout and stderr are now drained concurrently in tokio tasks, and
+  every line is forwarded to the SetupScreen as a `setup://log` event the
+  moment it's written. The screen renders a scrolling tail of the last 12
+  lines under the progress bar so users can see "Downloading numpy
+  (15.6 MiB)…", "Installed 47 packages in 1m 23s", etc.
+
+---
+
 ## [1.5.2] — 2026-05-20
 
 ### Added
