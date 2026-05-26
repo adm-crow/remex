@@ -322,16 +322,18 @@ def test_ingest_sqlite_incremental_skips_unchanged_row(tmp_path):
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    # Simulate row already in collection with matching hash
+    # Simulate row already in collection with matching hash.
+    # Incremental mode now prefetches chunk-0 metadata via a single
+    # `collection.get(where=...)` call (see ingester.existing_by_row),
+    # so the mock must include row_id + chunk so the prefetch indexes it.
     import hashlib
     from remex.core.sqlite_ingester import _make_sqlite_id
-    # Just use the actual serialization that ingest_sqlite produces
     body_text = "word " * 30
     row_hash = hashlib.sha256(f"body: {body_text}".encode(), usedforsecurity=False).hexdigest()[:16]
     check_id = _make_sqlite_id(db, "articles", 1, 0)
     collection.get.return_value = {
         "ids": [check_id],
-        "metadatas": [{"row_hash": row_hash, "n_chunks": 1}],
+        "metadatas": [{"row_hash": row_hash, "n_chunks": 1, "row_id": "1", "chunk": 0}],
     }
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \
@@ -359,12 +361,14 @@ def test_ingest_sqlite_incremental_reingest_changed_row(tmp_path):
     client = MagicMock()
     client.get_or_create_collection.return_value = collection
 
-    # Simulate row already in collection with a DIFFERENT hash
+    # Simulate row already in collection with a DIFFERENT hash.
+    # Same prefetch shape requirements as the skip-on-match test above —
+    # row_id + chunk are needed so the prefetch loop indexes the entry.
     from remex.core.sqlite_ingester import _make_sqlite_id
     check_id = _make_sqlite_id(db, "articles", 1, 0)
     collection.get.return_value = {
         "ids": [check_id],
-        "metadatas": [{"row_hash": "stale_hash_abc123", "n_chunks": 1}],
+        "metadatas": [{"row_hash": "stale_hash_abc123", "n_chunks": 1, "row_id": "1", "chunk": 0}],
     }
 
     with patch("remex.core.pipeline.chromadb.PersistentClient", return_value=client), \

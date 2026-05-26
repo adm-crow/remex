@@ -934,7 +934,9 @@ def test_collection_stats_returns_correct_values(tmp_path):
 
     collection = MagicMock()
     collection.metadata = {"embedding_model": "all-MiniLM-L6-v2"}
-    # collection_stats counts chunks from get()["ids"], not collection.count()
+    # collection_stats reads total_chunks from collection.count() (fast path)
+    # and unique sources from get()["metadatas"].
+    collection.count.return_value = 10
     collection.get.return_value = {
         "ids": [f"id{i}" for i in range(10)],
         "metadatas": [
