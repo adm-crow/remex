@@ -15,7 +15,7 @@
 [![PyPI](https://img.shields.io/pypi/v/remex-cli?style=flat&logo=pypi&logoColor=white&label=PyPI&color=3775a9)](https://pypi.org/project/remex-cli)
 [![License](https://img.shields.io/badge/CLI-Apache%202.0-22c55e?style=flat&label=License)](LICENSES.md)
 [![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat&logo=windows&logoColor=white)](https://github.com/adm-crow/remex/releases)
-[![Python](https://img.shields.io/badge/3.11+-FFD43B?style=flat&logo=python&logoColor=black)](https://pypi.org/project/remex-cli)
+[![Python](https://img.shields.io/badge/3.13+-FFD43B?style=flat&logo=python&logoColor=black)](https://pypi.org/project/remex-cli)
 
 <br/>
 
