@@ -187,9 +187,8 @@ pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
 
     // Step 0: locate uv.exe
     emit_progress(app, "Preparing installer…", 0);
-    let uv_path = find_uv(app).map_err(|msg| {
+    let uv_path = find_uv(app).inspect_err(|msg| {
         let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
-        msg
     })?;
 
     // Step 1: create venv with Python 3.13
