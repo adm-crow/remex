@@ -41,7 +41,15 @@ def create_app() -> FastAPI:
         """Catch-all: routes through FastAPI's HTTPException handler so that
         CORSMiddleware can attach Access-Control-Allow-Origin to error responses.
         Full detail is logged server-side only — the response never leaks
-        internal paths, API keys, or stack content."""
+        internal paths, API keys, or stack content.
+
+        HTTPException (and its `RequestValidationError`/422 family) must pass
+        through to FastAPI's normal handlers so 4xx responses keep their
+        original status code and detail body; otherwise this would mask every
+        validation error as a generic 500.
+        """
+        if isinstance(exc, FastAPIHTTPException):
+            return await http_exception_handler(request, exc)
         _logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
         return await http_exception_handler(
             request,

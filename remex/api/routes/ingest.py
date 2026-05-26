@@ -233,13 +233,18 @@ async def ingest_files_stream(
 async def ingest_sqlite_table(
     collection: str, req: IngestSQLiteRequest
 ) -> IngestResultResponse:
-    """Ingest rows from a SQLite table. Blocks until complete."""
-    _logger.info("[INGEST/sqlite] collection=%s table=%s db=%s", collection, req.table, req.sqlite_path)
+    """Ingest rows from a SQLite table or custom SQL query. Blocks until complete."""
+    mode_desc = (
+        f"table={req.table}" if req.table is not None
+        else f"sql=<{len(req.sql_query or '')}ch>"
+    )
+    _logger.info("[INGEST/sqlite] collection=%s %s db=%s", collection, mode_desc, req.sqlite_path)
     try:
         result = await asyncio.to_thread(
             ingest_sqlite,
             db_path=req.sqlite_path,
             table=req.table,
+            sql_query=req.sql_query,
             columns=req.columns,
             id_column=req.id_column,
             row_template=req.row_template,
@@ -275,11 +280,16 @@ async def ingest_sqlite_stream(
       data: {"type": "done",     "result": {...}}
       data: {"type": "error",    "detail": "..."}
     """
-    _logger.info("[INGEST/sqlite/stream] collection=%s table=%s db=%s", collection, req.table, req.sqlite_path)
+    mode_desc = (
+        f"table={req.table}" if req.table is not None
+        else f"sql=<{len(req.sql_query or '')}ch>"
+    )
+    _logger.info("[INGEST/sqlite/stream] collection=%s %s db=%s", collection, mode_desc, req.sqlite_path)
     def _fn(on_progress: Callable[[IngestProgress], None]) -> IngestResult:
         return ingest_sqlite(
             db_path=req.sqlite_path,
             table=req.table,
+            sql_query=req.sql_query,
             columns=req.columns,
             id_column=req.id_column,
             row_template=req.row_template,

@@ -26,11 +26,20 @@ _MAX_EXTRACT_WORKERS = 4  # threads for parallel file extraction (I/O-bound)
 
 
 def _get_client(db_path: str) -> Any:
+    """Return a cached ChromaDB client for `db_path`, recreating it if the
+    underlying directory was deleted/moved since the previous call (otherwise
+    we'd hand back a stale client that errors on every operation)."""
     with _CLIENT_LOCK:
-        if db_path in _CLIENT_CACHE:
-            # Move to end (most-recently-used) without re-opening.
-            _CLIENT_CACHE[db_path] = _CLIENT_CACHE.pop(db_path)
-            return _CLIENT_CACHE[db_path]
+        cached = _CLIENT_CACHE.get(db_path)
+        if cached is not None:
+            # If the persistent directory has gone (user deleted the project
+            # between calls), drop the stale client and reopen below.
+            persisted = Path(db_path)
+            if db_path == "./remex_db" or persisted.exists():
+                # Move to end (most-recently-used) without re-opening.
+                _CLIENT_CACHE[db_path] = _CLIENT_CACHE.pop(db_path)
+                return _CLIENT_CACHE[db_path]
+            _CLIENT_CACHE.pop(db_path, None)
         client = chromadb.PersistentClient(path=db_path)
         _CLIENT_CACHE[db_path] = client
         if len(_CLIENT_CACHE) > _CLIENT_CACHE_MAX:
@@ -47,14 +56,21 @@ def _extract_file_safe(file_path: Path) -> tuple[str | None, Exception | None]:
         return None, exc
 
 
+def _stable_id(*parts: object) -> str:
+    """MD5 of the ``::``-joined ``parts``. Shared primitive used by `_make_id`,
+    `_make_id_abs`, and `_make_sqlite_id` so all chunk IDs share one hashing
+    strategy and any future change happens in one place."""
+    key = "::".join(str(p) for p in parts)
+    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
+
+
 def _make_id(file_path: Path, source_dir: Path, chunk_index: int) -> str:
     """Stable unique ID based on relative path — portable across machine moves."""
     try:
         rel = file_path.relative_to(source_dir)
     except ValueError:
         rel = file_path.resolve()
-    key = f"{rel}::{chunk_index}"
-    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
+    return _stable_id(rel, chunk_index)
 
 
 def _file_hash(path: Path) -> str:
@@ -68,6 +84,22 @@ def _get_source_chunks(collection: Any, source_str: str) -> dict[str, Any]:
         where={"source": {"$eq": source_str}},
         include=["metadatas"],
     )
+
+
+def _get_existing_collection(db_path: str, collection_name: str) -> Any:
+    """Look up an existing collection or raise CollectionNotFoundError.
+
+    Used by read-only / management endpoints (purge, stats, sources, delete,
+    rename, etc.) that must not silently create a fresh collection if the
+    target is missing — that would mask user error and produce empty results.
+    """
+    client = _get_client(db_path)
+    try:
+        return client.get_collection(name=collection_name)
+    except (ValueError, ChromaNotFoundError):
+        raise CollectionNotFoundError(
+            f"Collection '{collection_name}' not found in '{db_path}'."
+        ) from None
 
 
 def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True) -> Any:
@@ -98,21 +130,27 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
         return collection
     # Read metadata first to determine the stored embedding model, then re-fetch
     # the collection with the correct EF — avoids mutating a private attribute.
-    _meta_col = client.get_collection(name=collection_name)
-    stored_model = (
-        _meta_col.metadata.get("embedding_model")
-        if isinstance(_meta_col.metadata, dict) else None
-    ) or embedding_model
-    return client.get_collection(  # type: ignore[return-value]
-        name=collection_name,
-        embedding_function=get_embedding_function(stored_model),  # type: ignore[arg-type]
-    )
+    # Both lookups can fail (collection deleted between calls — race) so wrap
+    # them in one try/except that bubbles a clean CollectionNotFoundError.
+    try:
+        _meta_col = client.get_collection(name=collection_name)
+        stored_model = (
+            _meta_col.metadata.get("embedding_model")
+            if isinstance(_meta_col.metadata, dict) else None
+        ) or embedding_model
+        return client.get_collection(  # type: ignore[return-value]
+            name=collection_name,
+            embedding_function=get_embedding_function(stored_model),  # type: ignore[arg-type]
+        )
+    except (ValueError, ChromaNotFoundError):
+        raise CollectionNotFoundError(
+            f"Collection '{collection_name}' not found in '{db_path}'."
+        ) from None
 
 
 def _make_id_abs(file_path: Path, chunk_index: int) -> str:
     """Stable unique ID based on absolute path — used by ingest_many()."""
-    key = f"{file_path.resolve()}::{chunk_index}"
-    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
+    return _stable_id(file_path.resolve(), chunk_index)
 
 
 _STREAM_BATCH = 100  # max chunks per ChromaDB upsert call during streaming
@@ -777,16 +815,14 @@ def collection_stats(
     Raises:
         CollectionNotFoundError: If the collection does not exist.
     """
-    client = _get_client(db_path)
-    try:
-        collection = client.get_collection(name=collection_name)
-    except (ValueError, ChromaNotFoundError):
-        raise CollectionNotFoundError(
-            f"Collection '{collection_name}' not found in '{db_path}'."
-        ) from None
-
+    collection = _get_existing_collection(db_path, collection_name)
+    # Fast path: ChromaDB exposes count() directly so we don't materialise every
+    # chunk just to len() it. Sources are still derived from metadata (no
+    # ChromaDB-side group-by yet, see https://github.com/chroma-core/chroma/issues
+    # for a tracking ticket) but we only need the `source` field, not every
+    # column, so the payload is much smaller.
+    total_chunks = collection.count()
     results = collection.get(include=["metadatas"])
-    total_chunks = len(results["ids"] or [])
     unique_sources = len({
         str(meta.get("source", ""))
         for meta in (results["metadatas"] or [])

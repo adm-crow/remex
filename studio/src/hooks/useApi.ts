@@ -118,6 +118,11 @@ export function useChat(
       options?.model,
       !!options?.api_key, // presence change (key added/removed) busts cache without exposing value
       options?.system_prompt,
+      // Custom-provider config — two providers sharing the same model name
+      // must not return a cached answer from the previous provider.
+      options?.base_url,
+      options?.header_name,
+      options?.header_prefix,
     ],
     queryFn: () =>
       api.chat(apiUrl, dbPath, collection, {
@@ -164,6 +169,10 @@ export function useMultiChat(
       options?.provider, options?.model,
       !!options?.api_key, // presence change busts cache without exposing value
       options?.system_prompt,
+      // Custom-provider config — see useChat above.
+      options?.base_url,
+      options?.header_name,
+      options?.header_prefix,
     ],
     queryFn: () =>
       api.multiChat(apiUrl, dbPath, {

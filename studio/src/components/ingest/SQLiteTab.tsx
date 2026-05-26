@@ -38,6 +38,7 @@ import type { IngestResultResponse } from "@/api/client";
 import { formatDuration } from "@/lib/formatDuration";
 import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
 import { STATUS_VARIANT } from "./ingestShared";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 type TableProgress = {
   table: string;
@@ -82,6 +83,10 @@ export function SQLiteTab() {
   const [columns,         setColumns]         = useState("");
   const [idColumn,        setIdColumn]        = useState("id");
   const [rowTemplate,     setRowTemplate]     = useState("");
+  // Source mode — "table" picks a single table from the DB; "sql" lets the user
+  // write an arbitrary SELECT/WITH (e.g. JOINs across multiple tables).
+  const [sourceMode,      setSourceMode]      = useState<"table" | "sql">("table");
+  const [sqlQuery,        setSqlQuery]        = useState("");
   const [embeddingModel,  setEmbeddingModel]  = useState(
     () => projectDefaults.embeddingModel ?? DEFAULT_EMBEDDING_MODEL
   );
@@ -189,19 +194,24 @@ export function SQLiteTab() {
     rowOffset: number,
   ): Promise<IngestResultResponse | null> {
     let tableResult: IngestResultResponse | null = null;
+    const requestBody: Parameters<typeof api.ingestSqliteStream>[3] = {
+      sqlite_path: sqlitePath,
+      embedding_model: effectiveModel,
+      columns: columns
+        ? columns.split(",").map((c) => c.trim()).filter(Boolean)
+        : undefined,
+      id_column: idColumn || "id",
+      row_template: rowTemplate || undefined,
+      incremental,
+    };
+    if (sourceMode === "sql") {
+      requestBody.sql_query = sqlQuery;
+    } else {
+      requestBody.table = table;
+    }
     for await (const event of api.ingestSqliteStream(
       apiUrl, currentDb!, effectiveCollection,
-      {
-        sqlite_path: sqlitePath,
-        table,
-        embedding_model: effectiveModel,
-        columns: columns
-          ? columns.split(",").map((c) => c.trim()).filter(Boolean)
-          : undefined,
-        id_column: idColumn || "id",
-        row_template: rowTemplate || undefined,
-        incremental,
-      },
+      requestBody,
       signal,
     )) {
       if (event.type === "model_download") {
@@ -221,7 +231,9 @@ export function SQLiteTab() {
   }
 
   async function handleRun() {
-    if (!sqlitePath || !selectedTable || !effectiveCollection || !currentDb) return;
+    if (!sqlitePath || !effectiveCollection || !currentDb) return;
+    if (sourceMode === "table" && !selectedTable) return;
+    if (sourceMode === "sql" && !sqlQuery.trim()) return;
 
     resetSqliteIngestSession();
     setModelDownload(null);
@@ -240,7 +252,10 @@ export function SQLiteTab() {
     runAbortRef.current = new AbortController();
 
     try {
-      setCurrentIngestTable(selectedTable);
+      const sourceLabel = sourceMode === "sql"
+        ? `SQL (${sqlQuery.length} chars)`
+        : selectedTable;
+      setCurrentIngestTable(sourceLabel);
       const tableResult = await ingestOneTable(
         selectedTable, runAbortRef.current.signal, 0,
       );
@@ -251,7 +266,7 @@ export function SQLiteTab() {
       };
       if (tableResult) {
         setTableProgress([{
-          table: selectedTable,
+          table: sourceLabel,
           status: tableResult.sources_ingested > 0 ? "ingested"
                 : tableResult.sources_skipped  > 0 ? "skipped"
                 : "error",
@@ -303,7 +318,14 @@ export function SQLiteTab() {
     }
   }
 
-  const canRun = !sqliteIngestRunning && !!sqlitePath && !!selectedTable && !!effectiveCollection && !waitingForLockedModel;
+  const canRun =
+    !sqliteIngestRunning
+    && !!sqlitePath
+    && !!effectiveCollection
+    && !waitingForLockedModel
+    && (sourceMode === "sql"
+        ? sqlQuery.trim().length > 0 && idColumn.trim().length > 0
+        : !!selectedTable);
 
   const hasActivity =
     sqliteIngestRunning ||
@@ -332,33 +354,92 @@ export function SQLiteTab() {
         </div>
       </div>
 
-      {/* Table picker */}
+      {/* Source mode toggle — table picker or SQL query */}
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Table</Label>
-        <Select
-          value={selectedTable}
-          onValueChange={setSelectedTable}
-          disabled={!sqlitePath || isLoadingTables || !!tableError || tables.length === 0}
-        >
-          <SelectTrigger className="h-8 text-sm" aria-label="Select table">
-            <SelectValue
-              placeholder={
-                isLoadingTables   ? "Loading tables…"
-                : tableError      ? "Error loading tables"
-                : !sqlitePath     ? "Select a database first"
-                : tables.length === 0 ? "No tables found"
-                : "Select a table…"
-              }
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {tables.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {tableError && <p className="text-xs text-destructive">{tableError}</p>}
+        <Label className="text-xs text-muted-foreground">Source</Label>
+        <SegmentedControl
+          value={sourceMode}
+          onChange={setSourceMode}
+          ariaLabel="Source mode"
+          options={[
+            { value: "table", label: "Table" },
+            { value: "sql",   label: "SQL query" },
+          ] as const}
+        />
       </div>
+
+      {sourceMode === "table" ? (
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Table</Label>
+          <Select
+            value={selectedTable}
+            onValueChange={setSelectedTable}
+            disabled={!sqlitePath || isLoadingTables || !!tableError || tables.length === 0}
+          >
+            <SelectTrigger className="h-8 text-sm" aria-label="Select table">
+              <SelectValue
+                placeholder={
+                  isLoadingTables   ? "Loading tables…"
+                  : tableError      ? "Error loading tables"
+                  : !sqlitePath     ? "Select a database first"
+                  : tables.length === 0 ? "No tables found"
+                  : "Select a table…"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {tables.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {tableError && <p className="text-xs text-destructive">{tableError}</p>}
+        </div>
+      ) : (
+        <>
+          <div className="space-y-1">
+            <Label htmlFor="sqlite-sql-query" className="text-xs text-muted-foreground">
+              SQL query
+            </Label>
+            <textarea
+              id="sqlite-sql-query"
+              value={sqlQuery}
+              onChange={(e) => setSqlQuery(e.target.value)}
+              placeholder={`SELECT t.id, t.title, t.body, u.name AS author
+FROM posts t
+LEFT JOIN users u ON t.user_id = u.id`}
+              rows={6}
+              spellCheck={false}
+              disabled={!sqlitePath}
+              aria-label="SQL query"
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono resize-y placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Must be a <code>SELECT</code> (or <code>WITH&hellip;SELECT</code>) statement.
+              Changing the query produces a new source identifier.
+            </p>
+          </div>
+
+          {/* ID column is required for incremental dedup and chunk IDs.
+              In SQL mode it can't fall back to rowid, so we surface it here. */}
+          <div className="space-y-1">
+            <Label htmlFor="sqlite-id-col-sql" className="text-xs text-muted-foreground">
+              ID column <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="sqlite-id-col-sql"
+              value={idColumn}
+              onChange={(e) => setIdColumn(e.target.value)}
+              placeholder="id"
+              className="h-8 text-xs font-mono"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              Must be one of the columns returned by the query.
+              Alias one in your SELECT if you don't have a natural unique key.
+            </p>
+          </div>
+        </>
+      )}
 
       {/* Collection — picker (existing or new) */}
       <div className="space-y-1">
@@ -409,16 +490,18 @@ export function SQLiteTab() {
                 className="h-8 text-xs"
               />
             </div>
-            <div className="w-24 space-y-1">
-              <Label htmlFor="sqlite-id-col" className="text-xs">ID column</Label>
-              <Input
-                id="sqlite-id-col"
-                value={idColumn}
-                onChange={(e) => setIdColumn(e.target.value)}
-                placeholder="id"
-                className="h-8 text-xs"
-              />
-            </div>
+            {sourceMode === "table" && (
+              <div className="w-24 space-y-1">
+                <Label htmlFor="sqlite-id-col" className="text-xs">ID column</Label>
+                <Input
+                  id="sqlite-id-col"
+                  value={idColumn}
+                  onChange={(e) => setIdColumn(e.target.value)}
+                  placeholder="id"
+                  className="h-8 text-xs"
+                />
+              </div>
+            )}
           </div>
           <div className="space-y-1">
             <Label htmlFor="sqlite-template" className="text-xs">Row template (optional)</Label>

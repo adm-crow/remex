@@ -134,7 +134,12 @@ def _answer_anthropic(
             system=system,
             messages=[{"role": "user", "content": question}],
         )
-    except Exception as e:
+    except anthropic.APIStatusError as e:
+        # Surface the upstream HTTP status so the route can return e.g. 401/429
+        # instead of an opaque 500. The message also includes the provider's
+        # own error body, which is the most useful thing for the user.
+        raise RuntimeError(f"Anthropic API error ({e.status_code}): {e.message}") from e
+    except anthropic.APIError as e:
         raise RuntimeError(f"Anthropic API error: {e}") from e
     text_block = next((b for b in response.content if isinstance(b, TextBlock)), None)
     if text_block is None:
@@ -163,7 +168,11 @@ def _answer_openai(
                 {"role": "user", "content": question},
             ],
         )
-    except Exception as e:
+    except openai.APIStatusError as e:
+        # As with Anthropic: keep the status code in the message so the route
+        # can map it to a sensible HTTP response instead of a generic 500.
+        raise RuntimeError(f"OpenAI API error ({e.status_code}): {e.message}") from e
+    except openai.APIError as e:
         raise RuntimeError(f"OpenAI API error: {e}") from e
     return response.choices[0].message.content or ""
 
@@ -205,7 +214,6 @@ def _custom_request(
     header_name: str,
     header_prefix: str,
     body: Optional[bytes] = None,
-    timeout: float = 60.0,
 ) -> urllib.request.Request:
     """Build a Request object with the custom-provider auth header attached."""
     headers: dict[str, str] = {"Accept": "application/json"}

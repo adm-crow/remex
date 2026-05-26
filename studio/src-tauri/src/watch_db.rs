@@ -30,7 +30,8 @@ impl Default for WatchDbState {
 #[derive(Clone, Serialize)]
 pub struct DbChangedEvent {
     /// Absolute path to the .sqlite file the user registered (NOT a WAL/SHM sibling).
-    #[serde(rename = "dbPath")]
+    /// Field name kept snake_case to match the `watch:changed` event (which uses
+    /// `folder`/`paths`) and the rest of the HTTP wire format.
     pub db_path: String,
 }
 

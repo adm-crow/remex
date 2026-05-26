@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,13 @@ export function RenameCollectionDialog({
   open, currentName, onClose, onRename, isLoading, error,
 }: RenameCollectionDialogProps) {
   const [value, setValue] = useState(currentName);
+
+  // Dialog is rendered unconditionally in SourcesPane (one instance per card),
+  // so the input state must reset when the user opens it on a different
+  // collection — otherwise the previous name lingers.
+  useEffect(() => {
+    if (open) setValue(currentName);
+  }, [open, currentName]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

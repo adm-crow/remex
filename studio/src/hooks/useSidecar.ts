@@ -31,8 +31,13 @@ export function useSidecar() {
   const setSetupError = useAppStore((s) => s.setSetupError);
   const appendSetupLog = useAppStore((s) => s.appendSetupLog);
   const clearSetupLog = useAppStore((s) => s.clearSetupLog);
+  const setExtrasInstalling    = useAppStore((s) => s.setExtrasInstalling);
+  const appendExtrasInstallLog = useAppStore((s) => s.appendExtrasInstallLog);
+  const clearExtrasInstallLog  = useAppStore((s) => s.clearExtrasInstallLog);
+  const setExtrasInstallError  = useAppStore((s) => s.setExtrasInstallError);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const didSpawnRef = useRef(false);
+  const extrasFiredForSeqRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +72,26 @@ export function useSidecar() {
       listen<{ message: string }>("setup://log", (event) => {
         if (!cancelled) appendSetupLog(event.payload.message);
       }),
+      // Background extras install — fires AFTER the sidecar is healthy.
+      listen("extras://started", () => {
+        if (!cancelled) {
+          clearExtrasInstallLog();
+          setExtrasInstallError(null);
+          setExtrasInstalling(true);
+        }
+      }),
+      listen<{ message: string }>("extras://log", (event) => {
+        if (!cancelled) appendExtrasInstallLog(event.payload.message);
+      }),
+      listen("extras://done", () => {
+        if (!cancelled) setExtrasInstalling(false);
+      }),
+      listen<{ message: string }>("extras://error", (event) => {
+        if (!cancelled) {
+          setExtrasInstallError(event.payload.message);
+          setExtrasInstalling(false);
+        }
+      }),
     ]);
 
     async function spawnAndPoll() {
@@ -74,7 +99,7 @@ export function useSidecar() {
       // even if the effect is cancelled while spawn_sidecar is in-flight.
       didSpawnRef.current = true;
       try {
-        await invoke("spawn_sidecar", { host, port, extras: setupExtras });
+        await invoke("spawn_sidecar", { host, port });
       } catch (err) {
         didSpawnRef.current = false;
         console.error("[useSidecar] spawn_sidecar failed:", err);
@@ -108,7 +133,13 @@ export function useSidecar() {
           }
           if (await checkHealth()) {
             clearInterval(timerId);
-            if (!cancelled) setSidecarStatus("connected");
+            if (!cancelled) {
+              setSidecarStatus("connected");
+              // Phase 2: kick off the background extras install. Tracked by
+              // `extrasFiredForSeqRef` so we don't fire it twice if the
+              // sidecar transitions connected → reconnecting → connected.
+              maybeFireExtrasInstall();
+            }
           }
         } finally {
           pollInFlight = false;
@@ -117,11 +148,27 @@ export function useSidecar() {
       intervalRef.current = timerId;
     }
 
+    function maybeFireExtrasInstall() {
+      if (extrasFiredForSeqRef.current === reconnectSeq) return;
+      extrasFiredForSeqRef.current = reconnectSeq;
+      if (!setupExtras || setupExtras.length === 0) return;
+      // Backend is a no-op if everything is already installed, so it's safe
+      // to invoke on every connect.
+      invoke("install_extras", { extras: setupExtras }).catch((err) => {
+        console.error("[useSidecar] install_extras failed:", err);
+      });
+    }
+
     async function start() {
       setSidecarStatus("starting");
 
       if (await checkHealth()) {
-        if (!cancelled) setSidecarStatus("connected");
+        if (!cancelled) {
+          setSidecarStatus("connected");
+          // Sidecar was already up — still need to ensure the user's chosen
+          // extras are present (they may have just toggled one in Settings).
+          maybeFireExtrasInstall();
+        }
         return;
       }
       if (cancelled) return;
@@ -131,7 +178,7 @@ export function useSidecar() {
       // from SetupScreen rather than spawning automatically.
       let needsSetup = false;
       try {
-        needsSetup = await invoke<boolean>("check_needs_setup", { extras: setupExtras });
+        needsSetup = await invoke<boolean>("check_needs_setup");
       } catch {
         needsSetup = false;
       }
@@ -156,5 +203,10 @@ export function useSidecar() {
         invoke("kill_sidecar").catch(() => {});
       }
     };
-  }, [apiUrl, reconnectSeq, setupExtras, setSidecarStatus, setSidecarError, setSetupProgress, setSetupError, appendSetupLog, clearSetupLog]);
+  }, [
+    apiUrl, reconnectSeq, setupExtras,
+    setSidecarStatus, setSidecarError, setSetupProgress, setSetupError,
+    appendSetupLog, clearSetupLog,
+    setExtrasInstalling, appendExtrasInstallLog, clearExtrasInstallLog, setExtrasInstallError,
+  ]);
 }

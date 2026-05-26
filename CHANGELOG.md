@@ -8,6 +8,130 @@ All notable changes to `remex` are documented here.
 
 ---
 
+## [2.0.0] — 2026-05-26
+
+> **Remex is now fully free, fully open-source, and locally-managed by default.**
+> The 1.x line shipped a Pro tier with paid feature flags and an opaque license
+> system. 2.0 removes that entirely: every feature ships in the box, the
+> licensing scaffolding is gone, and the codebase has been re-audited end-to-end.
+
+### Added
+- **OS keyring storage for API keys** — built-in and custom-provider keys are now
+  persisted in Windows Credential Manager / macOS Keychain / libsecret via the
+  `keyring` crate. Set once, kept across launches. New Rust commands
+  `keyring_get` / `keyring_set` / `keyring_delete`, TS wrapper
+  `studio/src/lib/secrets.ts`, write-through setters in the Zustand store, and
+  a `hydrateApiKeys()` action that runs on AppShell mount.
+- **SQL-query mode for SQLite ingest** — the SQLite tab gains a Source toggle:
+  pick a single table (existing) or paste an arbitrary `SELECT` / `WITH`
+  statement. Enables multi-table JOINs (e.g. enrich an `albums` row with the
+  artist's name from `artists`), computed columns, and union queries. The
+  same mode is available in Settings → Auto-ingest so watched databases can
+  re-ingest a JOIN incrementally.
+- **Low-confidence answer banner** — when no result hits
+  `score >= HIGH_CONFIDENCE_THRESHOLD` (`0.70`), the Query pane shows an amber
+  "No clear match — showing the closest results (best score X)" hint above the
+  results. Search still returns whatever passed `min_score`.
+- **Per-project Query defaults** — `nResults` and `minScore` are now stored
+  per-project alongside the existing chunk/overlap/mode/embedding defaults.
+  Switching projects re-seeds the Query gear popover; changes there persist
+  back to the project store.
+- **Settings re-organised into 5 tabs** — `General`, `Personalization`,
+  `AI & Server`, `Auto-ingest`, `References`. AI Manage is a sub-picker
+  (Personas · Custom providers · Embedding presets) so only one editor is
+  visible at a time. Status header per tab summarises the configured state.
+- **Vertical tab rail** in Settings replaces the top tab bar, footer collapses
+  to a single `⋯` overflow menu (Welcome guide, Shortcuts, Report a bug,
+  Updates).
+- **Sources pane** — collection action buttons fold into a `⋮` dropdown menu;
+  stats render as a single dot-separated line for density.
+- **Query pane** — merged history + collection chip row, Source filter and
+  search options live in popovers (`Sources [N]` and `⚙ {N}`), 2-column
+  results grid on wide screens.
+- **Brand assets** — three provider logos (`/claude.svg`, `/openai.svg`,
+  `/ollama.svg`) shipped in `studio/public/` and used wherever providers are
+  surfaced.
+- **`SoftAlert`, `SegmentedControl`, `Popover`, `DropdownMenu`** UI primitives
+  extracted to `studio/src/components/ui/`.
+- **Tagline**: "Stop searching. Start asking. — Local-first AI for the
+  documents you already have."
+
+### Changed
+- **Remex is fully free.** The Pro tier, license-key checking, and all paid
+  feature flags are removed. Every previously paid feature ships enabled.
+- **Tagline + homepage cards** updated — the homepage feature pills now lead
+  with `Ingest · Search · AI Answer · Private` (replacing the previous
+  Collections card with the privacy-positioning Private card).
+- **README rewritten** with a Privacy & data flow section that makes the
+  local-first vs AI-call boundary explicit, plus an architecture diagram and
+  updated screenshots.
+- **`__version__` reads from package metadata** instead of being a hard-coded
+  string that could drift from `pyproject.toml`.
+
+### Fixed
+- **Non-streaming `/ingest/sqlite` route now forwards `sql_query`** — previously
+  it called `ingest_sqlite()` without passing it, so any non-streaming SQL-mode
+  request errored at the validator. Only the `/stream` variant worked.
+- **`spawn_sidecar` arg mismatch** — the SetupScreen sent an unknown `extras`
+  argument that the Rust handler didn't accept; extras now go through the
+  existing `install_extras` post-spawn path only.
+- **Settings → AI Agent form fields now re-sync** when `apiUrl` or `setupExtras`
+  change externally (matching the existing `aiModel`/`aiApiKey` behaviour).
+- **`useChat` / `useMultiChat` cache keys** include `base_url` / `header_name` /
+  `header_prefix` so switching between custom providers with the same model
+  name no longer returns the previous provider's cached answer.
+- **`RenameCollectionDialog` resets** on `open` / `currentName` change so
+  renaming a different collection doesn't show the previous name.
+- **Watch-DB wizard** now captures `idColumn` / `columns` / `rowTemplate`; the
+  AppShell auto-ingest handler reads them so an automated re-ingest matches
+  what was originally configured.
+- **Source filter scoped to single-collection queries** — applying a
+  per-collection source filter across a multi-collection query was silently
+  zero-ing out the other collections. The Sources popover is hidden in
+  multi-collection mode.
+- **Settings footer kept blocking the main thread** on `kill_sidecar`; now
+  runs `kill()+wait()` on a `spawn_blocking` thread.
+- **Incremental SQLite N+1** — prefetch chunk-0 metadata once instead of
+  per-row `collection.get`; large incremental re-ingests are now O(1) per
+  unchanged row.
+- **`SELECT COUNT(*)` SQL wrapper** uses a subquery-with-alias form so
+  user-supplied queries ending with `ORDER BY`/`LIMIT` or starting with
+  `WITH` are wrapped portably.
+- **`n_chunks` int coercion guard** — pre-2.0 chunks missing this field no
+  longer throw on incremental re-ingest; falls back to `1` and runs the
+  orphan-cleanup path.
+- **`_unhandled_exception_handler` passes `HTTPException` through** to
+  FastAPI's normal 4xx handler instead of masking validation errors as 500.
+- **PDF extractor closes its file handle** deterministically via `with open()`
+  so subsequent purge/rename operations don't hit `WinError 32` on Windows.
+- **AI provider exceptions preserve status codes** — `APIStatusError` from
+  Anthropic / OpenAI is now caught separately and the upstream status code
+  (401, 429, …) is included in the message.
+- **Sidecar stdout** is now redirected to the log file alongside stderr —
+  prevents OS pipe-buffer fill from blocking the Python interpreter under
+  chatty logging.
+- **`watch:db:changed` event payload** uses `db_path` (snake_case) to match
+  `watch:changed`'s `folder`/`paths` and the rest of the wire format.
+
+### Removed
+- **Pro tier and license-key infrastructure** — `SynapseError` remains as a
+  backward-compat alias for users who pinned to the old name.
+- **`warmup(model_name)`** — unused helper; `warmup_collections` is the public
+  surface.
+- **Dead `IngestProgressEvent` Pydantic class** — the SSE emitter hand-rolls
+  the dict; the unused schema would have silently drifted.
+- **Dead `setup://done` Tauri event** — never had a listener on the frontend.
+
+### Security
+- **API keys never persist to plaintext localStorage.** Both the built-in
+  `aiApiKey` and the custom-provider key map are stored in the OS keyring,
+  with the in-memory store acting as a session cache only.
+- **`db_path` validators unified** between the Pydantic Request bodies and
+  the query-string handler — the `"./remex_db"` sentinel is accepted by both
+  paths (previously a `GET` rejected what a `POST` body would accept).
+
+---
+
 ## [1.5.3] — 2026-05-21
 
 ### Changed

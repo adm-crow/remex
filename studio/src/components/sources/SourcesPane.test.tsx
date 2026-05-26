@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { SourcesPane } from "./SourcesPane";
 import { useAppStore } from "@/store/app";
@@ -157,8 +158,10 @@ describe("SourcesPane", () => {
   });
 
   it("clicking collection delete button opens confirmation dialog", async () => {
+    const user = userEvent.setup();
     renderWithProviders(<SourcesPane />);
-    fireEvent.click(screen.getByRole("button", { name: /delete collection myCol/i }));
+    await user.click(screen.getByRole("button", { name: /actions for myCol/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /^delete$/i }));
     await waitFor(() => {
       expect(screen.getByRole("dialog")).toBeInTheDocument();
       expect(screen.getByText(/delete collection/i)).toBeInTheDocument();
@@ -166,8 +169,10 @@ describe("SourcesPane", () => {
   });
 
   it("confirming collection delete calls mutateAsync and clears currentCollection", async () => {
+    const user = userEvent.setup();
     renderWithProviders(<SourcesPane />);
-    fireEvent.click(screen.getByRole("button", { name: /delete collection myCol/i }));
+    await user.click(screen.getByRole("button", { name: /actions for myCol/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /^delete$/i }));
     await waitFor(() => screen.getByRole("dialog"));
     fireEvent.click(screen.getByRole("button", { name: /^delete$/i }));
     await waitFor(() => {
@@ -177,8 +182,10 @@ describe("SourcesPane", () => {
   });
 
   it("purge button calls mutateAsync and shows result", async () => {
+    const user = userEvent.setup();
     renderWithProviders(<SourcesPane />);
-    fireEvent.click(screen.getByTitle(/purge stale chunks/i));
+    await user.click(screen.getByRole("button", { name: /actions for myCol/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /purge stale chunks/i }));
     await waitFor(() => {
       expect(mockPurgeMutate).toHaveBeenCalled();
       expect(screen.getByText(/purged 1 \/ 5 chunks/i)).toBeInTheDocument();

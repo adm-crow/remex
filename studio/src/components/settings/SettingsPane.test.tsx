@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { SettingsPane } from "./SettingsPane";
 import { useAppStore } from "@/store/app";
@@ -58,17 +59,21 @@ describe("SettingsPane", () => {
     });
   });
 
-  it("footer Welcome guide button resets onboarding", async () => {
+  it("footer Welcome guide menu item resets onboarding", async () => {
+    const user = userEvent.setup();
     useAppStore.setState({ onboardingDone: true } as any);
     renderWithProviders(<SettingsPane />);
-    fireEvent.click(screen.getByRole("button", { name: /show welcome guide/i }));
+    await user.click(screen.getByRole("button", { name: /more actions/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /show welcome guide/i }));
     expect(useAppStore.getState().onboardingDone).toBe(false);
     await waitFor(() => {});
   });
 
-  it("footer Shortcuts button opens the shortcuts modal", async () => {
+  it("footer Shortcuts menu item opens the shortcuts modal", async () => {
+    const user = userEvent.setup();
     renderWithProviders(<SettingsPane />);
-    fireEvent.click(screen.getByRole("button", { name: /keyboard shortcuts/i }));
+    await user.click(screen.getByRole("button", { name: /more actions/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /keyboard shortcuts/i }));
     expect(useAppStore.getState().shortcutsOpen).toBe(true);
     await waitFor(() => {});
   });
@@ -81,6 +86,7 @@ describe("SettingsPane — theme selection", () => {
 
   it("clicking any theme sets it on the store", async () => {
     renderWithProviders(<SettingsPane />);
+    fireEvent.click(screen.getByRole("button", { name: /personalization/i }));
     fireEvent.click(screen.getByLabelText("Midnight"));
     expect(useAppStore.getState().theme).toBe("midnight");
     await waitFor(() => {}); // drain async queue (getVersion useEffect)

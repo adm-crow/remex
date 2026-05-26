@@ -30,6 +30,7 @@ import { useCollections, useCollectionStats } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { formatDuration } from "@/lib/formatDuration";
 import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { STATUS_VARIANT } from "./ingestShared";
 
 export function FilesTab() {
@@ -364,27 +365,16 @@ export function FilesTab() {
             </div>
             <div className="flex items-center gap-1.5">
               <Label className="text-xs whitespace-nowrap">Mode</Label>
-              <div className="flex rounded-md border overflow-hidden text-xs">
-                {([
+              <SegmentedControl
+                value={chunking}
+                onChange={setChunking}
+                ariaLabel="Chunking mode"
+                options={[
                   { value: "recursive", label: "Recursive" },
                   { value: "sentence",  label: "Sentence"  },
                   { value: "word",      label: "Word"      },
-                ] as const).map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setChunking(value)}
-                    className={cn(
-                      "px-2.5 py-1 transition-colors",
-                      chunking === value
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+                ] as const}
+              />
             </div>
           </div>
 

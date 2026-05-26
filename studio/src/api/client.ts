@@ -52,7 +52,17 @@ export interface MultiChatResponse {
   collections: string[];
 }
 
-export interface QueryRequest {
+/**
+ * Fields injected by the API helper functions from the route's path/query.
+ * Listed here so request types accurately mirror the Pydantic schemas — the
+ * helper functions still inject these at the call site, but TS callers can
+ * now see they exist.
+ */
+export interface DbPathScoped {
+  db_path?: string;
+}
+
+export interface QueryRequest extends DbPathScoped {
   text: string;
   n_results?: number;
   embedding_model?: string;
@@ -75,7 +85,7 @@ export interface TestCustomProviderResponse {
   models: string[];
 }
 
-export interface IngestRequest {
+export interface IngestRequest extends DbPathScoped {
   source_dir: string;
   embedding_model?: string;
   chunk_size?: number;
@@ -103,9 +113,12 @@ export interface SourceItem {
   chunk_count: number;
 }
 
-export interface IngestSQLiteRequest {
+export interface IngestSQLiteRequest extends DbPathScoped {
   sqlite_path: string;
-  table: string;
+  /** Exactly one of `table` or `sql_query` must be set. */
+  table?: string;
+  /** Arbitrary SELECT/WITH statement — enables JOINs and computed columns. */
+  sql_query?: string;
   embedding_model?: string;
   chunk_size?: number;
   overlap?: number;
@@ -489,7 +502,15 @@ export const api = {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(req),
+        // Drop empty header_name / header_prefix so the Python defaults
+        // ("Authorization" / "Bearer ") apply. An empty string here would
+        // override the default and produce a broken auth header.
+        body: JSON.stringify({
+          base_url: req.base_url,
+          api_key: req.api_key || undefined,
+          header_name: req.header_name?.trim() ? req.header_name : undefined,
+          header_prefix: req.header_prefix && req.header_prefix.length > 0 ? req.header_prefix : undefined,
+        }),
       }
     ),
 

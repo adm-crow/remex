@@ -86,7 +86,11 @@ class IngestRequest(BaseModel):
 
 class IngestSQLiteRequest(BaseModel):
     sqlite_path: str
-    table: str = Field(max_length=256)
+    # Exactly one of `table` or `sql_query` must be set. `table` is the
+    # simple single-table mode; `sql_query` allows arbitrary SELECT/WITH
+    # statements (e.g. JOINs across multiple tables, computed columns).
+    table: Optional[str] = Field(default=None, max_length=256)
+    sql_query: Optional[str] = Field(default=None, max_length=16384)
     db_path: DbPath = "./remex_db"
     columns: Optional[list[str]] = None
     id_column: str = Field(default="id", max_length=256)
@@ -99,6 +103,16 @@ class IngestSQLiteRequest(BaseModel):
     incremental: bool = False
 
     _check_overlap = model_validator(mode="after")(_validate_overlap)
+
+    @model_validator(mode="after")
+    def _exactly_one_source(self):
+        if (self.table is None) == (self.sql_query is None):
+            raise ValueError("provide exactly one of `table` or `sql_query`")
+        if self.sql_query is not None:
+            head = self.sql_query.lstrip().split(None, 1)[0].upper() if self.sql_query.strip() else ""
+            if head not in ("SELECT", "WITH"):
+                raise ValueError("sql_query must be a SELECT (or WITH ... SELECT) statement")
+        return self
 
     @field_validator("sqlite_path")
     @classmethod
@@ -117,13 +131,10 @@ class QueryRequest(BaseModel):
     min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 
-class ChatRequest(BaseModel):
-    text: str = _TEXT_FIELD
-    db_path: DbPath = "./remex_db"
-    n_results: int = Field(default=5, ge=1, le=500)
-    embedding_model: str = _EMBEDDING_MODEL_FIELD
-    where: WhereFilter = None
-    min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+class ChatRequest(QueryRequest):
+    """Single-collection AI answer. Inherits text/db_path/n_results/where/min_score
+    from QueryRequest and adds provider/model/credentials so the response is
+    synthesised by an LLM rather than returned raw."""
     provider: Optional[str] = None
     model: Optional[str] = None
     api_key: Optional[str] = _API_KEY_FIELD
@@ -158,14 +169,6 @@ class IngestResultResponse(BaseModel):
     skipped_reasons: list[str]
 
 
-class IngestProgressEvent(BaseModel):
-    filename: str
-    files_done: int
-    files_total: int
-    status: Literal["ingested", "skipped", "error"]
-    chunks_stored: int
-
-
 class QueryResultItem(BaseModel):
     text: str
     source: str
@@ -185,22 +188,10 @@ class ChatResponse(BaseModel):
     model: str
 
 
-class MultiChatRequest(BaseModel):
-    text: str = _TEXT_FIELD
+class MultiChatRequest(ChatRequest):
+    """Same as ChatRequest but spans an explicit list of collections instead of
+    the single one in the URL."""
     collections: list[str]
-    db_path: DbPath = "./remex_db"
-    n_results: int = Field(default=5, ge=1, le=500)
-    embedding_model: str = _EMBEDDING_MODEL_FIELD
-    where: WhereFilter = None
-    min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    provider: Optional[str] = None
-    model: Optional[str] = None
-    api_key: Optional[str] = _API_KEY_FIELD
-    system_prompt: Optional[str] = Field(default=None, max_length=32768)
-    # Custom-provider config — only consulted when provider == "custom"
-    base_url:      Optional[str] = Field(default=None, max_length=1024)
-    header_name:   Optional[str] = Field(default=None, max_length=128)
-    header_prefix: Optional[str] = Field(default=None, max_length=64)
 
 
 class TestCustomProviderRequest(BaseModel):

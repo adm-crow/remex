@@ -7,7 +7,7 @@ from .chunker import chunk_text
 from .exceptions import SourceNotFoundError, TableNotFoundError
 from .logger import logger
 from .models import IngestProgress, IngestResult
-from .pipeline import _get_collection
+from .pipeline import _get_collection, _stable_id
 
 
 def _row_to_text(row: dict, template: Optional[str]) -> str:
@@ -25,15 +25,19 @@ def _row_to_text(row: dict, template: Optional[str]) -> str:
     )
 
 
-def _make_sqlite_id(db_path: str, table: str, row_id: Any, chunk_index: int) -> str:
-    """Stable unique ID: hash of db path + table + row pk + chunk index."""
-    key = f"sqlite::{Path(db_path).resolve()}::{table}::{row_id}::{chunk_index}"
-    return hashlib.md5(key.encode(), usedforsecurity=False).hexdigest()
+def _make_sqlite_id(db_path: str, namespace: str, row_id: Any, chunk_index: int) -> str:
+    """Stable unique ID: hash of db path + namespace + row pk + chunk index.
+
+    `namespace` is the table name (table mode) or ``sql:<hash>`` (custom-SQL mode)
+    so the same query/table re-ingests to the same IDs across runs.
+    """
+    return _stable_id("sqlite", Path(db_path).resolve(), namespace, row_id, chunk_index)
 
 
 def ingest_sqlite(
     db_path: str,
-    table: str,
+    table: Optional[str] = None,
+    sql_query: Optional[str] = None,
     columns: Optional[List[str]] = None,
     id_column: str = "id",
     row_template: Optional[str] = None,
@@ -76,48 +80,112 @@ def ingest_sqlite(
     if not Path(db_path).exists():
         raise SourceNotFoundError(f"SQLite database not found: {db_path}")
 
+    # Exactly one of table / sql_query.
+    if (table is None) == (sql_query is None):
+        raise ValueError("provide exactly one of `table` or `sql_query`")
+
+    # `namespace_label` is used as the second component of the stable chunk ID
+    # and as the suffix of the `source` metadata. In SQL mode we hash the query
+    # so re-running the same query re-ingests to the same IDs (incremental works).
+    if sql_query is not None:
+        head = sql_query.lstrip().split(None, 1)[0].upper() if sql_query.strip() else ""
+        if head not in ("SELECT", "WITH"):
+            raise ValueError("sql_query must be a SELECT (or WITH ... SELECT) statement")
+        sql_hash = hashlib.md5(sql_query.encode(), usedforsecurity=False).hexdigest()[:12]
+        namespace_label = f"sql:{sql_hash}"
+        display_name = namespace_label
+    else:
+        namespace_label = table  # type: ignore[assignment]
+        display_name = table  # type: ignore[assignment]
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         cursor = conn.cursor()
 
-        # Validate table exists
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
-        )
-        if not cursor.fetchone():
-            raise TableNotFoundError(f"Table '{table}' not found in {db_path}")
+        if sql_query is not None:
+            # SQL-query mode — execute the user's SELECT, derive columns from
+            # cursor.description, and validate id_column against the result set.
+            #
+            # Both the COUNT and the streaming SELECT run on the same connection
+            # inside an implicit read transaction, so they observe a consistent
+            # snapshot (sqlite3 default behaviour). The CTE wrapper handles SQL
+            # that ends with ORDER BY/LIMIT — using a subquery alias rather than
+            # bare `FROM (...)` is also more portable.
+            try:
+                count_cur = conn.cursor()
+                stripped = sql_query.strip().rstrip(";").strip()
+                # Subquery-with-alias form works for any SELECT, including SQL
+                # that ends with ORDER BY/LIMIT or starts with a WITH clause.
+                count_cur.execute(
+                    f"SELECT COUNT(*) FROM ({stripped}) AS _remex_src"
+                )
+                row_count = count_cur.fetchone()[0]
+                cursor.execute(sql_query)
+            except sqlite3.Error as e:
+                conn.close()
+                raise ValueError(f"sql_query failed: {e}")
 
-        # Validate and resolve columns against actual schema.
-        # Double-quote escaping handles table/column names that contain `"`.
-        safe_table = table.replace('"', '""')
-        cursor.execute(f'PRAGMA table_info("{safe_table}")')
-        available = [row["name"] for row in cursor.fetchall()]
+            available = [d[0] for d in (cursor.description or [])]
+            if not available:
+                conn.close()
+                raise ValueError("sql_query returned no columns")
+            if id_column not in available:
+                conn.close()
+                raise ValueError(
+                    f"id_column '{id_column}' not in result columns {available}. "
+                    f"Add it to your SELECT or alias one of them AS {id_column}."
+                )
+            if columns:
+                invalid = [c for c in columns if c not in available]
+                if invalid:
+                    conn.close()
+                    raise ValueError(
+                        f"Columns not in result set: {invalid}. Available: {available}"
+                    )
+                selected = columns
+            else:
+                selected = available
+            use_rowid = False
 
-        if columns:
-            invalid = [c for c in columns if c not in available]
-            if invalid:
-                raise ValueError(f"Columns not found in '{table}': {invalid}")
-            selected = columns
         else:
-            selected = available
+            # Table mode — original code path.
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            )
+            if not cursor.fetchone():
+                raise TableNotFoundError(f"Table '{table}' not found in {db_path}")
 
-        # Fall back to SQLite rowid if id_column is absent.
-        # Alias as _remex_rowid so the name is stable even when the table has
-        # an INTEGER PRIMARY KEY column (which SQLite silently aliases to rowid,
-        # causing the cursor description to use the column's declared name instead).
-        use_rowid = id_column not in available
-        col_list = ", ".join(f'"{c.replace(chr(34), chr(34)*2)}"' for c in selected)
+            # Validate and resolve columns against actual schema.
+            # Double-quote escaping handles table/column names that contain `"`.
+            safe_table = table.replace('"', '""')  # type: ignore[union-attr]
+            cursor.execute(f'PRAGMA table_info("{safe_table}")')
+            available = [row["name"] for row in cursor.fetchall()]
 
-        # COUNT(*) first so we can report sources_found without loading all rows.
-        count_cur = conn.cursor()
-        count_cur.execute(f'SELECT COUNT(*) FROM "{safe_table}"')
-        row_count: int = count_cur.fetchone()[0]
+            if columns:
+                invalid = [c for c in columns if c not in available]
+                if invalid:
+                    raise ValueError(f"Columns not found in '{table}': {invalid}")
+                selected = columns
+            else:
+                selected = available
 
-        if use_rowid:
-            cursor.execute(f'SELECT rowid AS _remex_rowid, {col_list} FROM "{safe_table}"')
-        else:
-            cursor.execute(f'SELECT {col_list} FROM "{safe_table}"')
+            # Fall back to SQLite rowid if id_column is absent.
+            # Alias as _remex_rowid so the name is stable even when the table has
+            # an INTEGER PRIMARY KEY column (which SQLite silently aliases to rowid,
+            # causing the cursor description to use the column's declared name instead).
+            use_rowid = id_column not in available
+            col_list = ", ".join(f'"{c.replace(chr(34), chr(34)*2)}"' for c in selected)
+
+            # COUNT(*) first so we can report sources_found without loading all rows.
+            count_cur = conn.cursor()
+            count_cur.execute(f'SELECT COUNT(*) FROM "{safe_table}"')
+            row_count = count_cur.fetchone()[0]
+
+            if use_rowid:
+                cursor.execute(f'SELECT rowid AS _remex_rowid, {col_list} FROM "{safe_table}"')
+            else:
+                cursor.execute(f'SELECT {col_list} FROM "{safe_table}"')
 
     except Exception:
         conn.close()
@@ -128,7 +196,7 @@ def ingest_sqlite(
     if row_count == 0:
         conn.close()
         if verbose:
-            logger.info("No records found in %s::%s", db_path, table)
+            logger.info("No records found in %s::%s", db_path, display_name)
         return result
 
     # Validate row_template against the column schema before processing any rows.
@@ -143,7 +211,29 @@ def ingest_sqlite(
         raise
 
     if verbose:
-        logger.info("Ingesting: %s (%d records)", table, row_count)
+        logger.info("Ingesting: %s (%d records)", display_name, row_count)
+
+    source_str = f"{Path(db_path).resolve()}::{namespace_label}"
+
+    # Prefetch chunk-0 metadata indexed by row_id so incremental mode is O(1)
+    # per row instead of round-tripping ChromaDB for every existing row.
+    # A single broad `get(where=…)` collects everything for this source.
+    existing_by_row: dict[str, dict[str, Any]] = {}
+    if incremental:
+        try:
+            prefetch = collection.get(
+                where={"$and": [{"source": source_str}, {"chunk": 0}]},
+                include=["metadatas"],
+            )
+            for meta in (prefetch.get("metadatas") or []):
+                rid = meta.get("row_id") if isinstance(meta, dict) else None
+                if rid is not None:
+                    existing_by_row[str(rid)] = meta
+        except Exception as e:
+            # Prefetch is an optimisation; fall back to per-row checks on error.
+            if verbose:
+                logger.debug("incremental prefetch failed (%s); falling back per-row", e)
+            existing_by_row = {}
 
     try:
         for rows_done, row in enumerate(cursor, 1):
@@ -173,28 +263,31 @@ def ingest_sqlite(
                     _skip_reason = "empty_text"
                     result.sources_skipped += 1
                     if verbose:
-                        logger.debug("[skip] %s[%s]: no content columns populated", table, row_id)
+                        logger.debug("[skip] %s[%s]: no content columns populated", display_name, row_id)
                     continue
                 text = _row_to_text(text_dict, row_template)
-                source_str = f"{Path(db_path).resolve()}::{table}"
                 row_hash = hashlib.sha256(text.encode(), usedforsecurity=False).hexdigest()[:16]
 
                 if incremental:
-                    check_id = _make_sqlite_id(db_path, table, row_id, 0)
-                    existing = collection.get(ids=[check_id], include=["metadatas"])
-                    if existing["ids"]:
-                        if existing["metadatas"][0].get("row_hash") == row_hash:
+                    prior_meta = existing_by_row.get(str(row_id))
+                    if prior_meta is not None:
+                        if prior_meta.get("row_hash") == row_hash:
                             _skip_reason = "hash_match"
                             result.sources_skipped += 1
                             continue
-                        # Hash changed — delete all old chunks.
-                        # Use n_chunks for the fast path; fall back to a metadata
-                        # query to catch any orphaned chunks from a partial ingest
-                        # where n_chunks was not written or is stale.
-                        n_old = int(existing["metadatas"][0].get("n_chunks", 1))
-                        predicted_ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(n_old)]
+                        # Hash changed — delete all old chunks. Use n_chunks
+                        # for the fast path; coerce defensively because rows
+                        # ingested before n_chunks existed may not have it.
+                        try:
+                            n_old = int(prior_meta.get("n_chunks", 1))
+                        except (TypeError, ValueError):
+                            n_old = 1
+                        predicted_ids = [
+                            _make_sqlite_id(db_path, namespace_label, row_id, i)
+                            for i in range(n_old)
+                        ]
                         collection.delete(ids=predicted_ids)
-                        # Clean up any extras beyond n_chunks (partial-ingest orphans)
+                        # Clean up any extras beyond n_chunks (partial-ingest orphans).
                         orphan_check = collection.get(
                             where={"$and": [{"source": source_str}, {"row_id": str(row_id)}]},
                             include=[],
@@ -221,7 +314,7 @@ def ingest_sqlite(
                         result.sources_skipped += 1
                         continue
 
-                ids = [_make_sqlite_id(db_path, table, row_id, i) for i in range(len(chunks))]
+                ids = [_make_sqlite_id(db_path, namespace_label, row_id, i) for i in range(len(chunks))]
                 metadatas = [
                     {
                         "source_type": "sqlite",
@@ -243,17 +336,17 @@ def ingest_sqlite(
                 raise
             except Exception as e:
                 if verbose:
-                    logger.warning("[skip] %s[%s]: %s", table, row_id, e)
+                    logger.warning("[skip] %s[%s]: %s", display_name, row_id, e)
                 result.sources_skipped += 1
-                result.add_skip_reason(f"{table}[{row_id}]: extract_error: {e}")
+                result.add_skip_reason(f"{display_name}[{row_id}]: extract_error: {e}")
                 _status = "error"
 
             finally:
                 if _skip_reason:
-                    result.add_skip_reason(f"{table}[{row_id}]: {_skip_reason}")
+                    result.add_skip_reason(f"{display_name}[{row_id}]: {_skip_reason}")
                 if on_progress:
                     on_progress(IngestProgress(
-                        filename=f"{table}[{row_id}]",
+                        filename=f"{display_name}[{row_id}]",
                         files_done=rows_done,
                         files_total=row_count,
                         status=_status,  # type: ignore[arg-type]

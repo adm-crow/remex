@@ -3,11 +3,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "@/store/app";
 import { parseUrl } from "@/hooks/useSidecar";
 
+// Only `STEPS.length` is read by the SetupScreen — the names are documentation
+// for what each index emits. The live label comes from the `step` field on the
+// `setup://progress` event, so renaming here doesn't change UI text directly.
 const STEPS = [
   "Preparing installer",
   "Installing Python 3.13",
   "Installing remex-cli",
-  "Finalising",
+  "Starting sidecar",
 ];
 
 const EXTRAS_OPTIONS = [
@@ -96,12 +99,14 @@ export function SetupScreen() {
     setInstalling(true);
     const { host, port } = parseUrl(apiUrl);
     try {
-      await invoke("spawn_sidecar", { host, port, extras: selectedExtras });
+      await invoke("spawn_sidecar", { host, port });
       // Persist the extras selection and trigger reconnect in one batch so the
-      // useSidecar effect only re-runs once — after the install is done and the
-      // server is healthy. Calling setSetupExtras before the invoke would cause
-      // an early effect re-run that races check_needs_setup against setup://started
-      // and can wipe the progress bar.
+      // useSidecar effect only re-runs once — after the sidecar is healthy.
+      // Extras are installed later (in the background) by useSidecar via the
+      // separate `install_extras` command, so `spawn_sidecar` itself does not
+      // take an extras arg. Calling setSetupExtras before the invoke would
+      // cause an early effect re-run that races check_needs_setup against
+      // setup://started and can wipe the progress bar.
       completeSetup(selectedExtras);
     } catch {
       // setup://error event handles the error UI; just re-enable the button.

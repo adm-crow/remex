@@ -32,6 +32,10 @@ export function AppShell() {
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR);
   const sidecarStatus = useAppStore((s) => s.sidecarStatus);
   const sidecarError = useAppStore((s) => s.sidecarError);
+  const extrasInstalling   = useAppStore((s) => s.extrasInstalling);
+  const extrasInstallLog   = useAppStore((s) => s.extrasInstallLog);
+  const extrasInstallError = useAppStore((s) => s.extrasInstallError);
+  const setExtrasInstallError = useAppStore((s) => s.setExtrasInstallError);
   const shortcutsOpen = useAppStore((s) => s.shortcutsOpen);
   const setShortcutsOpen = useAppStore((s) => s.setShortcutsOpen);
   const triggerSidecarReconnect = useAppStore((s) => s.triggerSidecarReconnect);
@@ -43,6 +47,13 @@ export function AppShell() {
   const isDragging = useRef(false);
 
   // Note: model warmup is fired from App.tsx — don't duplicate it here.
+
+  // Hydrate API keys from the OS keyring on mount. Fire-and-forget — the
+  // setters in the store fail soft when the keyring is unavailable, so the
+  // worst case is the user re-enters the key once.
+  useEffect(() => {
+    void useAppStore.getState().hydrateApiKeys();
+  }, []);
 
   // Restore file + database watchers from the persisted lists on startup. WatchState
   // lives in Rust memory and is cleared on restart, so we re-register here once the
@@ -112,11 +123,11 @@ export function AppShell() {
   // is written. Look up the watch's stored config and re-run ingest_sqlite with
   // `incremental: true` so existing rows are deduped by hash.
   useEffect(() => {
-    const unsub = listen<{ dbPath: string }>("watch:db:changed", async (evt) => {
+    const unsub = listen<{ db_path: string }>("watch:db:changed", async (evt) => {
       const state = useAppStore.getState();
       const proj = state.currentDb;
       if (!proj) return;
-      const watch = state.watchDatabases.find((w) => w.dbPath === evt.payload.dbPath);
+      const watch = state.watchDatabases.find((w) => w.dbPath === evt.payload.db_path);
       if (!watch) return;
       const url = state.apiUrl;
       const col = watch.collection;
@@ -126,7 +137,11 @@ export function AppShell() {
       try {
         const r = await api.ingestSqlite(url, proj, col, {
           sqlite_path: watch.dbPath,
-          table:       watch.table,
+          // Exactly one of `table` / `sql_query` is sent — the watch entry's
+          // wizard enforced the mode, so trust the stored shape here.
+          ...(watch.sqlQuery
+            ? { sql_query: watch.sqlQuery }
+            : { table: watch.table ?? "" }),
           incremental: true,
           embedding_model: embeddingModel,
           ...(watch.columns     !== undefined && { columns:      watch.columns }),
@@ -148,6 +163,14 @@ export function AppShell() {
           skippedReasons:  r.skipped_reasons,
         });
         useAppStore.getState().setIngestDoneUnread(true);
+        // Same as the file-watch branch above: purge stale chunks for rows
+        // that no longer exist in the table so the collection stays consistent
+        // with the source DB.
+        try {
+          await api.purgeCollection(url, proj, col);
+        } catch (err) {
+          console.error("[watch:db] purge failed:", err);
+        }
       } catch (err) {
         console.error("[watch:db] auto-ingest failed:", err);
       }
@@ -238,6 +261,51 @@ export function AppShell() {
               className="ml-auto shrink-0 underline underline-offset-2 hover:no-underline"
             >
               Retry
+            </button>
+          </div>
+        )}
+
+        {/* Background optional-extras install (Phase 2) — Studio is fully
+            usable while this runs; the banner just lets the user see progress
+            and surfaces errors (which fall back gracefully — missing extras
+            raise ImportError on the affected feature, not a crash). */}
+        {extrasInstalling && (
+          <div
+            className="shrink-0 bg-primary/8 border-b border-primary/20 px-4 py-2 text-xs text-muted-foreground flex items-center gap-3"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="size-2 rounded-full bg-primary shrink-0 animate-pulse-dot" />
+            <span className="font-medium text-foreground shrink-0">Installing optional packages…</span>
+            {extrasInstallLog.length > 0 && (
+              <span className="font-mono truncate min-w-0 opacity-70" title={extrasInstallLog[extrasInstallLog.length - 1]}>
+                {extrasInstallLog[extrasInstallLog.length - 1]}
+              </span>
+            )}
+          </div>
+        )}
+        {extrasInstallError && !extrasInstalling && (
+          <div
+            className="shrink-0 bg-amber-500/10 border-b border-amber-500/25 px-4 py-2.5 text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2"
+            role="alert"
+          >
+            <span className="size-2 rounded-full bg-amber-500 shrink-0" />
+            <span className="shrink-0 font-medium">Optional packages didn't install:</span>
+            <span className="truncate min-w-0">{extrasInstallError}</span>
+            <button
+              onClick={() => {
+                setExtrasInstallError(null);
+                triggerSidecarReconnect();
+              }}
+              className="ml-auto shrink-0 underline underline-offset-2 hover:no-underline"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => setExtrasInstallError(null)}
+              className="shrink-0 underline underline-offset-2 hover:no-underline opacity-80"
+            >
+              Dismiss
             </button>
           </div>
         )}

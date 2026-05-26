@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  AI_API_KEY_ACCOUNT,
+  customProviderAccount,
+  deleteSecret,
+  getSecret,
+  setSecret,
+} from "@/lib/secrets";
 
 export interface RecentProject {
   path: string;
@@ -48,6 +55,10 @@ export interface ProjectDefaults {
   overlap?: number;
   chunking?: "word" | "sentence" | "recursive";
   embeddingModel?: string;
+  /** Seeds the Query pane's max-results control for this project. */
+  nResults?: number;
+  /** Seeds the Query pane's min-score filter (0–1) for this project. */
+  minScore?: number;
 }
 
 /** A user-defined embedding model entry. Surfaces in the EmbeddingModelField
@@ -68,8 +79,9 @@ export interface AgentPersona {
 }
 
 /** A user-defined OpenAI-compatible LLM endpoint (corporate gateway, Azure
- *  OpenAI, LiteLLM proxy, vLLM, etc.). The API key is never persisted — it's
- *  re-entered each session, same policy as the built-in `aiApiKey`. */
+ *  OpenAI, LiteLLM proxy, vLLM, etc.). API keys are persisted in the OS
+ *  keyring (see `studio/src/lib/secrets.ts`) — the in-memory map below is
+ *  only a session cache. */
 export interface CustomProvider {
   id:            string;
   name:          string;
@@ -92,14 +104,21 @@ export interface WatchFolder {
 
 /** Persisted watch entry for a SQLite database file. The watch fires on any
  *  write to the file (including its `-wal` / `-shm` siblings); the frontend
- *  then re-runs `ingest_sqlite` with the stored config + `incremental: true`. */
+ *  then re-runs `ingest_sqlite` with the stored config + `incremental: true`.
+ *
+ *  Exactly one of `table` or `sqlQuery` is meaningful per entry — the wizard
+ *  enforces this. Existing entries without `sqlQuery` keep working unchanged. */
 export interface WatchDatabase {
   dbPath: string;
-  table: string;
+  /** Single-table mode source. Set when sqlQuery is omitted. */
+  table?: string;
+  /** Custom SELECT/WITH statement — enables JOINs and computed columns. */
+  sqlQuery?: string;
   collection: string;
   /** Optional column subset; omitted = ingest all columns. */
   columns?: string[];
-  /** Identity column for incremental dedup; defaults to `"id"`. */
+  /** Identity column for incremental dedup; defaults to `"id"`.
+   *  Required when `sqlQuery` is set — must match one of the SELECTed columns. */
   idColumn?: string;
   /** Optional row-to-text template; omitted = default serialisation. */
   rowTemplate?: string;
@@ -118,6 +137,10 @@ export interface AppState {
   setupError: string;
   setupExtras: string[];
   setupLogLines: string[];
+  // Background optional-extras install (Phase 2 — runs after sidecar is healthy)
+  extrasInstalling:  boolean;
+  extrasInstallLog:  string[];
+  extrasInstallError: string | null;
   darkMode: boolean;
   theme: Theme;
   homeBg: HomeBg;
@@ -173,6 +196,10 @@ export interface AppState {
   completeSetup: (extras: string[]) => void;
   appendSetupLog: (line: string) => void;
   clearSetupLog: () => void;
+  setExtrasInstalling:    (v: boolean) => void;
+  appendExtrasInstallLog: (line: string) => void;
+  clearExtrasInstallLog:  () => void;
+  setExtrasInstallError:  (err: string | null) => void;
   setDarkMode: (dark: boolean) => void;
   setTheme: (theme: Theme) => void;
   setHomeBg: (bg: HomeBg) => void;
@@ -220,12 +247,17 @@ export interface AppState {
   // which live in the in-memory `customApiKeys` map below).
   customProviders:        CustomProvider[];
   activeCustomProviderId: string | null;
-  customApiKeys:          Record<string, string>; // NOT persisted (credentials)
+  // In-memory mirror of API keys, the source of truth lives in the OS keyring
+  // (see `studio/src/lib/secrets.ts`). Hydrated on boot by `hydrateApiKeys()`.
+  customApiKeys:          Record<string, string>;
   addCustomProvider:    (provider: CustomProvider) => void;
   updateCustomProvider: (id: string, patch: Partial<Omit<CustomProvider, "id">>) => void;
   removeCustomProvider: (id: string) => void;
   setActiveCustomProviderId: (id: string | null) => void;
   setCustomApiKey:      (id: string, key: string) => void;
+  /** Read all stored API keys from the OS keyring into the store. Call once
+   *  on app boot so the user doesn't have to re-enter them. */
+  hydrateApiKeys: () => Promise<void>;
   // Watch folders (persisted) — auto-ingest documents when a folder changes
   watchFolders: WatchFolder[];
   addWatchFolder:    (path: string, collection: string) => Promise<void>;
@@ -253,6 +285,9 @@ export const useAppStore = create<AppState>()(
       setupError: "",
       setupExtras: [],
       setupLogLines: [],
+      extrasInstalling: false,
+      extrasInstallLog: [],
+      extrasInstallError: null,
       sidecarReconnectSeq: 0,
       darkMode: false,
       darkModeAuto: false,
@@ -330,6 +365,10 @@ export const useAppStore = create<AppState>()(
       completeSetup:    (extras)      => set((s) => ({ setupExtras: extras, sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
       appendSetupLog:   (line)        => set((s) => ({ setupLogLines: [...s.setupLogLines.slice(-99), line] })),
       clearSetupLog:    ()            => set({ setupLogLines: [] }),
+      setExtrasInstalling:    (v)     => set({ extrasInstalling: v }),
+      appendExtrasInstallLog: (line)  => set((s) => ({ extrasInstallLog: [...s.extrasInstallLog.slice(-99), line] })),
+      clearExtrasInstallLog:  ()      => set({ extrasInstallLog: [] }),
+      setExtrasInstallError:  (err)   => set({ extrasInstallError: err }),
       triggerSidecarReconnect: ()       => set((s) => ({ sidecarReconnectSeq: s.sidecarReconnectSeq + 1 })),
       setDarkMode:       (dark)     => set({ darkMode: dark }),
       setDarkModeAuto:   (v)        => set({ darkModeAuto: v }),
@@ -347,7 +386,12 @@ export const useAppStore = create<AppState>()(
       setHomeBg:         (homeBg)   => set({ homeBg }),
       setAiProvider:          (provider) => set({ aiProvider: provider }),
       setAiModel:             (model)    => set({ aiModel: model }),
-      setAiApiKey:            (key)      => set({ aiApiKey: key }),
+      setAiApiKey: (key) => {
+        set({ aiApiKey: key });
+        // Write-through to the OS keyring so the key survives restarts.
+        // Fire-and-forget: errors are logged in the helper, never surface here.
+        void setSecret(AI_API_KEY_ACCOUNT, key);
+      },
 
       resetIngestSession: () => set({
         ingestRunning:     false,
@@ -459,7 +503,7 @@ export const useAppStore = create<AppState>()(
             p.id === id ? { ...p, ...patch } : p
           ),
         })),
-      removeCustomProvider: (id) =>
+      removeCustomProvider: (id) => {
         set((s) => {
           const { [id]: _dropped, ...remainingKeys } = s.customApiKeys;
           void _dropped;
@@ -469,10 +513,41 @@ export const useAppStore = create<AppState>()(
             // Clear the active selection if we just removed it.
             activeCustomProviderId: s.activeCustomProviderId === id ? null : s.activeCustomProviderId,
           };
-        }),
+        });
+        // Tidy up the keyring so deleting a provider also revokes its stored key.
+        void deleteSecret(customProviderAccount(id));
+      },
       setActiveCustomProviderId: (id) => set({ activeCustomProviderId: id }),
-      setCustomApiKey: (id, key) =>
-        set((s) => ({ customApiKeys: { ...s.customApiKeys, [id]: key } })),
+      setCustomApiKey: (id, key) => {
+        set((s) => ({ customApiKeys: { ...s.customApiKeys, [id]: key } }));
+        // Write-through to the OS keyring (per-provider account).
+        void setSecret(customProviderAccount(id), key);
+      },
+      hydrateApiKeys: async () => {
+        const builtin = await getSecret(AI_API_KEY_ACCOUNT);
+        // Hydrate the built-in key only when present so we don't clobber a key
+        // the user typed in the current session while we were still loading.
+        if (builtin && !get().aiApiKey) {
+          set({ aiApiKey: builtin });
+        }
+        // Custom keys — one keyring lookup per known provider.
+        const providers = get().customProviders;
+        const entries = await Promise.all(
+          providers.map(async (p) => {
+            const v = await getSecret(customProviderAccount(p.id));
+            return [p.id, v] as const;
+          }),
+        );
+        const customApiKeys = { ...get().customApiKeys };
+        let changed = false;
+        for (const [id, value] of entries) {
+          if (value && !customApiKeys[id]) {
+            customApiKeys[id] = value;
+            changed = true;
+          }
+        }
+        if (changed) set({ customApiKeys });
+      },
 
       addWatchFolder: async (path, collection) => {
         await invoke("watch_start", { folder: path }); // throws if the folder is gone
@@ -578,14 +653,13 @@ function partialize(state: AppState) {
     aiModel:               state.aiModel,
     agentPersonas:         state.agentPersonas,
     activePersonaId:       state.activePersonaId,
-    // customApiKeys intentionally NOT persisted — re-entered each session
-    // so credentials never hit plaintext localStorage.
+    // customApiKeys and aiApiKey are NOT persisted to localStorage — they
+    // live in the OS keyring instead (see `studio/src/lib/secrets.ts`).
+    // Hydrated on boot by `hydrateApiKeys()` in AppShell.
     customProviders:        state.customProviders,
     activeCustomProviderId: state.activeCustomProviderId,
     projectDefaults:       state.projectDefaults,
     customEmbeddingPresets: state.customEmbeddingPresets,
-    // aiApiKey intentionally NOT persisted — re-entered each session to avoid
-    // storing credentials in plaintext localStorage.
     homeBg:                state.homeBg,
     lastIngestResult:      state.lastIngestResult,
     collectionTypes:       state.collectionTypes,

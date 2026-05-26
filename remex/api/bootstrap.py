@@ -15,12 +15,20 @@ logger = logging.getLogger("remex.core")
 
 
 def _inject_truststore() -> None:
-    """Trust the OS native certificate store so corporate SSL-inspection proxies work."""
+    """Trust the OS native certificate store so corporate SSL-inspection proxies work.
+
+    A failure here (e.g. Windows group policy blocking keystore access) must not
+    take the sidecar down — the user can still reach plain-HTTP endpoints and the
+    error is surfaced at WARNING level.
+    """
     try:
         import truststore
     except ImportError:
         return
-    truststore.inject_into_ssl()
+    try:
+        truststore.inject_into_ssl()
+    except Exception as exc:
+        logger.warning("truststore inject failed (%s); falling back to bundled CA bundle.", exc)
 
 
 def _seed_bundled_model() -> None:

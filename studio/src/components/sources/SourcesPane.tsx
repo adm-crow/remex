@@ -1,11 +1,18 @@
 import { useState } from "react";
-import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle, FileText, Database, Pencil, RotateCcw, MessageSquare } from "lucide-react";
+import { ChevronRight, ChevronDown, Trash2, RefreshCw, AlertTriangle, FileText, Database, Pencil, RotateCcw, MessageSquare, MoreVertical } from "lucide-react";
 
 import { errMsg } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -231,13 +238,17 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
     checked: number;
   } | null>(null);
 
-  const {
-    currentCollection, setCurrentCollection,
-    setCollectionType, removeCollectionType,
-    setIncompleteCollection, clearIncompleteCollection,
-    lastIngestParamsMap, setIngestPrefill, setRequestedView,
-    setLastIngestParams, removeLastIngestParams,
-  } = useAppStore();
+  const currentCollection         = useAppStore((s) => s.currentCollection);
+  const setCurrentCollection      = useAppStore((s) => s.setCurrentCollection);
+  const setCollectionType         = useAppStore((s) => s.setCollectionType);
+  const removeCollectionType      = useAppStore((s) => s.removeCollectionType);
+  const setIncompleteCollection   = useAppStore((s) => s.setIncompleteCollection);
+  const clearIncompleteCollection = useAppStore((s) => s.clearIncompleteCollection);
+  const lastIngestParamsMap       = useAppStore((s) => s.lastIngestParamsMap);
+  const setIngestPrefill          = useAppStore((s) => s.setIngestPrefill);
+  const setRequestedView          = useAppStore((s) => s.setRequestedView);
+  const setLastIngestParams       = useAppStore((s) => s.setLastIngestParams);
+  const removeLastIngestParams    = useAppStore((s) => s.removeLastIngestParams);
 
   const { data: stats, isLoading: statsLoading } = useCollectionStats(apiUrl, dbPath, name);
   const purgeMutation  = usePurgeCollection(apiUrl, dbPath, name);
@@ -305,63 +316,62 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
           )}
         </button>
 
-        {lastIngestParams && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
-            title="Re-ingest with last parameters"
-            aria-label={`Re-ingest ${name}`}
-            onClick={() => {
-              setIngestPrefill(lastIngestParams);
-              setRequestedView("ingest");
-            }}
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </Button>
+        {purgeMutation.isPending && (
+          <RefreshCw className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" aria-label="Purging" />
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
-          onClick={handleOpenDesc}
-          title="Edit description"
-          aria-label={`Edit description for ${name}`}
-        >
-          <MessageSquare className="w-3.5 h-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
-          onClick={handlePurge}
-          disabled={purgeMutation.isPending}
-          title="Purge stale chunks"
-        >
-          <RefreshCw className={cn("w-3.5 h-3.5", purgeMutation.isPending && "animate-spin")} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
-          onClick={() => setRenameOpen(true)}
-          disabled={renameMutation.isPending}
-          title="Rename collection"
-          aria-label={`Rename collection ${name}`}
-        >
-          <Pencil className="w-3.5 h-3.5" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
-          onClick={() => setConfirmDelete(true)}
-          disabled={deleteMutation.isPending}
-          title="Delete collection"
-          aria-label={`Delete collection ${name}`}
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted shrink-0"
+              aria-label={`Actions for ${name}`}
+              title="Collection actions"
+            >
+              <MoreVertical className="w-3.5 h-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {lastIngestParams && (
+              <DropdownMenuItem
+                onSelect={() => {
+                  setIngestPrefill(lastIngestParams);
+                  setRequestedView("ingest");
+                }}
+              >
+                <RotateCcw />
+                Re-ingest with last parameters
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={handleOpenDesc}>
+              <MessageSquare />
+              Edit description
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={handlePurge}
+              disabled={purgeMutation.isPending}
+            >
+              <RefreshCw />
+              Purge stale chunks
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => setRenameOpen(true)}
+              disabled={renameMutation.isPending}
+            >
+              <Pencil />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => setConfirmDelete(true)}
+              disabled={deleteMutation.isPending}
+              className="text-destructive focus:text-destructive [&_svg]:text-destructive"
+            >
+              <Trash2 />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Delete confirmation dialog */}
@@ -487,24 +497,20 @@ function CollectionCard({ name, apiUrl, dbPath, isCurrent, collectionType, isInc
         </DialogContent>
       </Dialog>
 
-      {/* Stats row */}
+      {/* Stats row — inline dot-separated, single line */}
       {statsLoading ? (
-        <div className="px-4 pb-3 text-xs text-muted-foreground">Loading stats…</div>
+        <div className="px-4 pb-2 text-xs text-muted-foreground">Loading stats…</div>
       ) : stats ? (
-        <div className="px-4 pb-3 space-y-1.5">
-          <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <span>
-              <strong className="text-foreground tabular-nums">{stats.total_chunks.toLocaleString()}</strong>{" "}
-              chunks
-            </span>
-            <span>
-              <strong className="text-foreground tabular-nums">{stats.total_sources.toLocaleString()}</strong>{" "}
-              {collectionType === "sqlite" ? "tables" : "documents"}
-            </span>
-            <span className="font-mono text-xs">{stats.embedding_model}</span>
-          </div>
+        <div className="px-4 pb-2 space-y-1">
+          <p className="text-xs text-muted-foreground truncate" title={`${stats.total_chunks} chunks · ${stats.total_sources} ${collectionType === "sqlite" ? "tables" : "documents"} · ${stats.embedding_model}`}>
+            <span className="tabular-nums text-foreground">{stats.total_chunks.toLocaleString()}</span> chunks
+            <span className="px-1.5">·</span>
+            <span className="tabular-nums text-foreground">{stats.total_sources.toLocaleString()}</span> {collectionType === "sqlite" ? "tables" : "documents"}
+            <span className="px-1.5">·</span>
+            <span className="font-mono">{stats.embedding_model}</span>
+          </p>
           {stats.description && (
-            <p className="text-xs text-muted-foreground italic">{stats.description}</p>
+            <p className="text-xs text-muted-foreground italic truncate" title={stats.description}>{stats.description}</p>
           )}
         </div>
       ) : null}
@@ -568,13 +574,11 @@ export function SourcesPane() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 py-4 border-b flex items-center justify-between shrink-0">
-        <div>
-          <h2 className="font-semibold text-sm">Collections</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {collections.length} collection{collections.length !== 1 ? "s" : ""}
-          </p>
-        </div>
+      <div className="px-4 py-2 border-b flex items-center gap-2 shrink-0">
+        <h2 className="font-semibold text-sm">Collections</h2>
+        <span className="text-xs text-muted-foreground">
+          · {collections.length} collection{collections.length !== 1 ? "s" : ""}
+        </span>
       </div>
 
       {collections.length === 0 ? (

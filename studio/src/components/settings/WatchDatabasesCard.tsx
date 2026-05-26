@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Database, Plus, X } from "lucide-react";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import { useAppStore } from "@/store/app";
 import { useCollections } from "@/hooks/useApi";
 import { api } from "@/api/client";
 import { errMsg, basename } from "@/lib/utils";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 export function WatchDatabasesCard() {
   const {
@@ -38,6 +40,14 @@ export function WatchDatabasesCard() {
   const [collection, setCollection] = useState<string>("");
   const [wizardError, setWizardError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Source mode — same Table | SQL toggle as SQLiteTab so a watcher and a
+  // one-shot ingest can be configured identically.
+  const [sourceMode, setSourceMode] = useState<"table" | "sql">("table");
+  const [sqlQuery, setSqlQuery] = useState<string>("");
+  // Optional ingest knobs — defaults match SQLiteTab's defaults.
+  const [idColumn, setIdColumn] = useState<string>("id");
+  const [columnsCsv, setColumnsCsv] = useState<string>("");
+  const [rowTemplate, setRowTemplate] = useState<string>("");
 
   function resetWizard() {
     setWizardOpen(false);
@@ -46,6 +56,11 @@ export function WatchDatabasesCard() {
     setTable("");
     setCollection("");
     setWizardError(null);
+    setSourceMode("table");
+    setSqlQuery("");
+    setIdColumn("id");
+    setColumnsCsv("");
+    setRowTemplate("");
   }
 
   async function handlePickFile() {
@@ -67,11 +82,26 @@ export function WatchDatabasesCard() {
   }
 
   async function handleConfirm() {
-    if (!pickedPath || !table || !collection) return;
+    if (!pickedPath || !collection) return;
+    if (sourceMode === "table" && !table) return;
+    if (sourceMode === "sql" && (!sqlQuery.trim() || !idColumn.trim())) return;
     setBusy(true);
     setWizardError(null);
     try {
-      await addWatchDatabase({ dbPath: pickedPath, table, collection });
+      const cols = columnsCsv
+        .split(",")
+        .map((c) => c.trim())
+        .filter(Boolean);
+      await addWatchDatabase({
+        dbPath: pickedPath,
+        ...(sourceMode === "sql"
+          ? { sqlQuery: sqlQuery.trim() }
+          : { table }),
+        collection,
+        ...(idColumn.trim() && idColumn.trim() !== "id" && { idColumn: idColumn.trim() }),
+        ...(cols.length > 0 && { columns: cols }),
+        ...(rowTemplate.trim() && { rowTemplate: rowTemplate.trim() }),
+      });
       resetWizard();
     } catch (err) {
       setWizardError(errMsg(err));
@@ -98,7 +128,12 @@ export function WatchDatabasesCard() {
           <li key={w.dbPath} className="flex items-center gap-2">
             <div className="flex-1 min-w-0">
               <p className="text-xs font-mono truncate" title={w.dbPath}>{basename(w.dbPath)}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{w.table}</p>
+              <p
+                className="text-[10px] text-muted-foreground truncate"
+                title={w.sqlQuery ?? w.table ?? ""}
+              >
+                {w.sqlQuery ? "SQL query" : (w.table ?? "")}
+              </p>
             </div>
             <Select
               value={w.collection}
@@ -147,16 +182,90 @@ export function WatchDatabasesCard() {
             </div>
           </div>
 
+          {/* Source mode — table picker or arbitrary SQL */}
           <div className="space-y-1">
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Table</label>
-            <Select value={table} onValueChange={setTable} disabled={tables.length === 0}>
-              <SelectTrigger className="h-7 text-xs" aria-label="Table">
-                <SelectValue placeholder={tables.length === 0 ? "Pick a file first" : "Select a table"} />
-              </SelectTrigger>
-              <SelectContent>
-                {tables.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Source</label>
+            <SegmentedControl
+              value={sourceMode}
+              onChange={setSourceMode}
+              size="sm"
+              ariaLabel="Source mode"
+              options={[
+                { value: "table", label: "Table" },
+                { value: "sql",   label: "SQL query" },
+              ] as const}
+            />
+          </div>
+
+          {sourceMode === "table" ? (
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Table</label>
+              <Select value={table} onValueChange={setTable} disabled={tables.length === 0}>
+                <SelectTrigger className="h-7 text-xs" aria-label="Table">
+                  <SelectValue placeholder={tables.length === 0 ? "Pick a file first" : "Select a table"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {tables.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                SQL query <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                value={sqlQuery}
+                onChange={(e) => setSqlQuery(e.target.value)}
+                placeholder={`SELECT t.id, t.title, t.body, u.name AS author
+FROM posts t
+LEFT JOIN users u ON t.user_id = u.id`}
+                rows={5}
+                spellCheck={false}
+                disabled={!pickedPath}
+                aria-label="SQL query"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-mono resize-y placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Must be a <code>SELECT</code> / <code>WITH</code>. The <strong>ID column</strong> below
+                must match one of the SELECTed columns so re-ingest can deduplicate.
+              </p>
+            </div>
+          )}
+
+          {/* Optional ingest knobs — match SQLiteTab so auto-ingest behaviour
+              is identical to what the user originally configured. */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">ID column</label>
+              <Input
+                value={idColumn}
+                onChange={(e) => setIdColumn(e.target.value)}
+                placeholder="id"
+                className="h-7 text-xs font-mono"
+                aria-label="ID column"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Columns (CSV, optional)</label>
+              <Input
+                value={columnsCsv}
+                onChange={(e) => setColumnsCsv(e.target.value)}
+                placeholder="title, body"
+                className="h-7 text-xs"
+                aria-label="Columns"
+              />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase tracking-wider text-muted-foreground">Row template (optional)</label>
+            <Input
+              value={rowTemplate}
+              onChange={(e) => setRowTemplate(e.target.value)}
+              placeholder="{title}: {body}"
+              className="h-7 text-xs"
+              aria-label="Row template"
+            />
           </div>
 
           <div className="space-y-1">
@@ -192,7 +301,14 @@ export function WatchDatabasesCard() {
             <Button
               size="sm"
               onClick={() => void handleConfirm()}
-              disabled={busy || !pickedPath || !table || !collection}
+              disabled={
+                busy
+                || !pickedPath
+                || !collection
+                || (sourceMode === "table"
+                    ? !table
+                    : !sqlQuery.trim() || !idColumn.trim())
+              }
             >
               Add
             </Button>

@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
 
 // Must match the remex-cli version published to PyPI.
-pub const EXPECTED_VERSION: &str = "1.5.3";
+pub const EXPECTED_VERSION: &str = "2.0.0";
 pub const PYTHON_VERSION: &str = "3.13";
 
 #[derive(Serialize, Deserialize)]
@@ -65,7 +65,14 @@ fn write_setup_json(data_dir: &Path, extras: &[String]) -> Result<(), String> {
         .map_err(|e| format!("Failed to write setup.json: {e}"))
 }
 
-pub fn version_is_current(data_dir: &Path, extras: &[String]) -> bool {
+/// Check whether the base `remex-cli[api]` install is the expected version.
+///
+/// The user-selected optional extras (`formats`, `ai`, `sentence`) are tracked
+/// in `setup.json::extras` and installed in the background after the sidecar
+/// is up — see `install_extras_in_background`. They deliberately don't gate
+/// the fast path here so adding/removing an extra doesn't trigger a full
+/// venv rebuild.
+pub fn version_is_current(data_dir: &Path) -> bool {
     let path = setup_json_path(data_dir);
     let Ok(contents) = fs::read_to_string(&path) else {
         return false;
@@ -75,11 +82,18 @@ pub fn version_is_current(data_dir: &Path, extras: &[String]) -> bool {
     };
     json.remex_cli_version == EXPECTED_VERSION
         && json.python_version == PYTHON_VERSION
-        && sorted(&json.extras) == sorted(extras)
 }
 
-pub fn needs_setup(data_dir: &Path, extras: &[String]) -> bool {
-    !version_is_current(data_dir, extras) || !venv_remex_path(data_dir).exists()
+pub fn needs_setup(data_dir: &Path) -> bool {
+    !version_is_current(data_dir) || !venv_remex_path(data_dir).exists()
+}
+
+/// Extras currently installed in the venv (as recorded in `setup.json`).
+pub fn installed_extras(data_dir: &Path) -> Vec<String> {
+    let path = setup_json_path(data_dir);
+    let Ok(contents) = fs::read_to_string(&path) else { return Vec::new(); };
+    let Ok(json) = serde_json::from_str::<SetupJson>(&contents) else { return Vec::new(); };
+    json.extras
 }
 
 fn classify_uv_error(stderr: &str) -> String {
@@ -104,66 +118,12 @@ fn emit_log(app: &AppHandle, message: &str) {
 }
 
 async fn run_uv(app: &AppHandle, uv_path: &Path, args: &[&str]) -> Result<(), String> {
-    use std::process::Stdio;
-    use std::sync::{Arc, Mutex};
-    use tokio::io::{AsyncBufReadExt, BufReader};
-
-    let mut cmd = tokio::process::Command::new(uv_path);
-    cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-
-    let mut child = cmd.spawn().map_err(|e| format!("Failed to run uv: {e}"))?;
-
-    let stdout = child.stdout.take().ok_or_else(|| "uv stdout unavailable".to_string())?;
-    let stderr = child.stderr.take().ok_or_else(|| "uv stderr unavailable".to_string())?;
-
-    // stderr is captured to a buffer too so we can return it as the failure detail
-    // if the process exits non-zero. uv writes its progress (Downloading, Installed)
-    // to stderr; stdout is mostly empty.
-    let stderr_buf: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-
-    let app_out = app.clone();
-    let stdout_task = tokio::spawn(async move {
-        let mut reader = BufReader::new(stdout).lines();
-        while let Ok(Some(line)) = reader.next_line().await {
-            let t = line.trim();
-            if !t.is_empty() {
-                let _ = app_out.emit("setup://log", LogEvent { message: t.to_string() });
-            }
-        }
-    });
-
-    let app_err = app.clone();
-    let stderr_buf_clone = stderr_buf.clone();
-    let stderr_task = tokio::spawn(async move {
-        let mut reader = BufReader::new(stderr).lines();
-        while let Ok(Some(line)) = reader.next_line().await {
-            let t = line.trim();
-            if !t.is_empty() {
-                let _ = app_err.emit("setup://log", LogEvent { message: t.to_string() });
-                // Don't await while holding the lock — push and drop.
-                if let Ok(mut buf) = stderr_buf_clone.lock() {
-                    buf.push(t.to_string());
-                }
-            }
-        }
-    });
-
-    let status = child.wait().await.map_err(|e| format!("Failed to wait for uv: {e}"))?;
-
-    // Drain both readers so all events have been emitted before we return.
-    let _ = stdout_task.await;
-    let _ = stderr_task.await;
-
-    if !status.success() {
-        let buf = stderr_buf.lock().map_err(|e| e.to_string())?;
-        return Err(buf.join("\n").trim().to_string());
-    }
-    Ok(())
+    run_uv_streaming(app, uv_path, args, "setup://log").await
 }
 
-fn emit_progress(app: &AppHandle, step: &str, index: usize) {
+/// Emit a SetupScreen progress update. Public so `do_spawn` in lib.rs can
+/// drive the "starting the sidecar" phase that lives outside `ensure_ready`.
+pub fn emit_progress(app: &AppHandle, step: &str, index: usize) {
     let _ = app.emit(
         "setup://progress",
         ProgressEvent {
@@ -174,14 +134,41 @@ fn emit_progress(app: &AppHandle, step: &str, index: usize) {
     );
 }
 
-pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf, String> {
+/// Locate the bundled `uv.exe` in the app's resource directory.
+///
+/// Shared by both the first-install (`ensure_ready`) and background extras
+/// (`install_extras_in_background`) paths.
+fn find_uv(app: &AppHandle) -> Result<PathBuf, String> {
+    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "windows")]
+    let uv_bin = "uv.exe";
+    #[cfg(not(target_os = "windows"))]
+    let uv_bin = "uv";
+    // Run uv directly from the resource bundle — the file is already inside the
+    // app's install directory and trusted by Windows Defender. Copying it to
+    // %APPDATA% triggered a multi-minute AV scan on first run, blocking progress.
+    let uv_path = resource_dir.join("resources").join(uv_bin);
+    if !uv_path.exists() {
+        return Err("Installation tool not found. Please reinstall Remex Studio.".to_string());
+    }
+    Ok(uv_path)
+}
+
+/// Phase 1: ensure the venv exists with `remex-cli[api]==EXPECTED_VERSION`.
+///
+/// This is the BLOCKING part of setup — the SetupScreen stays visible until
+/// it returns and the sidecar is healthy. Optional extras (`formats`, `ai`,
+/// `sentence`) are deliberately NOT installed here; they're added afterwards
+/// by `install_extras_in_background` so the time-to-first-search drops from
+/// ~10 min to ~90 s on a cold cache.
+pub async fn ensure_ready(app: &AppHandle) -> Result<PathBuf, String> {
     let data_dir = app
         .path()
         .app_data_dir()
         .map_err(|e| e.to_string())?;
 
-    // Fast path: venv present and version + extras match
-    if version_is_current(&data_dir, extras) {
+    // Fast path: venv present and the base version matches
+    if version_is_current(&data_dir) {
         let remex = venv_remex_path(&data_dir);
         if remex.exists() {
             return Ok(remex);
@@ -198,25 +185,12 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
             .map_err(|e| format!("Failed to remove old venv: {e}"))?;
     }
 
-    // Step 0: locate uv.exe from bundled resources
+    // Step 0: locate uv.exe
     emit_progress(app, "Preparing installer…", 0);
-    let resource_dir = app
-        .path()
-        .resource_dir()
-        .map_err(|e| e.to_string())?;
-    #[cfg(target_os = "windows")]
-    let uv_bin = "uv.exe";
-    #[cfg(not(target_os = "windows"))]
-    let uv_bin = "uv";
-    // Run uv directly from the resource bundle — the file is already inside the
-    // app's install directory and trusted by Windows Defender. Copying it to
-    // %APPDATA% triggered a multi-minute AV scan on first run, blocking progress.
-    let uv_path = resource_dir.join("resources").join(uv_bin);
-    if !uv_path.exists() {
-        let msg = "Installation tool not found. Please reinstall Remex Studio.".to_string();
+    let uv_path = find_uv(app).map_err(|msg| {
         let _ = app.emit("setup://error", ErrorEvent { message: msg.clone() });
-        return Err(msg);
-    }
+        msg
+    })?;
 
     // Step 1: create venv with Python 3.13
     emit_progress(app, "Installing Python 3.13…", 1);
@@ -235,30 +209,17 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
         msg
     })?;
 
-    // Step 2: install remex-cli with selected extras into the venv
+    // Step 2: install remex-cli[api] only — extras come later
     emit_progress(app, "Installing remex-cli…", 2);
-    #[cfg(target_os = "windows")]
-    let python_path = venv_dir.join("Scripts").join("python.exe");
-    #[cfg(not(target_os = "windows"))]
-    let python_path = venv_dir.join("bin").join("python");
-    let python_str = python_path.to_str()
+    let python_str = venv_python(&venv_dir)
         .ok_or_else(|| "python path contains non-UTF-8 characters".to_string())?;
 
-    // Build extras specifier — api is always required
-    let extras_spec: String = if extras.is_empty() {
-        "api".to_string()
-    } else {
-        std::iter::once("api")
-            .chain(extras.iter().map(String::as_str))
-            .collect::<Vec<_>>()
-            .join(",")
-    };
-    let pkg = format!("remex-cli[{}]=={}", extras_spec, EXPECTED_VERSION);
+    let pkg = format!("remex-cli[api]=={}", EXPECTED_VERSION);
     emit_log(app, &format!("Installing {}…", pkg));
     run_uv(
         app,
         &uv_path,
-        &["pip", "install", &pkg, "--python", python_str],
+        &["pip", "install", &pkg, "--python", &python_str],
     )
     .await
     .map_err(|e| {
@@ -267,13 +228,179 @@ pub async fn ensure_ready(app: &AppHandle, extras: &[String]) -> Result<PathBuf,
         msg
     })?;
 
-    // Step 3: write setup.json to mark this version as installed
-    emit_progress(app, "Finalising…", 3);
-    write_setup_json(&data_dir, extras).inspect_err(|e| {
+    // Mark this version as installed. setup.json's `extras` field starts empty;
+    // Phase 2 (`install_extras_in_background`) updates it later if the user
+    // selected any optional packages. We don't emit a "Finalising…" progress
+    // step here — the visible time on screen during step 3 is dominated by the
+    // sidecar's first Python import + Windows Defender scan, not by this write.
+    // `do_spawn` in lib.rs emits its own "Starting Python sidecar…" label.
+    write_setup_json(&data_dir, &[]).inspect_err(|e| {
         let _ = app.emit("setup://error", ErrorEvent { message: e.clone() });
     })?;
 
     Ok(venv_remex_path(&data_dir))
+}
+
+/// Phase 2: install the user's chosen optional extras into the existing venv.
+///
+/// Runs AFTER `ensure_ready` has completed and the sidecar is healthy, so the
+/// user can already start querying / configuring while the heavy wheels
+/// (anthropic / openai / python-pptx / openpyxl / ebooklib / nltk) download
+/// in the background. Lazy `from xyz import …` calls inside the sidecar mean
+/// not-yet-installed extras simply raise `ImportError` until they land.
+///
+/// No-op if every requested extra is already recorded in `setup.json`.
+pub async fn install_extras_in_background(
+    app: &AppHandle,
+    requested: Vec<String>,
+) -> Result<(), String> {
+    // Allowlist matches the spawn-time validation that used to live in lib.rs.
+    for extra in &requested {
+        if !matches!(extra.as_str(), "formats" | "ai" | "sentence") {
+            return Err(format!("Unknown extra: {extra}"));
+        }
+    }
+
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let installed = installed_extras(&data_dir);
+
+    // Compute the diff. We only ADD here — uninstall is handled by the
+    // existing "Apply & reinstall" path (full venv rebuild).
+    let mut to_install: Vec<&String> = requested
+        .iter()
+        .filter(|r| !installed.iter().any(|i| i == *r))
+        .collect();
+    to_install.sort();
+    if to_install.is_empty() {
+        let _ = app.emit("extras://done", ());
+        return Ok(());
+    }
+
+    let _ = app.emit("extras://started", ());
+    emit_extras_log(
+        app,
+        &format!("Installing optional packages: {}", to_install.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ")),
+    );
+
+    let uv_path = match find_uv(app) {
+        Ok(p) => p,
+        Err(msg) => {
+            let _ = app.emit("extras://error", ErrorEvent { message: msg.clone() });
+            return Err(msg);
+        }
+    };
+
+    let venv_dir = data_dir.join("venv");
+    let python_str = venv_python(&venv_dir).ok_or_else(|| {
+        let msg = "python path contains non-UTF-8 characters".to_string();
+        let _ = app.emit("extras://error", ErrorEvent { message: msg.clone() });
+        msg
+    })?;
+
+    // Install api + every requested extra (uv treats this as an upgrade in place;
+    // existing wheels stay, new ones are pulled).
+    let extras_spec: String = std::iter::once("api")
+        .chain(requested.iter().map(String::as_str))
+        .collect::<Vec<_>>()
+        .join(",");
+    let pkg = format!("remex-cli[{}]=={}", extras_spec, EXPECTED_VERSION);
+
+    let result = run_uv_streaming(
+        app,
+        &uv_path,
+        &["pip", "install", "--upgrade", &pkg, "--python", &python_str],
+        "extras://log",
+    )
+    .await;
+
+    if let Err(e) = result {
+        let msg = classify_uv_error(&e);
+        let _ = app.emit("extras://error", ErrorEvent { message: msg.clone() });
+        return Err(msg);
+    }
+
+    // Record success — combined list of previously-installed + newly added.
+    let mut all = installed;
+    for r in &requested {
+        if !all.iter().any(|i| i == r) { all.push(r.clone()); }
+    }
+    write_setup_json(&data_dir, &all)?;
+    let _ = app.emit("extras://done", ());
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn venv_python(venv_dir: &Path) -> Option<String> {
+    venv_dir.join("Scripts").join("python.exe").to_str().map(String::from)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn venv_python(venv_dir: &Path) -> Option<String> {
+    venv_dir.join("bin").join("python").to_str().map(String::from)
+}
+
+fn emit_extras_log(app: &AppHandle, message: &str) {
+    let _ = app.emit("extras://log", LogEvent { message: message.to_string() });
+}
+
+/// Same streaming logic as `run_uv` but emits log lines on a configurable
+/// event channel (`setup://log` vs `extras://log`).
+async fn run_uv_streaming(
+    app: &AppHandle,
+    uv_path: &Path,
+    args: &[&str],
+    log_event: &'static str,
+) -> Result<(), String> {
+    use std::process::Stdio;
+    use std::sync::{Arc, Mutex};
+    use tokio::io::{AsyncBufReadExt, BufReader};
+
+    let mut cmd = tokio::process::Command::new(uv_path);
+    cmd.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let mut child = cmd.spawn().map_err(|e| format!("Failed to run uv: {e}"))?;
+    let stdout = child.stdout.take().ok_or_else(|| "uv stdout unavailable".to_string())?;
+    let stderr = child.stderr.take().ok_or_else(|| "uv stderr unavailable".to_string())?;
+
+    let stderr_buf: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let app_out = app.clone();
+    let stdout_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stdout).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let t = line.trim();
+            if !t.is_empty() {
+                let _ = app_out.emit(log_event, LogEvent { message: t.to_string() });
+            }
+        }
+    });
+
+    let app_err = app.clone();
+    let stderr_buf_clone = stderr_buf.clone();
+    let stderr_task = tokio::spawn(async move {
+        let mut reader = BufReader::new(stderr).lines();
+        while let Ok(Some(line)) = reader.next_line().await {
+            let t = line.trim();
+            if !t.is_empty() {
+                let _ = app_err.emit(log_event, LogEvent { message: t.to_string() });
+                if let Ok(mut buf) = stderr_buf_clone.lock() {
+                    buf.push(t.to_string());
+                }
+            }
+        }
+    });
+
+    let status = child.wait().await.map_err(|e| format!("Failed to wait for uv: {e}"))?;
+    let _ = stdout_task.await;
+    let _ = stderr_task.await;
+
+    if !status.success() {
+        let buf = stderr_buf.lock().map_err(|e| e.to_string())?;
+        return Err(buf.join("\n").trim().to_string());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -284,14 +411,14 @@ mod tests {
     #[test]
     fn version_is_current_false_when_file_missing() {
         let dir = tempdir().unwrap();
-        assert!(!version_is_current(dir.path(), &[]));
+        assert!(!version_is_current(dir.path()));
     }
 
     #[test]
     fn version_is_current_false_when_version_mismatch() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("setup.json"), r#"{"remex_cli_version":"0.9.0"}"#).unwrap();
-        assert!(!version_is_current(dir.path(), &[]));
+        assert!(!version_is_current(dir.path()));
     }
 
     #[test]
@@ -302,7 +429,7 @@ mod tests {
             EXPECTED_VERSION, PYTHON_VERSION
         );
         fs::write(dir.path().join("setup.json"), json).unwrap();
-        assert!(version_is_current(dir.path(), &[]));
+        assert!(version_is_current(dir.path()));
     }
 
     #[test]
@@ -310,37 +437,47 @@ mod tests {
         let dir = tempdir().unwrap();
         let json = format!(r#"{{"remex_cli_version":"{}","python_version":"3.11"}}"#, EXPECTED_VERSION);
         fs::write(dir.path().join("setup.json"), json).unwrap();
-        assert!(!version_is_current(dir.path(), &[]));
+        assert!(!version_is_current(dir.path()));
     }
 
     #[test]
     fn version_is_current_false_when_json_malformed() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("setup.json"), "not json").unwrap();
-        assert!(!version_is_current(dir.path(), &[]));
+        assert!(!version_is_current(dir.path()));
     }
 
+    // Extras list no longer gates the base version check — extras live on
+    // their own track via `installed_extras()` + `install_extras_in_background()`.
+    // Toggling an extra in Settings should not force a full venv rebuild.
     #[test]
-    fn version_is_current_extras_must_match() {
+    fn version_is_current_ignores_extras() {
         let dir = tempdir().unwrap();
         let json = format!(
             r#"{{"remex_cli_version":"{}","python_version":"{}","extras":["formats"]}}"#,
             EXPECTED_VERSION, PYTHON_VERSION
         );
         fs::write(dir.path().join("setup.json"), json).unwrap();
-        assert!(!version_is_current(dir.path(), &[]));
-        assert!(version_is_current(dir.path(), &["formats".to_string()]));
+        assert!(version_is_current(dir.path()));
     }
 
     #[test]
-    fn version_is_current_extras_order_insensitive() {
+    fn installed_extras_reads_from_setup_json() {
         let dir = tempdir().unwrap();
         let json = format!(
             r#"{{"remex_cli_version":"{}","python_version":"{}","extras":["formats","ai"]}}"#,
             EXPECTED_VERSION, PYTHON_VERSION
         );
         fs::write(dir.path().join("setup.json"), json).unwrap();
-        assert!(version_is_current(dir.path(), &["ai".to_string(), "formats".to_string()]));
+        let mut e = installed_extras(dir.path());
+        e.sort();
+        assert_eq!(e, vec!["ai".to_string(), "formats".to_string()]);
+    }
+
+    #[test]
+    fn installed_extras_empty_when_no_setup_json() {
+        let dir = tempdir().unwrap();
+        assert!(installed_extras(dir.path()).is_empty());
     }
 
     #[test]

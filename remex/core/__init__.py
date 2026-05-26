@@ -1,4 +1,11 @@
-__version__ = "1.5.0"
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+
+try:
+    __version__ = _pkg_version("remex-cli")
+except PackageNotFoundError:
+    # Source-tree fallback when the package isn't installed (e.g. running
+    # straight from a git checkout without `pip install -e .`).
+    __version__ = "0.0.0+local"
 
 from .ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
 from .config import load_config, save_config

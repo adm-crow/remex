@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import type { FormEvent } from "react";
-import { Search, Sparkles, Info, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter, Download, CheckCircle2 } from "lucide-react";
+import { Search, Sparkles, Loader2, X, FolderOpen, Inbox, SearchX, ChevronDown, Clock, Layers, Filter, Download, CheckCircle2, SlidersHorizontal } from "lucide-react";
 import { save } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import ReactMarkdown from "react-markdown";
@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SoftAlert } from "@/components/ui/soft-alert";
 import { useMultiQueryResults, useChat, useMultiChat, useCollections, useCollectionStats, useSources } from "@/hooks/useApi";
 import { useAppStore } from "@/store/app";
 import { toBibTeX, toRIS, toCSLJson, toObsidianVault } from "@/lib/exports";
@@ -82,12 +84,41 @@ function isAiNetworkError(msg: string): boolean {
 }
 
 export function QueryPane({ onFocusReady }: QueryPaneProps) {
-  const { apiUrl, currentDb, currentCollection, aiProvider, aiModel, aiApiKey,
-          agentPersonas, activePersonaId, setActivePersonaId,
-          customProviders, activeCustomProviderId, customApiKeys,
-          queryHistory, addQueryHistory, removeQueryHistory, clearQueryHistory,
-          setRequestedView } =
-    useAppStore();
+  // Narrow selectors: each subscription re-renders the pane only when its
+  // specific slice changes, instead of the destructure-everything pattern that
+  // wakes the component up on any store mutation.
+  const apiUrl                  = useAppStore((s) => s.apiUrl);
+  const currentDb               = useAppStore((s) => s.currentDb);
+  const currentCollection       = useAppStore((s) => s.currentCollection);
+  const aiProvider              = useAppStore((s) => s.aiProvider);
+  const aiModel                 = useAppStore((s) => s.aiModel);
+  const aiApiKey                = useAppStore((s) => s.aiApiKey);
+  const agentPersonas           = useAppStore((s) => s.agentPersonas);
+  const activePersonaId         = useAppStore((s) => s.activePersonaId);
+  const setActivePersonaId      = useAppStore((s) => s.setActivePersonaId);
+  const customProviders         = useAppStore((s) => s.customProviders);
+  const activeCustomProviderId  = useAppStore((s) => s.activeCustomProviderId);
+  const customApiKeys           = useAppStore((s) => s.customApiKeys);
+  const queryHistory            = useAppStore((s) => s.queryHistory);
+  const addQueryHistory         = useAppStore((s) => s.addQueryHistory);
+  const removeQueryHistory      = useAppStore((s) => s.removeQueryHistory);
+  const clearQueryHistory       = useAppStore((s) => s.clearQueryHistory);
+  const projectDefaults         = useAppStore((s) => s.projectDefaults);
+  const setProjectDefaults      = useAppStore((s) => s.setProjectDefaults);
+  const setRequestedView        = useAppStore((s) => s.setRequestedView);
+  // Per-project Query settings live on the project-defaults map so that changes
+  // made in the gear popover persist across sessions and project switches.
+  const currentProjectDefaults = currentDb ? (projectDefaults[currentDb] ?? {}) : {};
+  const nResults = currentProjectDefaults.nResults ?? 5;
+  const minScore = currentProjectDefaults.minScore ?? 0;
+  const setNResults = (v: number) => {
+    if (!currentDb) return;
+    setProjectDefaults(currentDb, { ...currentProjectDefaults, nResults: v });
+  };
+  const setMinScore = (v: number) => {
+    if (!currentDb) return;
+    setProjectDefaults(currentDb, { ...currentProjectDefaults, minScore: v });
+  };
   const activePersona = agentPersonas.find((p) => p.id === activePersonaId) ?? null;
   const agentSystemPrompt = activePersona?.systemPrompt ?? "";
 
@@ -116,8 +147,6 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const [text, setText] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [useAi, setUseAi] = useState(false);
-  const [nResults, setNResults] = useState(5);
-  const [minScore, setMinScore] = useState(0);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [selectedCollections, setSelectedCollections] = useState<string[]>(
     currentCollection ? [currentCollection] : []
@@ -138,7 +167,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     setSelectedSources([]);
   }, [currentCollection]);
 
-  // Clear query state when the user opens a different project.
+  // Clear query state when the user opens a different project. Max-results and
+  // min-score automatically re-derive from projectDefaults on the new currentDb.
   useEffect(() => {
     setText("");
     setSubmitted("");
@@ -161,11 +191,16 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
     apiUrl, currentDb ?? "", selectedCollections[0] ?? currentCollection ?? ""
   );
 
+  // Source filter is per-collection (sourcesData comes from selectedCollections[0]).
+  // Applying it across a multi-collection query would silently zero-out the
+  // other collections, so we scope the where-clause to single-collection mode.
+  const isSingleCollection = selectedCollections.length === 1;
   const whereFilter = useMemo<Record<string, unknown> | undefined>(() => {
+    if (!isSingleCollection) return undefined;
     if (selectedSources.length === 1) return { source: { "$eq": selectedSources[0] } };
     if (selectedSources.length > 1) return { source: { "$in": selectedSources } };
     return undefined;
-  }, [selectedSources]);
+  }, [isSingleCollection, selectedSources]);
 
   const multiResult = useMultiQueryResults(
     apiUrl, currentDb ?? "", selectedCollections, submitted,
@@ -340,6 +375,14 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
   const error = useAi ? chatResult.error : multiResult.error;
   const canRun = !isLoading && selectedCollections.length > 0;
 
+  // Heuristic: a query is "well-answered" when at least one result is in the
+  // strongly-relevant band (cosine ≳ 0.55 for normalized embeddings, see README).
+  // Below this, we still return the results but caveat them with a soft banner.
+  const HIGH_CONFIDENCE_THRESHOLD = 0.70;
+  const bestScore = results.length > 0 ? Math.max(...results.map((r) => r.score)) : 0;
+  const lowConfidence =
+    !!submitted && !isLoading && results.length > 0 && bestScore < HIGH_CONFIDENCE_THRESHOLD;
+
   const filteredSources = useMemo(() => {
     const q = sourceSearch.trim().toLowerCase();
     if (!q) return sourcesData;
@@ -397,24 +440,19 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           </Button>
         </form>
 
-        {/* Query history chips */}
+        {/* Recent queries — own row */}
         {queryHistory.length > 0 && (
           <div className="flex flex-wrap gap-1.5 items-center">
+            <Clock className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" aria-label="Recent" />
             {queryHistory.length > 20 && (
-              <div className="w-full">
-                <Input
-                  value={historyFilter}
-                  onChange={(e) => setHistoryFilter(e.target.value)}
-                  placeholder="Search your query history…"
-                  className="h-8 text-xs"
-                  aria-label="Search query history"
-                />
-              </div>
+              <Input
+                value={historyFilter}
+                onChange={(e) => setHistoryFilter(e.target.value)}
+                placeholder="Filter history…"
+                className="h-7 text-xs w-40"
+                aria-label="Search query history"
+              />
             )}
-            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
-              <Clock className="w-3.5 h-3.5" />
-              Recent
-            </span>
             {visibleHistory.map((q) => (
               <span
                 key={q}
@@ -441,7 +479,7 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
               <button
                 type="button"
                 onClick={clearQueryHistory}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors ml-0.5"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 Clear all
               </button>
@@ -449,175 +487,185 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
           </div>
         )}
 
-        {/* Separator between history and collections */}
-        {queryHistory.length > 0 && collections.length > 0 && (
-          <div className="h-px bg-border/60" />
-        )}
-
-        {/* Collection pills */}
-        {collections.length > 0 && (
+        {/* Collections + right-side controls — own row */}
+        {(collections.length > 0 || sourcesData.length > 0) && (
           <div className="flex flex-wrap gap-1.5 items-center">
-            <span className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider text-muted-foreground/60 mr-0.5 shrink-0">
-              <Layers className="w-3.5 h-3.5" />
-              Collections
-            </span>
-            {collections.map((col) => (
-              <CollectionPill
-                key={col}
-                col={col}
-                isSelected={selectedCollections.includes(col)}
-                apiUrl={apiUrl}
-                currentDb={currentDb ?? ""}
-                onClick={() => handleCollectionToggle(col)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Options strip — compact, secondary */}
-        <div className="flex items-center gap-3">
-
-          {/* Results count */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Results</span>
-            <Input
-              type="number" min={1} max={50}
-              value={nResults}
-              onChange={(e) => setNResults(Math.max(1, Number(e.target.value)))}
-              className="h-8 w-14 text-xs text-center px-1"
-              aria-label="Max results"
-            />
-          </div>
-
-          {/* Min score */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Min score</span>
-            <Input
-              id="min-score"
-              type="number" min={0} max={1} step={0.05}
-              value={minScore}
-              onChange={(e) => setMinScore(Number(e.target.value))}
-              className="h-8 w-16 text-xs text-center px-1"
-            />
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Persona switcher — only meaningful when AI Answer is on AND personas exist.
-              Lets the user swap the agent's voice without leaving the Query pane. */}
-          {useAi && agentPersonas.length > 0 && (
-            <Select
-              value={activePersonaId ?? ""}
-              onValueChange={(v) => setActivePersonaId(v || null)}
-            >
-              <SelectTrigger className="h-7 text-xs w-36" aria-label="Active persona">
-                <SelectValue placeholder="Persona…" />
-              </SelectTrigger>
-              <SelectContent>
-                {agentPersonas.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.name || "(unnamed)"}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* AI toggle */}
-          <div className="flex items-center gap-2">
-            <Switch
-              id="ai-toggle"
-              checked={useAi}
-              onCheckedChange={(val) => {
-                setUseAi(val);
-              }}
-              aria-label="AI answer toggle"
-            />
-            <Label
-              htmlFor="ai-toggle"
-              className="text-xs flex items-center gap-1.5 cursor-pointer select-none"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              AI Answer
-            </Label>
-          </div>
-        </div>
-
-        {/* Filter by source — collapsible chip strip */}
-        {sourcesData.length > 0 && (
-          <Collapsible open={filterOpen} onOpenChange={setFilterOpen}>
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-6 px-1.5 text-muted-foreground gap-1.5 text-xs">
-                <Filter className="w-3.5 h-3.5" />
-                Filter by source
-                {selectedSources.length > 0 && (
-                  <span className="rounded-full bg-primary text-primary-foreground text-xs px-1.5">
-                    {selectedSources.length}
-                  </span>
-                )}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="pt-1.5 space-y-1.5">
-                {sourcesData.length > 6 && (
-                  <Input
-                    value={sourceSearch}
-                    onChange={(e) => setSourceSearch(e.target.value)}
-                    placeholder="Filter sources…"
-                    className="h-8 text-xs"
-                    aria-label="Filter sources"
+            {collections.length > 0 && (
+              <>
+                <Layers className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" aria-label="Collections" />
+                {collections.map((col) => (
+                  <CollectionPill
+                    key={col}
+                    col={col}
+                    isSelected={selectedCollections.includes(col)}
+                    apiUrl={apiUrl}
+                    currentDb={currentDb ?? ""}
+                    onClick={() => handleCollectionToggle(col)}
                   />
-                )}
-                <div className="flex flex-wrap gap-1.5">
-                  {filteredSources.map((s) => {
-                    const label = basename(s.source);
-                    const isSelected = selectedSources.includes(s.source);
-                    return (
-                      <button
-                        key={s.source}
-                        type="button"
-                        title={s.source}
-                        onClick={() =>
-                          setSelectedSources((prev) =>
-                            prev.includes(s.source)
-                              ? prev.filter((x) => x !== s.source)
-                              : [...prev, s.source]
-                          )
-                        }
-                        className={cn(
-                          "text-xs px-2 py-0.5 rounded border transition-colors font-mono truncate max-w-[200px]",
-                          isSelected
-                            ? "bg-primary/10 border-primary text-primary"
-                            : "border-border text-muted-foreground hover:bg-muted"
-                        )}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                  {selectedSources.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSources([])}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                ))}
+              </>
+            )}
+
+            {/* Right-side controls — pushed to end */}
+            <div className="ml-auto flex items-center gap-1.5">
+              {/* Source filter popover — single-collection only, since the
+                  fetched source list comes from selectedCollections[0]. */}
+              {sourcesData.length > 0 && isSingleCollection && (
+                <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                      aria-label="Filter by source"
                     >
-                      Clear
-                    </button>
+                      <Filter className="w-3.5 h-3.5" />
+                      Sources
+                      {selectedSources.length > 0 && (
+                        <span className="rounded-full bg-primary text-primary-foreground text-[10px] leading-none px-1.5 py-0.5 tabular-nums">
+                          {selectedSources.length}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-80 space-y-2">
+                    {sourcesData.length > 6 && (
+                      <Input
+                        value={sourceSearch}
+                        onChange={(e) => setSourceSearch(e.target.value)}
+                        placeholder="Filter sources…"
+                        className="h-8 text-xs"
+                        aria-label="Filter sources"
+                      />
+                    )}
+                    <div className="flex flex-wrap gap-1.5 max-h-64 overflow-y-auto">
+                      {filteredSources.map((s) => {
+                        const label = basename(s.source);
+                        const isSelected = selectedSources.includes(s.source);
+                        return (
+                          <button
+                            key={s.source}
+                            type="button"
+                            title={s.source}
+                            onClick={() =>
+                              setSelectedSources((prev) =>
+                                prev.includes(s.source)
+                                  ? prev.filter((x) => x !== s.source)
+                                  : [...prev, s.source]
+                              )
+                            }
+                            className={cn(
+                              "text-xs px-2 py-0.5 rounded border transition-colors font-mono truncate max-w-[200px]",
+                              isSelected
+                                ? "bg-primary/10 border-primary text-primary"
+                                : "border-border text-muted-foreground hover:bg-muted"
+                            )}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {selectedSources.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSources([])}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Clear selection
+                      </button>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              )}
+
+              {/* Search options popover (results count, min score, persona) */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+                    aria-label="Query options"
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    {nResults}{minScore > 0 ? ` · ≥${minScore}` : ""}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-64 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="opt-n-results" className="text-xs text-muted-foreground">Max results</Label>
+                    <Input
+                      id="opt-n-results"
+                      type="number" min={1} max={50}
+                      value={nResults}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        setNResults(Number.isFinite(n) ? Math.max(1, Math.min(50, n)) : 5);
+                      }}
+                      className="h-7 w-16 text-xs text-center px-1"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label htmlFor="opt-min-score" className="text-xs text-muted-foreground">Min score</Label>
+                    <Input
+                      id="opt-min-score"
+                      type="number" min={0} max={1} step={0.05}
+                      value={minScore}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        setMinScore(Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : 0);
+                      }}
+                      className="h-7 w-20 text-xs text-center px-1"
+                    />
+                  </div>
+                  {useAi && agentPersonas.length > 0 && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Persona</Label>
+                      <Select
+                        value={activePersonaId ?? ""}
+                        onValueChange={(v) => setActivePersonaId(v || null)}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-full" aria-label="Active persona">
+                          <SelectValue placeholder="Persona…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {agentPersonas.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name || "(unnamed)"}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
-                </div>
+                </PopoverContent>
+              </Popover>
+
+              {/* AI toggle — kept visible since it's a primary control */}
+              <div className="flex items-center gap-1.5 pl-1">
+                <Switch
+                  id="ai-toggle"
+                  checked={useAi}
+                  onCheckedChange={setUseAi}
+                  aria-label="AI answer toggle"
+                />
+                <Label
+                  htmlFor="ai-toggle"
+                  className="text-xs flex items-center gap-1 cursor-pointer select-none"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  AI
+                </Label>
               </div>
-            </CollapsibleContent>
-          </Collapsible>
+            </div>
+          </div>
         )}
 
         {/* AI Agent notice — shown below the strip when toggle is on but not configured */}
         {useAi && !aiProvider && !aiModel && (
-          <div
-            className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-600 dark:text-amber-400"
-            role="alert"
-          >
-            <Info className="w-4 h-4 shrink-0" />
+          <SoftAlert>
             AI Answer requires a provider and model — configure them in{" "}
             <strong className="font-medium">Settings → AI Agent</strong>.
-          </div>
+          </SoftAlert>
         )}
       </div>
 
@@ -638,16 +686,10 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
       {!!submitted && error && (
         <div className="mx-4 mt-3 shrink-0 space-y-2">
           {useAi && isAiNetworkError(error.message) && (
-            <div
-              className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-700 dark:text-amber-400"
-              role="alert"
-            >
-              <Info className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                AI provider is unreachable — your network or corporate firewall may be blocking this endpoint.
-                Try switching to <strong>Ollama (local)</strong> in <strong>Settings → AI & Server</strong>, or check with your IT team.
-              </span>
-            </div>
+            <SoftAlert>
+              AI provider is unreachable — your network or corporate firewall may be blocking this endpoint.
+              Try switching to <strong>Ollama (local)</strong> in <strong>Settings → AI & Server</strong>, or check with your IT team.
+            </SoftAlert>
           )}
           <div
             className="flex items-start gap-2.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-sm text-destructive"
@@ -776,6 +818,15 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
             </div>
           )}
 
+          {/* Low-confidence banner — no result reached HIGH_CONFIDENCE_THRESHOLD */}
+          {lowConfidence && (
+            <SoftAlert>
+              <strong className="font-medium">No clear match</strong> — showing the closest
+              results (best score {bestScore.toFixed(2)}). Try rephrasing the query or
+              check that the relevant content has been ingested.
+            </SoftAlert>
+          )}
+
           {/* Results / Sources — AI mode gets a collapsible, vector mode is always open */}
           {!isLoading && submitted && results.length > 0 && (
             useAi ? (
@@ -820,7 +871,8 @@ export function QueryPane({ onFocusReady }: QueryPaneProps) {
                     }
                   </Button>
                 </div>
-                <div className="flex flex-col gap-2">
+                {/* 2-col on wide screens for scan-and-click; single col on narrow */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-2 items-start">
                   {results.map((r, i) => (
                     <ResultCard key={`${r.source}-${r.chunk}-${i}`} result={r} onOpenViewer={handleOpenViewer} />
                   ))}

@@ -21,7 +21,15 @@ router = APIRouter(prefix="/collections", tags=["collections"])
 
 
 def _require_absolute_db_path(db_path: str) -> str:
-    """Reject relative paths to prevent directory-traversal into unintended locations."""
+    """Reject relative paths to prevent directory-traversal into unintended locations.
+
+    Matches the rule in `_validate_db_path` (used by Pydantic Request bodies)
+    so the same input is accepted/rejected consistently whether it arrives
+    via query string or JSON body: the sentinel `"./remex_db"` is allowed,
+    everything else must be absolute.
+    """
+    if db_path == "./remex_db":
+        return db_path
     if not os.path.isabs(db_path):
         raise HTTPException(status_code=400, detail="db_path must be an absolute path")
     return db_path

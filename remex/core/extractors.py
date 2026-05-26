@@ -15,8 +15,12 @@ def extract_pdf(path: Path) -> str:
         from pypdf import PdfReader
     except ImportError:
         raise ImportError("Install pypdf: pip install pypdf")
-    reader = PdfReader(str(path))
-    return "\n".join(page.extract_text() or "" for page in reader.pages)
+    # Open the file ourselves and pass the stream to PdfReader so the OS handle
+    # is closed deterministically as soon as we finish extracting — relying on
+    # GC means a subsequent purge/rename on Windows hits WinError 32.
+    with open(path, "rb") as fh:
+        reader = PdfReader(fh)
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
 def extract_docx(path: Path) -> str:

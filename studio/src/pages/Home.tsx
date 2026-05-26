@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { X, FolderOpen, Search, Upload, Database, Sparkles } from "lucide-react";
+import { X, FolderOpen, Search, Upload, Sparkles, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/app";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ const FEATURES = [
   {
     icon: Upload,
     label: "Ingest",
-    desc: "12 file formats + SQLite",
+    desc: "Files, SQLite, custom SQL",
   },
   {
     icon: Search,
@@ -20,12 +20,12 @@ const FEATURES = [
   {
     icon: Sparkles,
     label: "AI Answer",
-    desc: "Anthropic · OpenAI · Ollama",
+    desc: "Anthropic · OpenAI · Ollama · custom",
   },
   {
-    icon: Database,
-    label: "Collections",
-    desc: "Manage your knowledge base",
+    icon: Lock,
+    label: "Private",
+    desc: "Runs entirely on your machine",
   },
 ];
 
@@ -84,8 +84,11 @@ export function Home() {
           />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Remex Studio</h1>
-            <p className="text-sm text-muted-foreground mt-1 whitespace-nowrap">
-              Unleash the power of your files with local AI.
+            <p className="text-sm font-medium text-foreground mt-1 whitespace-nowrap">
+              Stop searching. Start asking.
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5 whitespace-nowrap">
+              Local-first AI for the documents you already have.
             </p>
           </div>
         </div>

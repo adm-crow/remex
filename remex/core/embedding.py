@@ -76,10 +76,6 @@ def get_embedding_function(model_name: str) -> "EmbeddingFunction":
     return _EF_CACHE[model_name]
 
 
-def warmup(model_name: str) -> None:
-    get_embedding_function(model_name)
-
-
 # ---------------------------------------------------------------------------
 # Download-progress helpers (used by the SSE ingest route)
 # ---------------------------------------------------------------------------
