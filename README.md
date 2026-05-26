@@ -283,7 +283,7 @@ See [`studio/README.md`](studio/README.md) for the full Studio build guide.
 
 **[Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Licensing](LICENSES.md) · [Issues](https://github.com/adm-crow/remex/issues) · [GitHub](https://github.com/adm-crow/remex)**
 
-<sub>Python CLI: Apache-2.0 · Studio (v1.3.0+): FSL-1.1-MIT — see <a href="LICENSES.md">LICENSES.md</a></sub>
+<sub>Python CLI: Apache-2.0 · Studio: FSL-1.1-MIT — see <a href="LICENSES.md">LICENSES.md</a></sub>
 
 </div>
 
