@@ -227,17 +227,17 @@ Any [SBERT](https://www.sbert.net/docs/pretrained_models.html), [HuggingFace](ht
 ## 🏗 Under the hood
 
 ```
-┌────────────────┐   Tauri IPC   ┌────────────────┐  HTTP/127.0.0.1  ┌─────────────────┐
+┌────────────────┐   Tauri IPC   ┌────────────────┐  HTTP/127.0.0.1   ┌─────────────────┐
 │  Studio (TS)   │ ────────────► │  Rust shell    │ ────────────────► │ Python sidecar  │
 │  React + Vite  │ ◄──────────── │  (lib.rs)      │ ◄──────────────── │ FastAPI         │
 └────────────────┘               └────────────────┘                   └────────┬────────┘
                                                                                │
                                                                                ▼
-                                                                     ┌─────────────────┐
-                                                                     │ ChromaDB        │
-                                                                     │ FastEmbed/ONNX  │
-                                                                     │ ./remex_db/     │
-                                                                     └─────────────────┘
+                                                                      ┌─────────────────┐
+                                                                      │ ChromaDB        │
+                                                                      │ FastEmbed/ONNX  │
+                                                                      │ ./remex_db/     │
+                                                                      └─────────────────┘
 ```
 
 - **Studio** — Tauri 2 · React 18 · Zustand · react-query · shadcn / Radix UI
