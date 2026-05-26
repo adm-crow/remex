@@ -8,6 +8,8 @@
 
 *Local-first AI for the documents you already have.*
 
+<br/>
+
 [![GitHub Release](https://img.shields.io/github/v/release/adm-crow/remex?style=flat&label=Release&color=4f8ef7)](https://github.com/adm-crow/remex/releases)
 [![CI](https://img.shields.io/github/actions/workflow/status/adm-crow/remex/ci.yml?style=flat&logo=github&label=CI)](https://github.com/adm-crow/remex/actions)
 [![PyPI](https://img.shields.io/pypi/v/remex-cli?style=flat&logo=pypi&logoColor=white&label=PyPI&color=3775a9)](https://pypi.org/project/remex-cli)
@@ -23,43 +25,32 @@
 
 <br/>
 
-Remex ingests PDFs, Word docs, Markdown, spreadsheets, code, web pages, e-books, and SQLite databases into a local vector index, then lets you ask questions in plain language and get answers cited from your own files. Everything — embedding, storage, retrieval — runs on your machine. The AI provider is optional and you bring your own (Anthropic, OpenAI, Ollama, or any OpenAI-compatible endpoint).
+Remex turns any folder of documents — PDFs, Word, Markdown, spreadsheets, code, SQLite databases — into a private, searchable knowledge base. Ask questions in plain language and get cited answers from your own files. **Everything runs on your machine** unless you explicitly opt into a cloud AI provider.
 
 <br/>
 
 ---
 
-## Install
+## 🚀 Install
 
-<table>
-<tr>
-<td width="50%" valign="top">
+### 🖥️ Remex Studio — Native desktop (Windows)
 
-### 🖥️ Remex Studio
+**[⬇ Download the latest release](https://github.com/adm-crow/remex/releases)**
 
-Native desktop app for Windows. Zero terminal.
-
-**[⬇ Download the latest release][release]**
+Zero terminal. One installer. Bundles everything (Python sidecar, ChromaDB, ONNX embeddings).
 
 > [!WARNING]
-> Windows SmartScreen may flag the installer because Remex isn't code-signed with a paid certificate. The source is in this repo — audit freely. Click **More info → Run anyway** to proceed.
+> Windows SmartScreen may flag the installer because Remex isn't yet code-signed with a paid certificate. The source is in this repo — audit freely. Click **More info → Run anyway** to proceed.
 
-</td>
-<td valign="top">
-
-### ⌨️ Python CLI
+### ⌨️ Python CLI / Library
 
 ```bash
 pip install remex-cli                      # core (7 formats)
 pip install "remex-cli[formats]"           # +.pptx .xlsx .epub .html .odt
 pip install "remex-cli[ai]"                # +Anthropic & OpenAI SDKs
 pip install "remex-cli[sentence]"          # +NLTK sentence chunking
-pip install "remex-cli[all]"               # everything
+pip install "remex-cli[all]"               # everything above
 ```
-
-</td>
-</tr>
-</table>
 
 <br/>
 
@@ -77,98 +68,65 @@ pip install "remex-cli[all]"               # everything
 
 ---
 
-## Features
-
-<table>
-<tr>
-<td width="33%" valign="top">
+## ✨ What you can do
 
 ### 🔍 Search & answer
 
-- **Semantic search** across one or many collections
-- **AI Answer** — synthesised, grounded, sources cited
-- **AI personas** — save voices (Researcher, Code Q&A, …) and switch from the Query pane
-- **Low-confidence banner** when no chunk scores above `0.70`
-- **Source filter** to narrow before searching
-- **Searchable query history**
-- **Chunk viewer** with keyboard navigation
-- **Export** to JSON · CSV · Markdown · BibTeX · RIS · CSL-JSON · Obsidian vault
-
-</td>
-<td width="33%" valign="top">
+Vector similarity search across one or many collections at once. Toggle **AI Answer** for a synthesised response grounded in your files with sources cited inline. Save multiple agent **personas** (Researcher, Code Q&A, Summariser…) and switch from the Query pane. When no result hits the high-confidence threshold, a banner warns *"No clear match — showing the closest results."* Searchable query history, chunk viewer with keyboard navigation, export to JSON · CSV · Markdown · BibTeX · RIS · CSL-JSON · Obsidian vault.
 
 ### 📥 Ingest
 
-- **12 file formats**: `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.jsonl` plus `.html` `.pptx` `.xlsx` `.epub` `.odt`
-- **SQLite ingest** — single table *or* a custom SQL query with JOINs
-- **Recursive / sentence / word** chunking
-- **Incremental** — SHA-256 hash check, only changed rows / files re-processed
-- **Auto-ingest** folders and SQLite files on change (debounced)
+**Twelve file formats** out of the box: `.pdf` `.docx` `.md` `.txt` `.csv` `.json` `.jsonl`, plus `.html` `.pptx` `.xlsx` `.epub` `.odt` with the `formats` extra. **SQLite databases** ingest as single tables *or* as custom SQL queries — JOIN multiple tables, compute columns, project a view. **Auto-ingest** watches folders and SQLite files on change (debounced) and re-ingests incrementally — SHA-256 hash check means only changed rows or files are re-processed.
 
-</td>
-<td valign="top">
+### ⚙️ Make it yours
 
-### ⚙️ Manage & customise
+Every popular embedding model: **MiniLM**, **BGE**, **multilingual**, **Nomic long-context**, plus any HuggingFace / FastEmbed / Ollama model by name. **Custom OpenAI-compatible providers** for corporate gateways (Azure OpenAI, LiteLLM, vLLM, on-prem). **Per-project defaults** for chunk size, overlap, embedding model, max results, and min score. Five Settings tabs (General / Personalization / AI & Server / Auto-ingest / References), sixteen accent colours, three home backgrounds, light · dark · auto themes, and a keyboard-first UI — press `?` for shortcuts.
 
-- **All embedding models** — MiniLM, BGE, multilingual, Nomic long-context, plus any HuggingFace / FastEmbed / Ollama model by name
-- **Custom OpenAI-compatible providers** for corporate gateways (Azure OpenAI, LiteLLM, vLLM)
-- **Custom embedding presets**
-- **Per-project defaults** for chunk size, overlap, embedding model, max results, min score
-- **Collections manager** — rename, describe, purge, bulk-delete, re-ingest
-- **Light · dark · auto** themes, 16 accent colours, 3 home backgrounds
-- **Keyboard-first** — press `?` for shortcuts
-
-</td>
-</tr>
-</table>
-
-> **Remex is free and open-source.** Every feature ships in the box — no tiers, no license keys, no payment required.
+> [!NOTE]
+> **Remex is free and fully open-source.** Every feature ships in the box — no tiers, no license keys, no payment required.
 
 <br/>
 
 ---
 
-## Privacy & data flow
+## 🔐 Privacy & data flow
 
-Remex is **local-first**. Here's exactly what touches the network:
+Remex is local-first. Most users — those who don't toggle AI Answer — never see a single network packet leave their machine.
 
 | Operation | Where it runs | Network? |
 |:---|:---:|:---|
 | File / SQLite extraction & chunking | 🖥 Local | ✗ None |
-| Default embedding (`all-MiniLM-L6-v2` or any FastEmbed model) | 🖥 Local (ONNX on CPU) | ✗ None |
+| Default embedding (`all-MiniLM-L6-v2` / any FastEmbed model) | 🖥 Local (ONNX on CPU) | ✗ None |
 | Vector storage (ChromaDB) | 🖥 Local (`./remex_db/`) | ✗ None |
 | Vector search (AI Answer **off**) | 🖥 Local | ✗ None |
-| **AI Answer (on)** | ☁ Your AI provider | ✓ Question + top-N retrieved chunks sent to the endpoint *you* configured |
-| OpenAI embedding model (opt-in) | ☁ OpenAI | ✓ Document text sent to OpenAI during ingest |
-| API key storage | 🔐 OS keyring | ✗ Never on disk in plaintext, never transmitted except as the auth header on requests *you* initiate |
+| **AI Answer (on)** | ☁ Your AI provider | ✓ Question + top-N chunks |
+| OpenAI embedding model (opt-in) | ☁ OpenAI | ✓ Document text sent to OpenAI |
+| API key storage | 🔐 OS keyring | ✗ Never on disk in plaintext |
 | Sidecar HTTP listener | `127.0.0.1` loopback only | ✗ Not reachable from the LAN |
 
 > [!IMPORTANT]
-> Remex itself has **no analytics, no telemetry, and no controlled servers** in the request path. The only outbound traffic is to the AI provider you yourself configured — and only when AI Answer is enabled or you submit a query in AI mode.
+> When **AI Answer** is on, the retrieved chunks (text from your documents) are sent to the AI provider you yourself configured. That's how RAG works — the LLM needs the context to ground its answer. Remex itself has no analytics, no telemetry, and no controlled servers in the request path.
 
-For zero data egress, point AI Answer at **Ollama** (local) or a self-hosted vLLM/TGI via a Custom Provider.
+> [!TIP]
+> For **zero data egress**, point AI Answer at **Ollama** (local) or a self-hosted vLLM / TGI via a Custom Provider. Same RAG flow — nothing leaves your machine.
 
 <br/>
 
 ---
 
-## CLI quick start
+## ⚡ CLI quick start
 
 ```bash
-# Scaffold a project (creates ./docs, remex.toml, .gitignore entries)
-remex init
-
-# Ingest a folder of documents
-remex ingest ./docs
-
-# Semantic search
-remex query "how does authentication work?"
-
-# AI-synthesised answer (requires ANTHROPIC_API_KEY, OPENAI_API_KEY, or a running Ollama)
-remex query "how does authentication work?" --ai
+remex init                                  # scaffold ./docs, remex.toml, .gitignore
+remex ingest ./docs                         # ingest a folder
+remex query "how does authentication work?" # semantic search
+remex query "..." --ai                      # AI-synthesised answer
 ```
 
-### Command reference
+<details>
+<summary><strong>📖 All CLI commands</strong></summary>
+
+<br/>
 
 | Command | Description |
 |:--------|:------------|
@@ -188,7 +146,12 @@ remex query "how does authentication work?" --ai
 remex <command> --help    # full option reference for any command
 ```
 
-### Use as a library
+</details>
+
+<details>
+<summary><strong>🐍 Use as a Python library</strong></summary>
+
+<br/>
 
 ```python
 from remex import ingest, query
@@ -203,11 +166,12 @@ for r in results:
     print(f"[{r.score:.3f}] {r.source}  →  {r.text[:120]}")
 ```
 
+</details>
+
+<details>
+<summary><strong>⚙️ Configuration — <code>remex.toml</code></strong></summary>
+
 <br/>
-
----
-
-## Configuration
 
 Drop a `remex.toml` in your project root (or run `remex init`):
 
@@ -225,11 +189,20 @@ embedding_model = "all-MiniLM-L6-v2"
 
 CLI flags always override `remex.toml`. Studio writes per-project defaults via **Settings → General → Project defaults** when a project is open.
 
+</details>
+
 <br/>
 
 ---
 
-## Embedding models
+## 🧠 Embedding models
+
+The default `all-MiniLM-L6-v2` is fast, small, and good enough for most knowledge bases. Switch only when you have a specific need.
+
+<details>
+<summary><strong>Built-in presets and how to pick</strong></summary>
+
+<br/>
 
 | Preset | Model | Size | Notes |
 |:-------|:------|:----:|:------|
@@ -240,41 +213,46 @@ CLI flags always override `remex.toml`. Studio writes per-project defaults via *
 | **E5 Large** | `intfloat/e5-large-v2` | 1.3 GB | Strong retrieval benchmark |
 | **Long ctx** | `nomic-ai/nomic-embed-text-v1.5` | 547 MB | 8 192-token context |
 
-Any [SBERT](https://www.sbert.net/docs/pretrained_models.html), [HuggingFace](https://huggingface.co/models?pipeline_tag=sentence-similarity), or [Ollama](https://ollama.com/search?c=embedding) embedding model works — type the model name into the picker. Add your own to **Settings → AI & Server → Embedding presets**.
+Any [SBERT](https://www.sbert.net/docs/pretrained_models.html), [HuggingFace](https://huggingface.co/models?pipeline_tag=sentence-similarity), or [Ollama](https://ollama.com/search?c=embedding) embedding model works — type its name into the picker. Add your own to **Settings → AI & Server → Embedding presets**.
+
+</details>
 
 > [!NOTE]
-> **Score interpretation.** ChromaDB returns L2² distance; Remex converts it to `score = 1 / (1 + distance)` so values lie in `(0, 1]`. For normalised embeddings (BGE, MiniLM, Nomic, OpenAI): `0.75+` is near-paraphrase, `0.65–0.75` is strongly relevant, `0.50–0.55` is borderline noise.
+> **Score interpretation.** Remex converts ChromaDB's L2² distance to `score = 1 / (1 + distance)` so values lie in `(0, 1]`. For normalised embeddings (BGE, MiniLM, Nomic, OpenAI): **0.75+** is near-paraphrase, **0.65–0.75** is strongly relevant, **0.50–0.55** is borderline noise.
 
 <br/>
 
 ---
 
-## Under the hood
+## 🏗 Under the hood
 
 ```
-┌────────────────┐   Tauri IPC    ┌────────────────────┐   HTTP/127.0.0.1   ┌──────────────────┐
-│  Studio (TS)   │ ─────────────► │  Rust shell        │ ────────────────► │  Python sidecar  │
-│  React + Vite  │ ◄───────────── │  (lib.rs)          │ ◄──────────────── │  FastAPI         │
-└────────────────┘                └────────────────────┘                    └────────┬─────────┘
-                                                                                    │
-                                                                                    ▼
-                                                                          ┌──────────────────┐
-                                                                          │  ChromaDB        │
-                                                                          │  FastEmbed/ONNX  │
-                                                                          │  ./remex_db/     │
-                                                                          └──────────────────┘
+┌────────────────┐   Tauri IPC   ┌────────────────┐  HTTP/127.0.0.1  ┌─────────────────┐
+│  Studio (TS)   │ ────────────► │  Rust shell    │ ────────────────► │ Python sidecar  │
+│  React + Vite  │ ◄──────────── │  (lib.rs)      │ ◄──────────────── │ FastAPI         │
+└────────────────┘               └────────────────┘                   └────────┬────────┘
+                                                                               │
+                                                                               ▼
+                                                                     ┌─────────────────┐
+                                                                     │ ChromaDB        │
+                                                                     │ FastEmbed/ONNX  │
+                                                                     │ ./remex_db/     │
+                                                                     └─────────────────┘
 ```
 
-- **Studio** — Tauri 2, React 18, Zustand, react-query, shadcn/Radix UI
-- **Sidecar** — FastAPI on `127.0.0.1`, uv-managed venv in `%APPDATA%\com.remex.studio\`
-- **Indexing** — ChromaDB persistent store, FastEmbed ONNX runtime, recursive / sentence / word chunker
+- **Studio** — Tauri 2 · React 18 · Zustand · react-query · shadcn / Radix UI
+- **Sidecar** — FastAPI on `127.0.0.1` · uv-managed venv in `%APPDATA%\com.remex.studio\`
+- **Indexing** — ChromaDB persistent store · FastEmbed ONNX runtime · recursive / sentence / word chunker
 - **Secrets** — OS keyring via the [`keyring`][keyring] crate (Windows Credential Manager · macOS Keychain · libsecret)
 
 <br/>
 
 ---
 
-## Build from source
+<details>
+<summary><strong>🛠 Build from source</strong></summary>
+
+<br/>
 
 > [!TIP]
 > Studio requires [Rust][rust], [Node.js 20+][node], and the [Tauri prerequisites][tauri-prereqs] for your OS.
@@ -295,6 +273,8 @@ npm run tauri build
 
 See [`studio/README.md`](studio/README.md) for the full Studio build guide.
 
+</details>
+
 <br/>
 
 ---
@@ -307,7 +287,6 @@ See [`studio/README.md`](studio/README.md) for the full Studio build guide.
 
 </div>
 
-[release]: https://github.com/adm-crow/remex/releases
 [rust]: https://rustup.rs/
 [node]: https://nodejs.org/
 [tauri-prereqs]: https://tauri.app/start/prerequisites/
