@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import tomllib
 from pathlib import Path
 from typing import Any, Optional
@@ -28,10 +29,10 @@ def load_config(root: Optional[Path] = None) -> dict[str, dict[str, Any]]:
         db             = "./remex_db"
         collection     = "myproject"
         embedding_model = "all-MiniLM-L6-v2"
-        chunk_size     = 1000
-        overlap        = 200
+        chunk_size     = 768
+        overlap        = 150
         min_chunk_size = 50
-        chunking       = "word"
+        chunking       = "recursive"
     """
     config_path = (root or Path.cwd()) / _CONFIG_FILE
     if not config_path.exists():
@@ -103,6 +104,13 @@ _KNOWN_KEYS: tuple[str, ...] = (
 )
 
 
+def _toml_string(value: str) -> str:
+    """Quote *value* as a TOML basic string. JSON string escaping is a valid
+    subset of TOML's except for DEL, which TOML requires to be escaped — so
+    Windows paths (backslashes) and quotes round-trip through load_config."""
+    return json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
+
+
 def save_config(
     settings: dict[str, Any],
     root: Optional[Path] = None,
@@ -148,7 +156,7 @@ def save_config(
             continue
         value = settings[key]
         if isinstance(value, str):
-            remex_lines.append(f'{key} = "{value}"')
+            remex_lines.append(f"{key} = {_toml_string(value)}")
         else:
             remex_lines.append(f"{key} = {value}")
 

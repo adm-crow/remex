@@ -1,9 +1,11 @@
 import logging
+import os
 
 from fastapi import FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, Response
 
 from remex.core import __version__
@@ -33,6 +35,11 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Set by `remex serve` / `python -m remex.api` when bound to loopback —
+    # see bootstrap.restrict_hosts_for_loopback (DNS-rebinding protection).
+    allowed_hosts = [h.strip() for h in os.environ.get("REMEX_ALLOWED_HOSTS", "").split(",") if h.strip()]
+    if allowed_hosts:
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
     @app.exception_handler(Exception)
     async def _unhandled_exception_handler(

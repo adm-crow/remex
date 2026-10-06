@@ -43,11 +43,11 @@ def ingest_sqlite(
     row_template: Optional[str] = None,
     chroma_path: str = "./remex_db",
     collection_name: str = "remex",
-    chunk_size: int = 1000,
-    overlap: int = 200,
+    chunk_size: int = 768,
+    overlap: int = 150,
     min_chunk_size: int = 50,
     embedding_model: str = "all-MiniLM-L6-v2",
-    chunking: str = "word",
+    chunking: str = "recursive",
     incremental: bool = False,
     verbose: bool = True,
     on_progress: Optional[Callable[[IngestProgress], None]] = None,
@@ -72,7 +72,7 @@ def ingest_sqlite(
         overlap:          Character overlap between consecutive chunks.
         min_chunk_size:   Discard chunks shorter than this.
         embedding_model:  Embedding model name.
-        chunking:         "word" (default) or "sentence" (requires nltk).
+        chunking:         "recursive" (default), "sentence" (requires nltk), or "word".
         verbose:          Emit progress via the remex.core logger.
         on_progress:      Optional callback invoked after each row is processed.
                           Receives an :class:`IngestProgress` instance.

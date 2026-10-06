@@ -161,3 +161,24 @@ def test_save_config_integer_values_unquoted(tmp_path):
 def test_save_config_returns_absolute_path(tmp_path):
     path = save_config({"db": "./db"}, root=tmp_path)
     assert path.is_absolute()
+
+
+def test_save_config_roundtrips_windows_paths_and_quotes(tmp_path):
+    """Backslashes and quotes must be escaped — a raw Windows path used to
+    produce invalid TOML that load_config silently discarded."""
+    db = r"C:\Users\me\remex_db"
+    collection = 'my "quoted" docs'
+    save_config({"db": db, "collection": collection}, root=tmp_path)
+    cfg = load_config(tmp_path)
+    assert cfg["ingest"]["db_path"] == db
+    assert cfg["ingest"]["collection"] == collection
+
+
+def test_cli_ingest_sqlite_accepts_recursive_from_config(tmp_path, monkeypatch):
+    """`chunking = "recursive"` (the documented default) must not break ingest-sqlite."""
+    _write_toml(tmp_path, '[remex]\nchunking = "recursive"\n')
+    monkeypatch.chdir(tmp_path)
+    with patch("remex.cli.ingest_sqlite") as mock_ingest_sqlite:
+        result = CliRunner().invoke(cli, ["ingest-sqlite", "./data.db", "--table", "t"])
+    assert result.exit_code == 0, result.output
+    assert mock_ingest_sqlite.call_args.kwargs["chunking"] == "recursive"

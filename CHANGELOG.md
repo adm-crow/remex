@@ -6,6 +6,43 @@ All notable changes to `remex` are documented here.
 
 ## [Unreleased]
 
+### Fixed
+- **Renamed collections became unqueryable** — rename copied rows into a
+  collection created without remex's embedding function, so ChromaDB persisted
+  its `default` EF config and every later query/ingest failed with an EF
+  conflict (shown as "collection not found"). Rename is now an in-place
+  `modify(name=…)` (no copy, no 10,000-chunk limit), and collections already
+  broken by an older rename are rebuilt automatically on first use.
+- **CLI printed nothing** — `remex ingest` / `purge` / `reset` log through
+  `remex.core`, which lost its default handler in 1.5.0; the CLI now installs one.
+- **Watched SQLite databases re-ingested forever** — reading a WAL-mode DB
+  creates/deletes its `-wal`/`-shm` siblings, so remex's own ingest re-triggered
+  the watcher. Changes now count only when the DB's content fingerprint moves.
+- **Watched folders could loop / overlap** — Chroma's own writes no longer
+  trigger auto-ingest when the project DB sits inside a watched folder, and
+  bursts of events coalesce into one follow-up run instead of parallel ingests.
+- **Stale chunks after re-ingest** — non-incremental re-ingest of a file that
+  shrank left its trailing chunks behind, and the same file ingested via two
+  different source roots was stored twice.
+- **Cancelled ingests lost files already reported as ingested** — the pending
+  batch is now flushed before the cancellation propagates.
+- **Model-download timeout could abort a running ingest** — the SSE poller now
+  stops as soon as the ingest reports progress.
+- `save_config` wrote invalid TOML for Windows paths (unescaped backslashes),
+  which `load_config` then silently discarded.
+- `remex ingest-sqlite` rejected `chunking = "recursive"` from `remex.toml`;
+  its defaults (and `ingest_many` / `ingest_async` / `ingest_sqlite`) now match
+  `ingest()` — 768 / 150 / recursive.
+- `remex query --provider custom` is no longer offered (it cannot work without
+  Studio's base URL / auth header settings).
+- Sidecar crash message no longer comes back empty when the log contains
+  non-UTF-8 bytes.
+
+### Security
+- When bound to loopback, the API sidecar now rejects requests whose `Host`
+  header is not `127.0.0.1` / `localhost` (DNS-rebinding protection). Override
+  with `REMEX_ALLOWED_HOSTS`.
+
 ---
 
 ## [2.0.0] — 2026-05-26

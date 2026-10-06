@@ -114,3 +114,29 @@ def test_stream_rejects_invalid_overlap(client, tmp_path):
         },
     )
     assert resp.status_code == 422
+
+
+def test_model_download_timeout_does_not_abort_running_ingest(client, tmp_path):
+    """Once the ingest is emitting progress the model is loaded, so the download
+    poller's timeout must not inject an error event and kill the stream."""
+    import time
+
+    def slow_ingest(*args, on_progress=None, **kwargs):
+        on_progress(IngestProgress(
+            filename="a.txt", files_done=1, files_total=2, status="ingested", chunks_stored=1,
+        ))
+        time.sleep(1.0)
+        return _make_result()
+
+    with patch("remex.api.routes.ingest.ingest", side_effect=slow_ingest), \
+         patch("remex.api.routes.ingest.is_model_cached", return_value=False), \
+         patch("remex.api.routes.ingest._MODEL_DOWNLOAD_TIMEOUT_S", 0.3):
+        resp = client.post(
+            "/collections/test/ingest/stream",
+            json={"source_dir": str(tmp_path), "db_path": str(tmp_path / "db"),
+                  "embedding_model": "BAAI/bge-small-en-v1.5"},
+        )
+
+    types = [e["type"] for e in _parse_events(resp.text)]
+    assert "error" not in types
+    assert types[-1] == "done"

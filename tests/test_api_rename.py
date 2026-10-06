@@ -92,3 +92,30 @@ def test_rename_preserves_documents(client, populated_db):
 
     assert stats_after["total_chunks"] == stats_before["total_chunks"]
     assert stats_after["total_sources"] == stats_before["total_sources"]
+
+
+def test_renamed_collection_is_still_queryable(client, tmp_path):
+    """Regression: rename used to re-create the collection without remex's
+    embedding function, so ChromaDB persisted its "default" EF config and every
+    later query failed with an EF conflict (surfaced as "not found")."""
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "fox.txt").write_text("The quick brown fox jumps over the lazy dog. " * 4)
+    db_path = str(tmp_path / "db")
+    ingest(source_dir=str(docs_dir), db_path=db_path, collection_name="old-name", verbose=False)
+
+    resp = client.patch(
+        "/collections/old-name/rename",
+        params={"db_path": db_path},
+        json={"new_name": "renamed"},
+    )
+    assert resp.status_code == 200
+
+    resp = client.post(
+        "/collections/renamed/query",
+        json={"text": "fox", "db_path": db_path},
+    )
+
+    assert resp.status_code == 200, resp.json()
+    assert len(resp.json()) == 1
+    assert "quick brown fox" in resp.json()[0]["text"]

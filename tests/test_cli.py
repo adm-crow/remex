@@ -109,7 +109,7 @@ def test_cli_ingest_sqlite_basic(mock_ingest_sqlite):
     kw = mock_ingest_sqlite.call_args.kwargs
     assert kw["db_path"] == "./data.db"
     assert kw["table"] == "articles"
-    assert kw["chunking"] == "word"
+    assert kw["chunking"] == "recursive"
 
 
 @patch("remex.cli.ingest_sqlite")
@@ -451,3 +451,35 @@ def test_cli_studio_placeholder():
     result = CliRunner().invoke(cli, ["studio"])
     assert result.exit_code == 0
     assert "github.com/adm-crow/remex" in result.output.lower()
+
+
+# --- regressions found in the v2.0.0 review ---
+
+def test_cli_shows_core_log_output():
+    """The CLI must install a log handler: purge / ingest / reset report
+    everything through the remex.core logger and used to print nothing."""
+    from remex.core.logger import logger
+
+    def _fake_purge(**kwargs):
+        logger.info("Purged 3 stale chunk(s).")
+
+    with patch("remex.cli.purge", side_effect=_fake_purge):
+        result = CliRunner().invoke(cli, ["purge"])
+    assert result.exit_code == 0
+    assert "Purged 3 stale chunk(s)." in result.output
+
+
+def test_cli_ingest_sqlite_defaults_match_ingest():
+    with patch("remex.cli.ingest_sqlite") as mock_ingest_sqlite:
+        result = CliRunner().invoke(cli, ["ingest-sqlite", "./data.db", "--table", "t"])
+    assert result.exit_code == 0
+    kw = mock_ingest_sqlite.call_args.kwargs
+    assert (kw["chunk_size"], kw["overlap"], kw["chunking"]) == (768, 150, "recursive")
+
+
+def test_cli_query_rejects_custom_provider():
+    """`custom` needs a base_url the CLI cannot supply, so reject it up front."""
+    with patch("remex.cli.query") as mock_query:
+        result = CliRunner().invoke(cli, ["query", "q", "--ai", "--provider", "custom"])
+    assert result.exit_code == 2
+    mock_query.assert_not_called()

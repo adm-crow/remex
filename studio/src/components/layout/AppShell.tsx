@@ -13,6 +13,7 @@ import { api } from "@/api/client";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { formatDuration } from "@/lib/formatDuration";
 import { DEFAULT_EMBEDDING_MODEL } from "@/lib/constants";
+import { createCoalescingRunner, isInsideDir } from "@/lib/watchGuards";
 import { OnboardingModal } from "./OnboardingModal";
 import { KeyboardShortcutsModal } from "./KeyboardShortcutsModal";
 
@@ -71,13 +72,14 @@ export function AppShell() {
   // Global watch:changed listener — kept here (always mounted) so it survives
   // navigation away from the Settings tab where WatchFoldersCard lives.
   useEffect(() => {
-    const unsub = listen<{ folder: string; paths: string[] }>("watch:changed", async (evt) => {
+    const runSerial = createCoalescingRunner();
+    const autoIngestFolder = async (folder: string) => {
       const state = useAppStore.getState();
       const db = state.currentDb;
       if (!db) return;
-      const watch = state.watchFolders.find((w) => w.path === evt.payload.folder);
+      const watch = state.watchFolders.find((w) => w.path === folder);
       if (!watch || !watch.collection) {
-        console.warn("[watch] fired for folder without a target collection — skipping", evt.payload.folder);
+        console.warn("[watch] fired for folder without a target collection — skipping", folder);
         return;
       }
       const col = watch.collection;
@@ -87,7 +89,7 @@ export function AppShell() {
       const startedAt = new Date().toISOString();
       try {
         const result = await api.ingestFiles(url, db, col, {
-          source_dir: evt.payload.folder,
+          source_dir: folder,
           incremental: true,
           embedding_model: embeddingModel,
           ...(lastParams?.chunkSize !== undefined && { chunk_size: lastParams.chunkSize }),
@@ -96,7 +98,7 @@ export function AppShell() {
         });
         useAppStore.getState().setLastIngestResult({
           collection: col,
-          sourcePath: evt.payload.folder,
+          sourcePath: folder,
           startedAt,
           completedAt: new Date().toISOString(),
           sourcesFound:    result.sources_found,
@@ -115,6 +117,14 @@ export function AppShell() {
       } catch (err) {
         console.error("[watch] purge failed:", err);
       }
+    };
+    const unsub = listen<{ folder: string; paths: string[] }>("watch:changed", (evt) => {
+      const db = useAppStore.getState().currentDb;
+      if (!db) return;
+      // The project DB may live inside the watched folder: ignore Chroma's own
+      // writes, or every auto-ingest would trigger the next one.
+      if (evt.payload.paths.every((p) => isInsideDir(p, db))) return;
+      void runSerial(evt.payload.folder, () => autoIngestFolder(evt.payload.folder));
     });
     return () => { void unsub.then((fn) => fn()); };
   }, []);
@@ -123,11 +133,12 @@ export function AppShell() {
   // is written. Look up the watch's stored config and re-run ingest_sqlite with
   // `incremental: true` so existing rows are deduped by hash.
   useEffect(() => {
-    const unsub = listen<{ db_path: string }>("watch:db:changed", async (evt) => {
+    const runSerial = createCoalescingRunner();
+    const autoIngestDb = async (dbPath: string) => {
       const state = useAppStore.getState();
       const proj = state.currentDb;
       if (!proj) return;
-      const watch = state.watchDatabases.find((w) => w.dbPath === evt.payload.db_path);
+      const watch = state.watchDatabases.find((w) => w.dbPath === dbPath);
       if (!watch) return;
       const url = state.apiUrl;
       const col = watch.collection;
@@ -174,6 +185,9 @@ export function AppShell() {
       } catch (err) {
         console.error("[watch:db] auto-ingest failed:", err);
       }
+    };
+    const unsub = listen<{ db_path: string }>("watch:db:changed", (evt) => {
+      void runSerial(evt.payload.db_path, () => autoIngestDb(evt.payload.db_path));
     });
     return () => { void unsub.then((fn) => fn()); };
   }, []);

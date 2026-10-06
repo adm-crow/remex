@@ -102,16 +102,85 @@ def _get_existing_collection(db_path: str, collection_name: str) -> Any:
         ) from None
 
 
+_REPAIR_PAGE = 1000  # rows copied per page when rebuilding a collection
+
+
+def _repair_default_ef_config(
+    client: Any, collection_name: str, embedding_model: str, ef: Any,
+) -> bool:
+    """Rebuild a collection whose persisted embedding-function config is ChromaDB's
+    ``default`` so it can be opened with remex's EF again. Returns True if rebuilt.
+
+    Remex <= 2.0.0 renamed collections by copying rows into a collection created
+    without an embedding function, which persisted the ``default`` EF config.
+    Opening it with remex's EF then fails with an "Embedding function conflict"
+    on every query and ingest. ChromaDB cannot change a persisted EF config in
+    place, so copy the rows (stored embeddings included — nothing is re-embedded)
+    into a fresh collection and swap it in under the original name.
+
+    Only collections that carry the ``default`` config *and* were built with the
+    requested model are touched — a genuine model mismatch is left to fail loudly.
+    """
+    try:
+        old = client.get_collection(name=collection_name)
+    except (ValueError, ChromaNotFoundError):
+        return False
+    persisted_ef = (old.configuration_json or {}).get("embedding_function") or {}
+    meta = old.metadata if isinstance(old.metadata, dict) else {}
+    if persisted_ef.get("name") != "default" or meta.get("embedding_model", embedding_model) != embedding_model:
+        return False
+
+    logger.warning(
+        "Collection '%s' has a stale embedding-function config (left by an older "
+        "rename) — rebuilding it in place.", collection_name,
+    )
+    tmp_name = f"remexfix.{hashlib.md5(collection_name.encode(), usedforsecurity=False).hexdigest()[:8]}"
+    try:
+        client.delete_collection(name=tmp_name)  # leftover from an interrupted repair
+    except (ValueError, ChromaNotFoundError):
+        pass
+    tmp = client.create_collection(
+        name=tmp_name, embedding_function=ef, metadata=meta or None,  # type: ignore[arg-type]
+    )
+    total = old.count()
+    offset = 0
+    while offset < total:
+        page = old.get(
+            include=["documents", "metadatas", "embeddings"],
+            limit=_REPAIR_PAGE, offset=offset,
+        )
+        if not page["ids"]:
+            break
+        tmp.upsert(
+            ids=page["ids"], documents=page["documents"],
+            metadatas=page["metadatas"], embeddings=page["embeddings"],
+        )
+        offset += len(page["ids"])
+    if tmp.count() != total:
+        client.delete_collection(name=tmp_name)
+        raise RuntimeError(f"Repair of collection '{collection_name}' aborted: row count mismatch.")
+    client.delete_collection(name=collection_name)
+    tmp.modify(name=collection_name)
+    return True
+
+
 def _get_collection(db_path: str, collection_name: str, embedding_model: str, create: bool = True) -> Any:
     """Get or create a ChromaDB collection with the given embedding model."""
     client = _get_client(db_path)
     ef = get_embedding_function(embedding_model)
     if create:
-        collection = client.get_or_create_collection(
-            name=collection_name,
-            embedding_function=ef,  # type: ignore[arg-type]
-            metadata={"embedding_model": embedding_model},
-        )
+        def _get_or_create() -> Any:
+            return client.get_or_create_collection(
+                name=collection_name,
+                embedding_function=ef,  # type: ignore[arg-type]
+                metadata={"embedding_model": embedding_model},
+            )
+        try:
+            collection = _get_or_create()
+        except ValueError:
+            if not _repair_default_ef_config(client, collection_name, embedding_model, ef):
+                raise
+            collection = _get_or_create()
         # Warn if this collection was created with a different model.
         # collection.metadata is only a dict when set explicitly; MagicMocks
         # and pre-v0.6.1 collections (no metadata) are skipped safely.
@@ -130,22 +199,28 @@ def _get_collection(db_path: str, collection_name: str, embedding_model: str, cr
         return collection
     # Read metadata first to determine the stored embedding model, then re-fetch
     # the collection with the correct EF — avoids mutating a private attribute.
-    # Both lookups can fail (collection deleted between calls — race) so wrap
-    # them in one try/except that bubbles a clean CollectionNotFoundError.
+    # Both lookups can fail (collection deleted between calls — race); those
+    # bubble up as a clean CollectionNotFoundError. A ValueError from the second
+    # lookup is an embedding-function conflict, not a missing collection.
+    not_found = CollectionNotFoundError(f"Collection '{collection_name}' not found in '{db_path}'.")
     try:
         _meta_col = client.get_collection(name=collection_name)
-        stored_model = (
-            _meta_col.metadata.get("embedding_model")
-            if isinstance(_meta_col.metadata, dict) else None
-        ) or embedding_model
-        return client.get_collection(  # type: ignore[return-value]
-            name=collection_name,
-            embedding_function=get_embedding_function(stored_model),  # type: ignore[arg-type]
-        )
     except (ValueError, ChromaNotFoundError):
-        raise CollectionNotFoundError(
-            f"Collection '{collection_name}' not found in '{db_path}'."
-        ) from None
+        raise not_found from None
+    stored_model = (
+        _meta_col.metadata.get("embedding_model")
+        if isinstance(_meta_col.metadata, dict) else None
+    ) or embedding_model
+    stored_ef = get_embedding_function(stored_model)
+    try:
+        try:
+            return client.get_collection(name=collection_name, embedding_function=stored_ef)  # type: ignore[arg-type]
+        except ValueError:
+            if not _repair_default_ef_config(client, collection_name, stored_model, stored_ef):
+                raise
+            return client.get_collection(name=collection_name, embedding_function=stored_ef)  # type: ignore[arg-type]
+    except ChromaNotFoundError:
+        raise not_found from None
 
 
 def _make_id_abs(file_path: Path, chunk_index: int) -> str:
@@ -291,151 +366,175 @@ def _process_file_list(
             batch_ids.clear()
             batch_metas.clear()
 
+    def _clear_stale(source_str: str, stale_ids: list[str] | None) -> None:
+        if stale_ids is None:
+            collection.delete(where={"source": {"$eq": source_str}})
+        elif stale_ids:
+            collection.delete(ids=stale_ids)
+
     files_total = len(file_paths)
-    for files_done, file_path in enumerate(file_paths, 1):
-        _status: str = "skipped"
-        _skip_reason: str = ""
-        current_hash = ""
+    try:
+        for files_done, file_path in enumerate(file_paths, 1):
+            _status: str = "skipped"
+            _skip_reason: str = ""
+            current_hash = ""
+            # Chunks already stored for this source, cleared once its new text
+            # is in hand. Incremental mode knows them from the hash lookup;
+            # otherwise they are unknown (None) and cleared by source, which
+            # also drops trailing chunks of a file that shrank and IDs minted
+            # under a different source_dir root.
+            stale_ids: list[str] | None = None
 
-        try:
-            if not file_path.exists():
+            try:
+                if not file_path.exists():
+                    if verbose:
+                        logger.warning("[skip] %s: file not found", file_path.name)
+                    _skip_reason = "extract_error: file not found"
+                    result.sources_skipped += 1
+                    continue
+
+                if not is_supported(file_path):
+                    if verbose:
+                        logger.warning("[skip] %s: unsupported format", file_path.name)
+                    _skip_reason = "extract_error: unsupported format"
+                    result.sources_skipped += 1
+                    continue
+
+                source_str = make_source_str(file_path)
+
+                if incremental:
+                    current_hash = _file_hash(file_path)
+                    existing = _get_source_chunks(collection, source_str)
+                    if existing["ids"]:
+                        stored_hash = existing["metadatas"][0].get("file_hash")
+                        if stored_hash == current_hash:
+                            if verbose:
+                                logger.info("Skipping (unchanged): %s", file_path.name)
+                            _skip_reason = "hash_match"
+                            result.sources_skipped += 1
+                            continue
+                    stale_ids = existing["ids"]
+
                 if verbose:
-                    logger.warning("[skip] %s: file not found", file_path.name)
-                _skip_reason = "extract_error: file not found"
-                result.sources_skipped += 1
-                continue
+                    logger.info("Ingesting: %s", file_path.name)
 
-            if not is_supported(file_path):
-                if verbose:
-                    logger.warning("[skip] %s: unsupported format", file_path.name)
-                _skip_reason = "extract_error: unsupported format"
-                result.sources_skipped += 1
-                continue
+                use_streaming = (
+                    streaming_threshold > 0
+                    and file_path.stat().st_size > streaming_threshold
+                    and supports_streaming(file_path)
+                )
 
-            source_str = make_source_str(file_path)
-
-            if incremental:
-                current_hash = _file_hash(file_path)
-                existing = _get_source_chunks(collection, source_str)
-                if existing["ids"]:
-                    stored_hash = existing["metadatas"][0].get("file_hash")
-                    if stored_hash == current_hash:
+                if use_streaming:
+                    try:
+                        doc_meta = extract_metadata(file_path)
+                        # Flush batch before streaming — streaming does its own upserts.
+                        _flush()
+                        _clear_stale(source_str, stale_ids)
+                        n = _ingest_file_streaming(
+                            file_path,
+                            streaming_source_dir(file_path),
+                            collection, source_str,
+                            chunk_size, overlap, min_chunk_size, chunking,
+                            doc_meta, incremental, current_hash,
+                            id_fn=lambda j, fp=file_path: make_chunk_id(fp, j),
+                        )
+                    except (OSError, ValueError, RuntimeError) as e:
                         if verbose:
-                            logger.info("Skipping (unchanged): %s", file_path.name)
-                        _skip_reason = "hash_match"
+                            logger.warning("[skip] %s: %s", file_path.name, e)
+                        _status = "error"
+                        _skip_reason = f"extract_error: {e}"
                         result.sources_skipped += 1
                         continue
-                    collection.delete(ids=existing["ids"])
 
-            if verbose:
-                logger.info("Ingesting: %s", file_path.name)
+                    if n == 0:
+                        if verbose:
+                            logger.warning("[skip] %s: no text extracted", file_path.name)
+                        _skip_reason = "empty"
+                        result.sources_skipped += 1
+                        continue
 
-            use_streaming = (
-                streaming_threshold > 0
-                and file_path.stat().st_size > streaming_threshold
-                and supports_streaming(file_path)
-            )
+                    _status = "ingested"
+                    result.sources_ingested += 1
+                    result.chunks_stored += n
+                    if verbose:
+                        logger.info("  -> %d chunks stored (streamed)", n)
 
-            if use_streaming:
-                try:
-                    doc_meta = extract_metadata(file_path)
-                    # Flush batch before streaming — streaming does its own upserts.
-                    _flush()
-                    n = _ingest_file_streaming(
-                        file_path,
-                        streaming_source_dir(file_path),
-                        collection, source_str,
-                        chunk_size, overlap, min_chunk_size, chunking,
-                        doc_meta, incremental, current_hash,
-                        id_fn=lambda j, fp=file_path: make_chunk_id(fp, j),
+                else:
+                    _text_result = pre_extracted.get(file_path) or _extract_file_safe(file_path)
+                    text, _err = _text_result
+                    if _err is not None:
+                        if verbose:
+                            logger.warning("[skip] %s: %s", file_path.name, _err)
+                        _status = "error"
+                        _skip_reason = f"extract_error: {_err}"
+                        result.sources_skipped += 1
+                        continue
+
+                    # Extraction succeeded, so the old chunks no longer reflect
+                    # the file, even if it is now empty. (A failed extraction
+                    # above keeps them: a transient error must not wipe the index.)
+                    _clear_stale(source_str, stale_ids)
+
+                    chunks = chunk_text(
+                        text or "",
+                        chunk_size=chunk_size,
+                        overlap=overlap,
+                        min_chunk_size=min_chunk_size,
+                        mode=chunking,
                     )
-                except (OSError, ValueError, RuntimeError) as e:
-                    if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, e)
-                    _status = "error"
-                    _skip_reason = f"extract_error: {e}"
-                    result.sources_skipped += 1
-                    continue
+                    if not chunks:
+                        if verbose:
+                            logger.warning("[skip] %s: no text extracted", file_path.name)
+                        _skip_reason = "empty"
+                        result.sources_skipped += 1
+                        continue
 
-                if n == 0:
-                    if verbose:
-                        logger.warning("[skip] %s: no text extracted", file_path.name)
-                    _skip_reason = "empty"
-                    result.sources_skipped += 1
-                    continue
+                    ids = [make_chunk_id(file_path, i) for i in range(len(chunks))]
+                    doc_meta = extract_metadata(file_path)
+                    metadatas: list[dict[str, Any]] = [
+                        {"source_type": "file", "source": source_str, "chunk": i, **doc_meta}
+                        for i in range(len(chunks))
+                    ]
+                    if incremental:
+                        for meta in metadatas:
+                            meta["file_hash"] = current_hash
 
-                _status = "ingested"
-                result.sources_ingested += 1
-                result.chunks_stored += n
+                    batch_docs.extend(chunks)
+                    batch_ids.extend(ids)
+                    batch_metas.extend(metadatas)
+                    if len(batch_docs) >= _BATCH_LIMIT:
+                        _flush()
+
+                    result.sources_ingested += 1
+                    result.chunks_stored += len(chunks)
+                    _status = "ingested"
+                    if verbose:
+                        logger.info("  -> %d chunks stored", len(chunks))
+
+            except (InterruptedError, KeyboardInterrupt):
+                raise
+            except Exception as e:
+                _status = "error"
+                _skip_reason = f"unexpected_error: {e}"
+                result.sources_skipped += 1
                 if verbose:
-                    logger.info("  -> %d chunks stored (streamed)", n)
-
-            else:
-                _text_result = pre_extracted.get(file_path) or _extract_file_safe(file_path)
-                text, _err = _text_result
-                if _err is not None:
-                    if verbose:
-                        logger.warning("[skip] %s: %s", file_path.name, _err)
-                    _status = "error"
-                    _skip_reason = f"extract_error: {_err}"
-                    result.sources_skipped += 1
-                    continue
-
-                chunks = chunk_text(
-                    text or "",
-                    chunk_size=chunk_size,
-                    overlap=overlap,
-                    min_chunk_size=min_chunk_size,
-                    mode=chunking,
-                )
-                if not chunks:
-                    if verbose:
-                        logger.warning("[skip] %s: no text extracted", file_path.name)
-                    _skip_reason = "empty"
-                    result.sources_skipped += 1
-                    continue
-
-                ids = [make_chunk_id(file_path, i) for i in range(len(chunks))]
-                doc_meta = extract_metadata(file_path)
-                metadatas: list[dict[str, Any]] = [
-                    {"source_type": "file", "source": source_str, "chunk": i, **doc_meta}
-                    for i in range(len(chunks))
-                ]
-                if incremental:
-                    for meta in metadatas:
-                        meta["file_hash"] = current_hash
-
-                batch_docs.extend(chunks)
-                batch_ids.extend(ids)
-                batch_metas.extend(metadatas)
-                if len(batch_docs) >= _BATCH_LIMIT:
-                    _flush()
-
-                result.sources_ingested += 1
-                result.chunks_stored += len(chunks)
-                _status = "ingested"
-                if verbose:
-                    logger.info("  -> %d chunks stored", len(chunks))
-
-        except (InterruptedError, KeyboardInterrupt):
-            raise
-        except Exception as e:
-            _status = "error"
-            _skip_reason = f"unexpected_error: {e}"
-            result.sources_skipped += 1
-            if verbose:
-                logger.exception("[skip] %s: unexpected error", file_path.name)
-        finally:
-            if _skip_reason:
-                result.add_skip_reason(f"{file_path.name}: {_skip_reason}")
-            if on_progress:
-                on_progress(IngestProgress(
-                    filename=file_path.name,
-                    files_done=files_done,
-                    files_total=files_total,
-                    status=_status,  # type: ignore[arg-type]
-                    chunks_stored=result.chunks_stored,
-                ))
+                    logger.exception("[skip] %s: unexpected error", file_path.name)
+            finally:
+                if _skip_reason:
+                    result.add_skip_reason(f"{file_path.name}: {_skip_reason}")
+                if on_progress:
+                    on_progress(IngestProgress(
+                        filename=file_path.name,
+                        files_done=files_done,
+                        files_total=files_total,
+                        status=_status,  # type: ignore[arg-type]
+                        chunks_stored=result.chunks_stored,
+                    ))
+    except (InterruptedError, KeyboardInterrupt):
+        # Cancelled mid-run: persist the files already reported as ingested,
+        # whose previous chunks have already been cleared.
+        _flush()
+        raise
 
     _flush()
 
@@ -468,7 +567,7 @@ def ingest(
         embedding_model:      Embedding model name.
         incremental:          Skip files whose content hash hasn't changed since
                               the last ingest. Changed files are re-ingested.
-        chunking:             "word" (default) or "sentence" (requires nltk).
+        chunking:             "recursive" (default), "sentence" (requires nltk), or "word".
         verbose:              Emit progress via the remex.core logger.
         streaming_threshold:  Files larger than this many bytes are paged
                               through the chunker instead of being fully loaded
@@ -576,7 +675,7 @@ def query(
     # ── single collection ──────────────────────────────────────────────────
     try:
         collection = _get_collection(db_path, collection_name, embedding_model, create=False)
-    except (ValueError, ChromaNotFoundError):
+    except (CollectionNotFoundError, ChromaNotFoundError):
         raise CollectionNotFoundError(
             f"Collection '{collection_name}' not found in '{db_path}' — run ingest() first."
         ) from None
@@ -921,11 +1020,11 @@ def ingest_many(
     paths: list[str | Path],
     db_path: str = "./remex_db",
     collection_name: str = "remex",
-    chunk_size: int = 1000,
-    overlap: int = 200,
+    chunk_size: int = 768,
+    overlap: int = 150,
     min_chunk_size: int = 50,
     embedding_model: str = "all-MiniLM-L6-v2",
-    chunking: str = "word",
+    chunking: str = "recursive",
     verbose: bool = True,
     incremental: bool = False,
     streaming_threshold: int = _STREAMING_THRESHOLD,
@@ -948,7 +1047,7 @@ def ingest_many(
         overlap:             Character overlap between consecutive chunks.
         min_chunk_size:      Discard chunks shorter than this (chars).
         embedding_model:     Embedding model name.
-        chunking:            ``"word"`` (default) or ``"sentence"`` (requires nltk).
+        chunking:            ``"recursive"`` (default), ``"sentence"`` (requires nltk), or ``"word"``.
         verbose:             Emit progress via the remex.core logger.
         incremental:         Skip files whose content hash hasn't changed since the
                              last ingest. Changed files are re-ingested.
@@ -1001,12 +1100,12 @@ async def ingest_async(
     source_dir: str = "./docs",
     db_path: str = "./remex_db",
     collection_name: str = "remex",
-    chunk_size: int = 1000,
-    overlap: int = 200,
+    chunk_size: int = 768,
+    overlap: int = 150,
     min_chunk_size: int = 50,
     embedding_model: str = "all-MiniLM-L6-v2",
     incremental: bool = False,
-    chunking: str = "word",
+    chunking: str = "recursive",
     verbose: bool = True,
     streaming_threshold: int = _STREAMING_THRESHOLD,
     on_progress: Callable[[IngestProgress], None] | None = None,

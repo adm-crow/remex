@@ -52,6 +52,20 @@ def _seed_bundled_model() -> None:
         logger.warning("Bundled ONNX seed failed (%s); model will be downloaded on first use.", exc)
 
 
+def restrict_hosts_for_loopback(host: str) -> None:
+    """Only answer requests addressed to a loopback name when bound to loopback.
+
+    Binding to 127.0.0.1 alone does not stop a web page from reaching the
+    sidecar through DNS rebinding (attacker.example re-resolving to 127.0.0.1),
+    and this API can read and index arbitrary local folders. ``create_app``
+    rejects any other Host header once ``REMEX_ALLOWED_HOSTS`` is set. A sidecar
+    deliberately exposed on another interface is left unrestricted, and an
+    explicit ``REMEX_ALLOWED_HOSTS`` always wins.
+    """
+    if host in ("127.0.0.1", "localhost"):
+        os.environ.setdefault("REMEX_ALLOWED_HOSTS", "127.0.0.1,localhost")
+
+
 def bootstrap_sidecar() -> None:
     """Run once before uvicorn starts. Idempotent."""
     _inject_truststore()

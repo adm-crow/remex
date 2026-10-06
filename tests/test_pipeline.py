@@ -1224,3 +1224,113 @@ def test_warmup_collections_skips_collections_without_model(tmp_path):
 
     assert result == ["all-MiniLM-L6-v2"]
     assert mock_get_ef.call_count == 1
+
+
+# --- regressions found in the v2.0.0 review ---
+
+def _real_ingest(docs_dir, db_path, **kwargs):
+    return ingest(source_dir=str(docs_dir), db_path=str(db_path), verbose=False, **kwargs)
+
+
+def test_collection_with_default_ef_config_is_repaired(tmp_path):
+    """Collections renamed by remex <= 2.0.0 were re-created without an
+    embedding function, so ChromaDB persisted its "default" EF config. Opening
+    them with remex's EF must self-heal instead of failing on every call."""
+    from remex.core.pipeline import _get_client
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "fox.txt").write_text("The quick brown fox jumps over the lazy dog. " * 4)
+    db = tmp_path / "db"
+    _real_ingest(docs, db, collection_name="original")
+
+    # Reproduce the old rename: copy rows into a collection created without an EF.
+    client = _get_client(str(db))
+    old = client.get_collection("original")
+    data = old.get(include=["documents", "metadatas", "embeddings"])
+    broken = client.create_collection("renamed", metadata=old.metadata)
+    broken.upsert(
+        ids=data["ids"], documents=data["documents"],
+        metadatas=data["metadatas"], embeddings=data["embeddings"],
+    )
+    client.delete_collection("original")
+
+    results = query("fox", db_path=str(db), collection_name="renamed")
+    assert len(results) == 1
+    assert "fox" in results[0]["text"]
+
+    # Re-ingesting into the repaired collection must work too.
+    (docs / "cat.txt").write_text("A sleepy cat naps on the warm windowsill all day. " * 4)
+    result = _real_ingest(docs, db, collection_name="renamed")
+    assert result.sources_ingested == 2
+    assert client.get_collection("renamed").count() == 2
+
+
+def test_reingest_of_shrunk_file_removes_stale_chunks(tmp_path):
+    """Non-incremental re-ingest must not leave trailing chunks behind when a
+    file now produces fewer chunks than before."""
+    from remex.core.pipeline import _get_client
+
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    f = docs / "notes.txt"
+    f.write_text(" ".join(f"Sentence number {i} has some words." for i in range(60)))
+    db = tmp_path / "db"
+    _real_ingest(docs, db, chunk_size=200, overlap=20)
+    col = _get_client(str(db)).get_collection("remex")
+    assert col.count() > 3
+
+    f.write_text("Now the file is short but still above the minimum chunk size.")
+    _real_ingest(docs, db, chunk_size=200, overlap=20)
+
+    assert col.count() == 1
+
+
+def test_same_file_via_different_source_dir_is_not_duplicated(tmp_path):
+    """Chunk IDs are relative to source_dir, so ingesting a file through a
+    parent and then a child directory used to store it twice."""
+    from remex.core.pipeline import _get_client
+
+    sub = tmp_path / "docs" / "sub"
+    sub.mkdir(parents=True)
+    (sub / "a.txt").write_text("Alpha beta gamma delta epsilon zeta eta theta iota kappa.")
+    db = tmp_path / "db"
+    _real_ingest(tmp_path / "docs", db)
+    _real_ingest(sub, db)
+
+    assert _get_client(str(db)).get_collection("remex").count() == 1
+
+
+def test_cancelled_ingest_persists_files_already_reported(mock_chroma, tmp_path):
+    """Files reported as ingested via on_progress must be flushed even when the
+    run is cancelled afterwards (cancel = InterruptedError from the callback)."""
+    docs = make_docs_dir(
+        tmp_path,
+        ("a.txt", "Content of A " * 20),
+        ("b.txt", "Content of B " * 20),
+    )
+
+    def _cancel_on_second(p):
+        if p.files_done == 2:
+            raise InterruptedError("cancelled")
+
+    with pytest.raises(InterruptedError):
+        ingest(source_dir=docs, db_path=str(tmp_path / "db"), verbose=False,
+               on_progress=_cancel_on_second)
+
+    assert mock_chroma.upsert.called
+
+
+def test_library_ingest_defaults_are_consistent():
+    """ingest_many / ingest_async / ingest_sqlite must share ingest()'s chunking defaults."""
+    import inspect
+    from remex.core.sqlite_ingester import ingest_sqlite
+
+    def _defaults(fn):
+        params = inspect.signature(fn).parameters
+        return {k: params[k].default for k in ("chunk_size", "overlap", "chunking")}
+
+    expected = _defaults(ingest)
+    assert _defaults(ingest_many) == expected
+    assert _defaults(ingest_async) == expected
+    assert _defaults(ingest_sqlite) == expected

@@ -5,7 +5,7 @@ from pathlib import Path
 import click
 
 from remex.core import __version__
-from remex.core.logger import logger
+from remex.core.logger import setup_logging
 from remex.core.ai import DEFAULT_MODELS, PROVIDERS, detect_provider, generate_answer
 from remex.core.config import load_config
 from remex.core.exceptions import RemexError
@@ -41,6 +41,9 @@ class _RemexGroup(click.Group):
 @click.version_option(__version__, prog_name="remex")
 def cli() -> None:
     """remex — local RAG: ingest files, query semantically."""
+    # remex.core reports progress through its logger, which ships without a
+    # handler (library hygiene) — give CLI users their output back.
+    setup_logging()
 
 
 @cli.command(name="ingest")
@@ -161,23 +164,23 @@ def ingest_cmd(
 )
 @click.option(
     "--chunk-size",
-    default=1000,
+    default=768,
     show_default=True,
     type=click.IntRange(min=1),
     help="Target characters per chunk.",
 )
 @click.option(
     "--overlap",
-    default=200,
+    default=150,
     show_default=True,
     type=click.IntRange(min=0),
     help="Character overlap between chunks.",
 )
 @click.option(
     "--chunking",
-    default="word",
+    default="recursive",
     show_default=True,
-    type=click.Choice(["word", "sentence"]),
+    type=click.Choice(["recursive", "word", "sentence"]),
     help="Chunking strategy.",
 )
 @click.option(
@@ -260,7 +263,8 @@ def ingest_sqlite_cmd(
 @click.option(
     "--provider",
     default=None,
-    type=click.Choice(list(PROVIDERS), case_sensitive=False),
+    # "custom" needs a base_url / auth header only Studio can supply.
+    type=click.Choice([p for p in PROVIDERS if p != "custom"], case_sensitive=False),
     help="LLM provider (anthropic, openai, ollama). Auto-detected if omitted.",
 )
 @click.option(
@@ -503,7 +507,7 @@ def init_cmd(path: str) -> None:
         gitignore = root / ".gitignore"
         entry = "remex_db/"
         if gitignore.exists():
-            if entry not in gitignore.read_text().splitlines():
+            if entry not in gitignore.read_text(encoding="utf-8", errors="replace").splitlines():
                 with gitignore.open("a", encoding="utf-8") as f:
                     f.write(f"\n# remex\n{entry}\n")
                 click.echo(f"  updated  .gitignore  ({entry})")
@@ -602,11 +606,10 @@ def delete_source_cmd(source: str, db_path: str, collection: str, yes: bool) -> 
 def serve_cmd(host: str, port: int, reload: bool) -> None:
     """Start the remex FastAPI sidecar."""
     import logging
-    import os
-    from remex.api.bootstrap import bootstrap_sidecar
-    from remex.core.logger import setup_logging
+    from remex.api.bootstrap import bootstrap_sidecar, restrict_hosts_for_loopback
     setup_logging(level=logging.INFO, log_file=os.environ.get("REMEX_LOG_FILE"))
     bootstrap_sidecar()
+    restrict_hosts_for_loopback(host)
     try:
         import uvicorn
     except ImportError:

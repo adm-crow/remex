@@ -213,9 +213,12 @@ async fn do_spawn(
     let mut phase: u8 = 0;
     while std::time::Instant::now() < deadline {
         if let Ok(Some(status)) = child.try_wait() {
+            // Lossy: Python's redirected stderr uses the ANSI code page on
+            // Windows, and one non-UTF-8 byte would otherwise blank the tail.
             let log = log_path
                 .as_ref()
-                .and_then(|p| fs::read_to_string(p).ok())
+                .and_then(|p| fs::read(p).ok())
+                .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
                 .unwrap_or_default();
             let tail: String = log.lines().rev().take(20).collect::<Vec<_>>()
                 .into_iter().rev().collect::<Vec<_>>().join("\n");

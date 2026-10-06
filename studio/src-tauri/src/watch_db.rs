@@ -6,12 +6,20 @@
 //! down to names that match the target database file or any of its WAL/SHM/
 //! journal siblings. Rollback-journal mode is also covered by the same prefix
 //! match (`<db>-journal`).
+//!
+//! Merely *reading* the database also touches those siblings: opening it
+//! creates an empty `-wal`/`-shm`, readers rewrite `-shm`, and the last
+//! connection deletes both on close. Remex's own ingest is such a reader, so
+//! reacting to every event would re-trigger ingest forever. Events therefore
+//! only count when the database's content fingerprint (main file + non-empty
+//! WAL) actually changed.
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
 use notify::{recommended_watcher, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Serialize;
@@ -38,6 +46,31 @@ pub struct DbChangedEvent {
 struct DebounceState {
     pending:   bool,
     last_emit: Instant,
+    last_fp:   DbFingerprint,
+}
+
+/// Size + mtime of the main database file and of its WAL — only while the WAL
+/// holds frames, since readers create and delete an empty one. `-shm` (the WAL
+/// index, rewritten by readers) and the rollback journal (whose commit always
+/// lands in the main file) are deliberately ignored.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DbFingerprint {
+    main: Option<(u64, Option<SystemTime>)>,
+    wal:  Option<(u64, Option<SystemTime>)>,
+}
+
+fn file_signature(path: &Path) -> Option<(u64, Option<SystemTime>)> {
+    let meta = fs::metadata(path).ok()?;
+    Some((meta.len(), meta.modified().ok()))
+}
+
+fn fingerprint(db: &Path) -> DbFingerprint {
+    let mut wal = db.as_os_str().to_owned();
+    wal.push("-wal");
+    DbFingerprint {
+        main: file_signature(db),
+        wal:  file_signature(Path::new(&wal)).filter(|(len, _)| *len > 0),
+    }
 }
 
 pub struct WatcherEntry {
@@ -82,11 +115,13 @@ pub fn watch_db_start(
     let debounce_state = Arc::new(Mutex::new(DebounceState {
         pending:   false,
         last_emit: Instant::now() - DEBOUNCE * 2,
+        last_fp:   fingerprint(&file_pb),
     }));
 
     let cb_state   = debounce_state.clone();
     let cb_handle  = app.clone();
     let cb_db_path = db_path.clone();
+    let cb_db_file = file_pb.clone();
     let cb_target  = target_name.clone();
 
     let mut watcher = recommended_watcher(move |res: Result<Event, notify::Error>| {
@@ -97,7 +132,10 @@ pub fn watch_db_start(
             p.file_name().map(|n| name_matches(n, &cb_target)).unwrap_or(false)
         });
         if !relevant { return; }
+        let fp = fingerprint(&cb_db_file);
         let mut s = cb_state.lock().unwrap_or_else(|e| e.into_inner());
+        if fp == s.last_fp { return; } // a reader touched the siblings, content unchanged
+        s.last_fp = fp;
         s.pending = true;
         if s.last_emit.elapsed() >= DEBOUNCE {
             s.pending = false;
@@ -173,6 +211,47 @@ mod tests {
         assert!(!name_matches(OsStr::new("foo.sqlite.bak"), &target)); // dot separator, not dash
         assert!(!name_matches(OsStr::new("foo.sql"),       &target));
         assert!(!name_matches(OsStr::new("foo.sqlitex"),   &target)); // no separator at all
+    }
+
+    fn temp_db(tag: &str) -> PathBuf {
+        let nanos = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_nanos();
+        let dir = std::env::temp_dir().join(format!("remex-watchdb-{tag}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let db = dir.join("app.sqlite");
+        fs::write(&db, b"SQLite format 3\0 main pages").unwrap();
+        db
+    }
+
+    fn sibling(db: &Path, suffix: &str) -> PathBuf {
+        let mut s = db.as_os_str().to_owned();
+        s.push(suffix);
+        PathBuf::from(s)
+    }
+
+    #[test]
+    fn fingerprint_ignores_reader_side_effects() {
+        let db = temp_db("reader");
+        let before = fingerprint(&db);
+        // What opening/reading the database does: empty WAL, rewritten SHM, then both deleted.
+        fs::write(sibling(&db, "-wal"), b"").unwrap();
+        fs::write(sibling(&db, "-shm"), b"wal-index read marks").unwrap();
+        assert_eq!(fingerprint(&db), before);
+        fs::remove_file(sibling(&db, "-wal")).unwrap();
+        fs::remove_file(sibling(&db, "-shm")).unwrap();
+        assert_eq!(fingerprint(&db), before);
+        let _ = fs::remove_dir_all(db.parent().unwrap());
+    }
+
+    #[test]
+    fn fingerprint_changes_on_real_writes() {
+        let db = temp_db("writer");
+        let before = fingerprint(&db);
+        fs::write(sibling(&db, "-wal"), b"wal frame with a committed row").unwrap();
+        let after_wal_write = fingerprint(&db);
+        assert_ne!(after_wal_write, before);
+        fs::write(&db, b"SQLite format 3\0 main pages + checkpointed row").unwrap();
+        assert_ne!(fingerprint(&db), after_wal_write);
+        let _ = fs::remove_dir_all(db.parent().unwrap());
     }
 
     #[test]

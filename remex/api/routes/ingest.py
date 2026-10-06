@@ -35,8 +35,12 @@ async def _sse_ingest(
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[dict] = asyncio.Queue()
     cancel_event = threading.Event()
+    # The embedding model loads before the first file is processed, so the
+    # first progress event proves it is ready whatever the cache probe says.
+    model_ready = threading.Event()
 
     def _on_progress(p: IngestProgress) -> None:
+        model_ready.set()
         # Raise immediately if the client disconnected — stops the ingest thread.
         if cancel_event.is_set():
             raise InterruptedError("Ingest cancelled by client")
@@ -81,26 +85,28 @@ async def _sse_ingest(
         """Emit model_download events every 500 ms while fastembed fetches the model.
 
         Bounded by ``_MODEL_DOWNLOAD_TIMEOUT_S`` so a stalled download surfaces as an
-        explicit error event instead of polling forever.
+        explicit error event instead of polling forever. Stops as soon as the
+        ingest reports progress, so the timeout can never abort a running ingest
+        whose model the cache probe failed to recognise.
         """
         if is_model_cached(model_name):
             return
         expected = get_model_expected_bytes(model_name)
         deadline = loop.time() + _MODEL_DOWNLOAD_TIMEOUT_S
         while True:
-            downloaded = get_model_downloaded_bytes(model_name)
-            await queue.put({
-                "type": "model_download",
-                "downloaded_bytes": downloaded,
-                "total_bytes": expected,
-            })
-            if is_model_cached(model_name):
+            if model_ready.is_set() or is_model_cached(model_name):
                 await queue.put({
                     "type": "model_download",
                     "downloaded_bytes": expected,
                     "total_bytes": expected,
                 })
                 return
+            downloaded = get_model_downloaded_bytes(model_name)
+            await queue.put({
+                "type": "model_download",
+                "downloaded_bytes": downloaded,
+                "total_bytes": expected,
+            })
             if loop.time() > deadline:
                 await queue.put({
                     "type": "error",

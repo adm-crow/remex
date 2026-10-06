@@ -27,6 +27,18 @@ class CustomFormatter(logging.Formatter):
         return logging.Formatter(log_fmt, date_fmt).format(record)
 
 
+class _StderrHandler(logging.StreamHandler):
+    """StreamHandler that always writes to the *current* ``sys.stderr``, so it
+    keeps working when stderr is swapped (Click's CliRunner, pytest capture)."""
+
+    def __init__(self) -> None:
+        logging.Handler.__init__(self)
+
+    @property
+    def stream(self):  # type: ignore[override]
+        return sys.stderr
+
+
 logger = logging.getLogger("remex.core")
 logger.setLevel(logging.INFO)
 logger.propagate = False  # prevent double output when the root logger has handlers
@@ -55,7 +67,7 @@ def setup_logging(
         logger.addHandler(fh)
     else:
         # Console handler (stderr) for CLI / library usage.
-        ch = logging.StreamHandler(sys.stderr)
+        ch = _StderrHandler()
         ch.setLevel(level)
         ch.setFormatter(CustomFormatter())
         logger.addHandler(ch)
