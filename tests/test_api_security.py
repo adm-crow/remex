@@ -24,6 +24,18 @@ def test_loopback_allow_list_rejects_foreign_host(monkeypatch):
     assert TestClient(app, base_url="http://attacker.example:37421").get("/health").status_code == 400
 
 
+def test_allow_list_applies_to_app_built_before_serve_sets_it(monkeypatch):
+    """`remex serve` sets REMEX_ALLOWED_HOSTS after `remex.api` (and its module
+    level `app`) has already been imported — the check must still apply."""
+    from remex.api.main import app
+
+    _clear_allowed_hosts(monkeypatch)
+    assert TestClient(app, base_url="http://attacker.example").get("/health").status_code == 200
+    monkeypatch.setenv("REMEX_ALLOWED_HOSTS", "127.0.0.1,localhost")
+    assert TestClient(app, base_url="http://attacker.example").get("/health").status_code == 400
+    assert TestClient(app, base_url="http://127.0.0.1:37421").get("/health").status_code == 200
+
+
 def test_no_allow_list_by_default(monkeypatch):
     _clear_allowed_hosts(monkeypatch)
     app = create_app()

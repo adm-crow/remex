@@ -7,6 +7,7 @@ from fastapi.exceptions import HTTPException as FastAPIHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse, Response
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from remex.core import __version__
 from remex.api.routes import collections, ingest, query, system
@@ -22,6 +23,29 @@ _ALLOWED_ORIGINS = [
 ]
 
 
+class _EnvTrustedHostMiddleware:
+    """Host-header allow-list from ``REMEX_ALLOWED_HOSTS`` (DNS-rebinding
+    protection — see bootstrap.restrict_hosts_for_loopback). No-op when unset.
+
+    Read per request, not at build time: the module-level ``app`` is created
+    when ``remex.api`` is first imported, before ``remex serve`` /
+    ``python -m remex.api`` know which interface they bind to.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+        self._configured: str | None = None
+        self._inner: ASGIApp = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        allowed = os.environ.get("REMEX_ALLOWED_HOSTS", "")
+        if allowed != self._configured:
+            hosts = [h.strip() for h in allowed.split(",") if h.strip()]
+            self._inner = TrustedHostMiddleware(self.app, allowed_hosts=hosts) if hosts else self.app
+            self._configured = allowed
+        await self._inner(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Remex API",
@@ -35,11 +59,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    # Set by `remex serve` / `python -m remex.api` when bound to loopback —
-    # see bootstrap.restrict_hosts_for_loopback (DNS-rebinding protection).
-    allowed_hosts = [h.strip() for h in os.environ.get("REMEX_ALLOWED_HOSTS", "").split(",") if h.strip()]
-    if allowed_hosts:
-        app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+    app.add_middleware(_EnvTrustedHostMiddleware)
 
     @app.exception_handler(Exception)
     async def _unhandled_exception_handler(
