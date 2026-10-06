@@ -477,6 +477,34 @@ def test_cli_ingest_sqlite_defaults_match_ingest():
     assert (kw["chunk_size"], kw["overlap"], kw["chunking"]) == (768, 150, "recursive")
 
 
+def test_cli_ingest_sqlite_sql_query_mode():
+    sql = "SELECT a.id, a.title, b.name FROM albums a JOIN artists b ON b.id = a.artist_id"
+    with patch("remex.cli.ingest_sqlite") as mock_ingest_sqlite:
+        result = CliRunner().invoke(cli, ["ingest-sqlite", "./data.db", "--sql", sql])
+    assert result.exit_code == 0, result.output
+    kw = mock_ingest_sqlite.call_args.kwargs
+    assert kw["sql_query"] == sql
+    assert kw["table"] is None
+
+
+def test_cli_ingest_sqlite_rejects_table_and_sql_together():
+    with patch("remex.cli.ingest_sqlite") as mock_ingest_sqlite:
+        result = CliRunner().invoke(cli, [
+            "ingest-sqlite", "./data.db", "--table", "t", "--sql", "SELECT 1 AS id",
+        ])
+    assert result.exit_code == 2
+    mock_ingest_sqlite.assert_not_called()
+
+
+def test_cli_ingest_sqlite_incremental_flag():
+    with patch("remex.cli.ingest_sqlite") as mock_ingest_sqlite:
+        CliRunner().invoke(cli, ["ingest-sqlite", "./data.db", "--table", "t"])
+        assert mock_ingest_sqlite.call_args.kwargs["incremental"] is False
+        result = CliRunner().invoke(cli, ["ingest-sqlite", "./data.db", "--table", "t", "--incremental"])
+    assert result.exit_code == 0
+    assert mock_ingest_sqlite.call_args.kwargs["incremental"] is True
+
+
 def test_cli_query_rejects_custom_provider():
     """`custom` needs a base_url the CLI cannot supply, so reject it up front."""
     with patch("remex.cli.query") as mock_query:

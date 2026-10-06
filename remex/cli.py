@@ -137,7 +137,19 @@ def ingest_cmd(
 
 @cli.command(name="ingest-sqlite")
 @click.argument("db_path")
-@click.option("--table", required=True, help="Table name to ingest.")
+@click.option("--table", default=None, help="Table name to ingest (or use --sql).")
+@click.option(
+    "--sql",
+    "sql_query",
+    default=None,
+    help="SELECT / WITH query to ingest instead of a table (e.g. a JOIN). "
+    "Must return the --id-column.",
+)
+@click.option(
+    "--incremental",
+    is_flag=True,
+    help="Skip rows whose content hasn't changed since the last ingest.",
+)
 @click.option(
     "--db",
     "chroma_path",
@@ -198,7 +210,9 @@ def ingest_cmd(
 )
 def ingest_sqlite_cmd(
     db_path: str,
-    table: str,
+    table: str | None,
+    sql_query: str | None,
+    incremental: bool,
     chroma_path: str,
     collection: str,
     columns: str | None,
@@ -210,7 +224,9 @@ def ingest_sqlite_cmd(
     min_chunk_size: int,
     embedding_model: str,
 ) -> None:
-    """Ingest records from a SQLite DB_PATH table into ChromaDB."""
+    """Ingest records from a SQLite DB_PATH table or query into ChromaDB."""
+    if (table is None) == (sql_query is None):
+        raise click.UsageError("Provide exactly one of --table or --sql.")
     columns_list = (
         [c.strip() for c in columns.split(",") if c.strip()] if columns else None
     )
@@ -218,6 +234,8 @@ def ingest_sqlite_cmd(
         ingest_sqlite(
             db_path=db_path,
             table=table,
+            sql_query=sql_query,
+            incremental=incremental,
             columns=columns_list,
             id_column=id_column,
             row_template=row_template,
