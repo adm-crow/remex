@@ -6,6 +6,18 @@ All notable changes to `remex` are documented here.
 
 ## [Unreleased]
 
+### Added
+- `remex ingest-sqlite --sql "SELECT …"` (custom query / JOIN mode, as in
+  Studio) and `--incremental`; `--table` is no longer required (exactly one of
+  `--table` / `--sql`).
+
+### Changed
+- Default Anthropic model is now `claude-sonnet-5-5` (was `claude-sonnet-4-5`).
+  Answers get a 16,000-token budget (current models think by default and
+  thinking shares `max_tokens` with the reply), and safety refusals are
+  reported as such instead of "response contained no text block".
+- Studio: `npm audit fix` within existing semver ranges (20 of 27 advisories).
+
 ### Fixed
 - **Renamed collections became unqueryable** — rename copied rows into a
   collection created without remex's embedding function, so ChromaDB persisted

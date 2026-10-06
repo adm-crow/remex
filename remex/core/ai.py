@@ -11,10 +11,12 @@ from typing import Optional
 PROVIDERS = ("anthropic", "openai", "ollama", "custom")
 
 DEFAULT_MODELS: dict[str, str] = {
-    "anthropic": "claude-sonnet-4-5",
+    "anthropic": "claude-sonnet-5-5",
     "openai": "gpt-4o",
     "ollama": "llama3",
 }
+
+_ANTHROPIC_MAX_TOKENS = 16000
 
 _SYSTEM_PROMPT = (
     "You are a helpful assistant. "
@@ -118,7 +120,6 @@ def _answer_anthropic(
 ) -> str:
     try:
         import anthropic  # type: ignore[import-untyped]
-        from anthropic.types import TextBlock  # type: ignore[import-untyped]
     except ImportError:
         raise ImportError("Anthropic SDK not installed. Run: pip install anthropic")
     key = api_key or os.getenv("ANTHROPIC_API_KEY")
@@ -130,7 +131,9 @@ def _answer_anthropic(
     try:
         response = client.messages.create(
             model=model,
-            max_tokens=1024,
+            # Current models think by default and thinking shares this budget
+            # with the answer, so leave room for both.
+            max_tokens=_ANTHROPIC_MAX_TOKENS,
             system=system,
             messages=[{"role": "user", "content": question}],
         )
@@ -141,9 +144,17 @@ def _answer_anthropic(
         raise RuntimeError(f"Anthropic API error ({e.status_code}): {e.message}") from e
     except anthropic.APIError as e:
         raise RuntimeError(f"Anthropic API error: {e}") from e
-    text_block = next((b for b in response.content if isinstance(b, TextBlock)), None)
+    if response.stop_reason == "refusal":
+        category = getattr(getattr(response, "stop_details", None), "category", None)
+        raise RuntimeError(
+            "Anthropic declined to answer this request"
+            + (f" (safety category: {category})" if category else "")
+            + ". Rephrase the question or choose another model."
+        )
+    # The response can start with thinking blocks — read the first text block.
+    text_block = next((b for b in response.content if getattr(b, "type", None) == "text"), None)
     if text_block is None:
-        raise RuntimeError("Anthropic response contained no text block.")
+        raise RuntimeError(f"Anthropic response contained no text (stop_reason: {response.stop_reason}).")
     return text_block.text
 
 
