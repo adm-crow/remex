@@ -112,6 +112,24 @@ describe("SetupScreen", () => {
     expect(reconnect).toHaveBeenCalledOnce();
   });
 
+  it("shows the error when the sidecar fails to start after the install", async () => {
+    // ensure_ready failures emit setup://error, but a sidecar that dies on
+    // start (e.g. its port is taken) only rejects spawn_sidecar. That used to
+    // leave the progress screen spinning forever.
+    const { invoke } = await import("@tauri-apps/api/core");
+    vi.mocked(invoke).mockRejectedValueOnce(
+      "Port 8000 on 127.0.0.1 is already in use by another program",
+    );
+    useAppStore.setState({ sidecarStatus: "setup_config" } as any);
+    renderWithProviders(<SetupScreen />);
+
+    fireEvent.click(screen.getByRole("button", { name: /install/i }));
+
+    expect(await screen.findByText(/already in use by another program/i)).toBeInTheDocument();
+    expect(useAppStore.getState().sidecarStatus).toBe("setup_error");
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+  });
+
   it("calls invoke and completeSetup on install click", async () => {
     const { invoke } = await import("@tauri-apps/api/core");
     const completeSetup = vi.fn();

@@ -66,6 +66,11 @@ fn is_loopback(host: &str) -> bool {
     matches!(host, "127.0.0.1" | "::1" | "localhost")
 }
 
+/// True when something already listens on `host:port`.
+fn port_in_use(host: &str, port: u16) -> bool {
+    std::net::TcpListener::bind((host, port)).is_err()
+}
+
 #[tauri::command]
 async fn check_needs_setup(app: AppHandle) -> bool {
     let Ok(data_dir) = app.path().app_data_dir() else { return true; };
@@ -114,6 +119,16 @@ async fn do_spawn(
     port: u16,
 ) -> Result<(), String> {
     let remex_path = setup::ensure_ready(app).await?;
+
+    // Another program on the port would make the sidecar die on bind after its
+    // slow first import, with only a cryptic WinError in the log. Say so up front.
+    if port_in_use(&host, port) {
+        return Err(format!(
+            "Port {port} on {host} is already in use by another program, so the Remex \
+             sidecar cannot start. Close that program, or change the port of the API URL \
+             in Settings → AI & Server (for example http://127.0.0.1:37421)."
+        ));
+    }
 
     // The Python sidecar's first import (chromadb + onnxruntime + fastembed + …)
     // can take several minutes on a cold install — on Windows the dominant cost
@@ -390,4 +405,18 @@ pub fn run() {
                 };
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn port_in_use_detects_a_listener() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        assert!(port_in_use("127.0.0.1", port));
+        drop(listener);
+        assert!(!port_in_use("127.0.0.1", port));
+    }
 }

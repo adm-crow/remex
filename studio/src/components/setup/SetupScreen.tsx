@@ -65,6 +65,8 @@ export function SetupScreen() {
   const completeSetup = useAppStore((s) => s.completeSetup);
   const clearSetupLog = useAppStore((s) => s.clearSetupLog);
   const setSetupProgress = useAppStore((s) => s.setSetupProgress);
+  const setSetupError = useAppStore((s) => s.setSetupError);
+  const setSidecarStatus = useAppStore((s) => s.setSidecarStatus);
 
   const [selectedExtras, setSelectedExtras] = useState<string[]>(setupExtras);
   const [installing, setInstalling] = useState(false);
@@ -108,8 +110,14 @@ export function SetupScreen() {
       // cause an early effect re-run that races check_needs_setup against
       // setup://started and can wipe the progress bar.
       completeSetup(selectedExtras);
-    } catch {
-      // setup://error event handles the error UI; just re-enable the button.
+    } catch (err) {
+      // Install failures already arrived as setup://error. A sidecar that dies
+      // on start after a successful install (e.g. its port is taken) only
+      // rejects here — surface it, or the progress screen spins forever.
+      if (useAppStore.getState().sidecarStatus !== "setup_error") {
+        setSetupError(String(err));
+        setSidecarStatus("setup_error");
+      }
       setInstalling(false);
     }
   }
